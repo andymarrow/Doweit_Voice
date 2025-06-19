@@ -52,7 +52,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         },
         { name: 'Audio Bookers', icon: FiBookOpen, href: '/agents/audiobookers' },
         { name: 'Alan AI', icon: FiCpu, href: '/agents/alanai' },
-        { name: 'Character AI', icon: FiMessageCircle, href: '/agents/characterai' },
+        { name: 'Character AI', icon: FiMessageCircle, href: '/characterai' },
         { name: 'Meeting Leader', icon: FiUsers, href: '/agents/meetingleader' },
         { name: 'Call Agents', icon: FiPhoneCall, href: '/callagents' },
         { name: 'Tutor', icon: FaMicrophoneAlt, href: '/agents/tutor' },

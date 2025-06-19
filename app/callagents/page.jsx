@@ -67,7 +67,7 @@ function CallAgentsMainPage() {
                         <FiFilter className="text-gray-600 dark:text-gray-300" />
                     </button>
                     {/* Create Agent Button */}
-                    <Link href="/agents/create">
+                    <Link href="/callagents/create">
                          <button className={`inline-flex items-center text-sm font-semibold px-4 py-2 rounded-md shadow ${accentButtonClasses} flex-shrink-0`}>
                              <FiPlus className="mr-2" />
                              Create Agent

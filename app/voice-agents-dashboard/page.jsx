@@ -30,7 +30,7 @@ const agentTools = [
     { name: 'Audio Booker', icon: FiBookOpen, href: '/agents/audiobooker' },
     { name: 'Call Agents', icon: FiPhoneCall, href: '/callagents' }, // Note: Duplicate href with Meeting Leader
     { name: 'Tutor', icon: FaMicrophoneAlt, href: '/agents/tutor' },
-    { name: 'Character AI', icon: FiMessageCircle, href: '/agents/characterai' },
+    { name: 'Character AI', icon: FiMessageCircle, href: '/characterai' },
     { name: 'Meeting Leader', icon: FiUsers, href: '/agents/meetingleader' }, // Note: Duplicate href with Call Agents
     // Add more tools as needed
 ];

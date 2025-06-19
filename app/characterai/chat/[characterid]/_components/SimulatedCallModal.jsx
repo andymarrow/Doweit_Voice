@@ -1,20 +1,21 @@
-// voice-agents-dashboard/chat/[characterid]/_components/SimulatedCallModal.jsx
+// characterai/chat/[characterid]/_components/SimulatedCallModal.jsx
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import Image from 'next/image'; // Import Image
-import { FiX, FiPhoneOff, FiPhoneCall, FiVolume2, FiMicOff, FiMic } from 'react-icons/fi'; // Icons
+import Image from 'next/image';
+import { FiX, FiPhoneOff, FiPhoneCall, FiVolume2, FiMicOff, FiMic } from 'react-icons/fi';
 
-// Import constants - Adjust path as necessary
-import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Using the path provided
+// Import constants - Adjusted path as necessary
+import { uiColors } from '@/app/characterai/_constants/uiConstants'; // Corrected path
 
-function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar }) {
+// Expect characterAvatarUrl instead of just characterAvatar
+function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatarUrl }) { // Changed prop name
     const [callStatus, setCallStatus] = useState('connecting'); // 'connecting', 'ongoing', 'ended'
     const [callDuration, setCallDuration] = useState(0); // seconds
     const [isMuted, setIsMuted] = useState(false); // State for muting
 
-    const intervalRef = useRef(null); // Ref for the timer interval
-    const modalRef = useRef(null); // Ref for click outside
+    const intervalRef = useRef(null);
+    const modalRef = useRef(null);
 
     // Timer effect
     useEffect(() => {
@@ -26,7 +27,7 @@ function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar })
             clearInterval(intervalRef.current);
         }
 
-        return () => clearInterval(intervalRef.current); // Cleanup on unmount or status change
+        return () => clearInterval(intervalRef.current);
     }, [isOpen, callStatus]);
 
     // Effect to handle call flow simulation
@@ -42,24 +43,28 @@ function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar })
 
             return () => clearTimeout(connectTimeout);
         } else {
-            setCallStatus('ended');
+             // When modal closes, set status to ended immediately for cleanup/closing effect
+             setCallStatus('ended');
+             // No need for a timeout to call onClose, parent handles isOpen state
         }
     }, [isOpen]);
 
-     // Handle clicks outside the modal to close it
+     // Handle clicks outside the modal to close it only when call has ended
      useEffect(() => {
          const handleClickOutside = (event) => {
              if (modalRef.current && !modalRef.current.contains(event.target) && isOpen && callStatus === 'ended') {
                  onClose();
              }
          };
+         // Add listener only when the modal is open
          if (isOpen) {
              document.addEventListener("mousedown", handleClickOutside);
          }
+         // Cleanup: remove listener when modal closes or component unmounts
          return () => {
              document.removeEventListener("mousedown", handleClickOutside);
          };
-     }, [isOpen, onClose, callStatus]);
+     }, [isOpen, onClose, callStatus]); // Depend on isOpen, onClose, and callStatus
 
     // Format duration into MM:SS
     const formatDuration = (seconds) => {
@@ -73,30 +78,31 @@ function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar })
     // Handle ending the call
     const handleEndCall = () => {
         setCallStatus('ended');
-        clearInterval(intervalRef.current);
-        setTimeout(() => {
-             onClose();
-        }, 1000);
+        // The modal will close automatically via the useEffect watching isOpen
+        // No need for the timeout here.
     };
 
-    // Prevent closing if call is ongoing
+    // Prevent closing if call is ongoing when clicking backdrop
     const handleBackdropClick = (e) => {
         if (callStatus !== 'ended') {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent the click from reaching the modal's own stopPropagation handler
         } else {
+             // Only allow closing on backdrop click if status is 'ended'
             onClose();
         }
     }
 
-
+    // Do not render if not open
     if (!isOpen) return null;
 
     return (
+        // Add onClick to the backdrop div
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4" onClick={handleBackdropClick}>
+            {/* Add onClick={(e) => e.stopPropagation()} to the modal content div */}
             <div
                 ref={modalRef}
                 className={`relative ${uiColors.bgPrimary} rounded-lg shadow-xl p-8 text-center flex flex-col items-center`}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()} // Prevent click from closing modal when clicking inside
             >
                 {/* Close Button (only when ended) */}
                 {callStatus === 'ended' && (
@@ -105,16 +111,15 @@ function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar })
                     </button>
                 )}
 
-
                 {/* Character Info */}
                 <div className="mb-6">
-                     {/* Strengthened conditional check remains */}
-                     {typeof characterAvatar === 'string' && characterAvatar ? (
-                         <Image src={characterAvatar} alt={characterName} width={80} height={80} className="rounded-full mx-auto mb-4" />
+                     {/* Use characterAvatarUrl and check if it's a string and not empty */}
+                     {typeof characterAvatarUrl === 'string' && characterAvatarUrl ? (
+                         <Image src={characterAvatarUrl} alt={characterName || 'Character'} width={80} height={80} className="rounded-full mx-auto mb-4 object-cover" />
                      ) : (
                          // Placeholder if no character avatar or avatar is not a valid string
-                         <div className={`w-20 h-20 rounded-full ${uiColors.bgSecondary} flex items-center justify-center text-3xl font-semibold mx-auto mb-4`}>
-                              {characterName?.charAt(0).toUpperCase()}
+                         <div className={`w-20 h-20 rounded-full ${uiColors.bgSecondary} flex items-center justify-center text-3xl font-semibold mx-auto mb-4 text-gray-500 dark:text-gray-400 border ${uiColors.borderPrimary}`}>
+                              {characterName?.charAt(0).toUpperCase() || '?'}
                          </div>
                      )}
                      <h3 className={`text-xl font-semibold ${uiColors.textPrimary}`}>{characterName}</h3>
@@ -138,6 +143,16 @@ function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar })
                           </div>
                      )}
                     {/* Optional: Add a simple audio visualization placeholder when ongoing */}
+                    {/* Added animation-wave class definition - ensure this is in your globals.css */}
+                    {/*
+                    @keyframes wave {
+                        0%, 100% { transform: scaleY(0.5); }
+                        50% { transform: scaleY(1); }
+                    }
+                    .animate-wave {
+                        animation: wave 1.5s ease-in-out infinite;
+                    }
+                     */}
                     {callStatus === 'ongoing' && (
                          <div className="mt-4 h-8 flex items-center justify-center space-x-1">
                              {Array(5).fill(0).map((_, i) => (
@@ -148,7 +163,8 @@ function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar })
                 </div>
 
                 {/* Call Controls */}
-                 <div className={`flex items-center justify-center space-x-6 ${callStatus !== 'ongoing' ? 'invisible' : ''}`}>
+                 {/* Hide controls if call is not ongoing */}
+                 <div className={`flex items-center justify-center space-x-6 ${callStatus !== 'ongoing' ? 'opacity-0 pointer-events-none' : ''} transition-opacity duration-300`}> {/* Added transition */}
                      {/* Mute Toggle */}
                      <button
                           onClick={() => setIsMuted(!isMuted)}
@@ -179,7 +195,6 @@ function SimulatedCallModal({ isOpen, onClose, characterName, characterAvatar })
                  </div>
 
             </div>
-            {/* Removed the style jsx global block */}
         </div>
     );
 }
