@@ -1,66 +1,53 @@
-// app/api/chat/[characterId]/route.js
+// app/api/chat/[characterId]/route.js - Handles fetching chat history
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
-import { chatMessages } from '@/lib/db/schemaCharacterAI';
-import { eq, and, desc } from 'drizzle-orm';
+import { db } from '@/configs/db'; // Your Drizzle DB config
+import { chatMessages } from '@/lib/db/schemaCharacterAI'; // Your schema imports
+import { eq, and, asc } from 'drizzle-orm';
 
-// Define the limit for chat history to fetch
-const CHAT_HISTORY_LIMIT = 30; // As per your requirement
-
+// GET handler for fetching initial chat history
+// This is called by your frontend useEffect fetch('/api/chat/${characterId}?userId=...')
 export async function GET(req, { params }) {
     const { characterId } = params;
-    const { userId } = auth(); // Get user ID from Clerk
+    const { userId: currentUserId } = auth(); // Get current user ID from Clerk
 
-    if (!userId) {
-        // If chat requires login, return unauthorized
-        return NextResponse.json({ error: 'Authentication required to view chat history' }, { status: 401 });
+    if (!currentUserId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!characterId) {
-        return NextResponse.json({ error: 'Character ID is required' }, { status: 400 });
-    }
-
-     const charIdInt = parseInt(characterId);
+    const charIdInt = parseInt(characterId);
      if (isNaN(charIdInt)) {
           return NextResponse.json({ error: 'Invalid Character ID' }, { status: 400 });
      }
 
-
-    // Determine the unique chat session ID for this user and character
-    const chatSessionId = `${userId}_${charIdInt}`;
-
     try {
-        // Fetch chat messages for this session, ordered by timestamp, limited
-        // We fetch slightly more than the limit to ensure we get the *last* N messages
-        // and then reverse them if needed or order ascending directly if DB supports that efficiently.
-        // Drizzle's `orderBy(asc(chatMessages.timestamp))` is fine.
+        // Assuming chatSessionId is stored as `${userId}_${characterId}`
+        const chatSessionId = `${currentUserId}_${charIdInt}`;
 
+        // Fetch messages for this user and character, ordered by timestamp
         const messages = await db.query.chatMessages.findMany({
-            where: and(
-                eq(chatMessages.chatSessionId, chatSessionId),
-                // Optional: Add filter for userId if chatSessionId isn't enough guarantee
-                // eq(chatMessages.userId, userId) // Redundant if chatSessionId includes userId
-            ),
-            orderBy: [asc(chatMessages.timestamp)], // Order ascending for chronological order
-            // limit: CHAT_HISTORY_LIMIT, // Applying limit might truncate history if not ordered correctly
-            // offset? // No offset needed for "last N"
+            where: eq(chatMessages.chatSessionId, chatSessionId),
+            orderBy: [asc(chatMessages.timestamp)], // Order by timestamp ascending
+             limit: 50, // Limit number of messages to fetch for history (adjust as needed)
         });
 
-        // If we fetched more than needed to ensure the last N:
-        // const lastNMessages = messages.slice(-CHAT_HISTORY_LIMIT);
-        // For `orderBy(asc)`, limit works as expected - it gets the first N messages chronologically.
-        // If you need the *last* N messages, you'd order by `desc` and then `reverse()` the array in JS,
-        // or use window functions in SQL for more complex paging.
-        // Let's stick to `orderBy(asc)` and just return what's fetched for simplicity.
+        console.log(`Fetched ${messages.length} messages for session ${chatSessionId}`);
 
-        console.log(`Fetched ${messages.length} chat messages for session ${chatSessionId}`);
+        // Format messages to match frontend Message component props exactly
+        const formattedMessages = messages.map(msg => ({
+             id: msg.id.toString(), // Ensure ID is a string for React keys
+             text: msg.text,
+             sender: msg.sender, // 'user' or 'character'
+             audioUrl: msg.audioUrl, // Can be null
+             timestamp: msg.timestamp.toISOString(), // Ensure ISO string format for consistency
+             // Add other fields if necessary from chatMessages schema
+        }));
 
-        // Return the chat messages
-        return NextResponse.json({ messages }, { status: 200 });
+
+        return NextResponse.json({ messages: formattedMessages }, { status: 200 });
 
     } catch (error) {
-        console.error(`API Error /api/chat/${characterId} (GET):`, error);
+        console.error(`API Error /api/chat/${characterId} (GET History):`, error);
         return NextResponse.json({ error: 'Internal server error fetching chat history' }, { status: 500 });
     }
 }

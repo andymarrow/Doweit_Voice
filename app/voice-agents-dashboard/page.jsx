@@ -113,7 +113,7 @@ export default function DashboardPage() {
                         <Link key={tool.name} href={tool.href} legacyBehavior>
                             <motion.a
                                 className="group flex flex-col items-center space-y-2 flex-shrink-0 w-24 md:w-28 cursor-pointer text-center"
-                                variants={toolItemVariants} // Still uses toolItemVariants defined in constants
+                                // variants={toolItemVariants} // Still uses toolItemVariants defined in constants
                                 whileHover="hover"
                                 whileTap={{ scale: 0.95 }}
                             >

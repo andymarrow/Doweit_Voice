@@ -61,6 +61,7 @@ export default function SingleCharacterChatRoom() {
                     if (!characterResponse.ok) {
                         throw new Error(`Failed to fetch character: ${characterResponse.status}`);
                     }
+                    console.log("this is the character response", characterResponse);
                     const characterData = await characterResponse.json();
                     setCharacter(characterData);
 
@@ -197,6 +198,7 @@ export default function SingleCharacterChatRoom() {
 
         // Send message to backend API
         try {
+            console.log("am hereee")
             const response = await fetch(`/api/chat/${characterId}/message`, {
                 method: 'POST',
                 headers: {
@@ -208,7 +210,7 @@ export default function SingleCharacterChatRoom() {
                      userId: currentUserId, // Send user ID
                      text: text,           // Send user message text
                      // You might need to send recent message history here too for context
-                     // history: messages.slice(-30), // Send last 30 messages as context
+                     history: messages.slice(-30), // Send last 30 messages as context
                  }),
             });
 

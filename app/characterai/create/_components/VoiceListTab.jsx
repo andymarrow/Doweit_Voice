@@ -5,19 +5,21 @@ import React from 'react';
 
 import VoiceItem from './VoiceItem';
 
-// Added onPlayVoice and isPlayingMessageId props
+// Removed VapiVoice type definition
+
+
 function VoiceListTab({ voices, selectedVoiceId, onSelectVoice, onPlayVoice, currentlyPlayingVoiceId }) {
     return (
         <div className="space-y-3">
-            {voices.map(voice => (
+            {/* voices is expected to be an array of voice objects */}
+            {voices.map((voice) => ( // Removed type assertion for voice
                 <VoiceItem
-                    key={voice.id}
-                    voice={voice}
-                    // isSelected checks against voice.id, but onSelectVoice gets the object
+                    key={voice.id} // Use the voice ID as the key
+                    voice={voice} // Pass the full voice object
                     isSelected={selectedVoiceId === voice.id}
-                    onSelectVoice={onSelectVoice} // Pass the handler (expects object)
-                    onPlayVoice={onPlayVoice} // Pass the new handler
-                    isPlaying={currentlyPlayingVoiceId === voice.id} // Check if this voice is playing
+                    onSelectVoice={onSelectVoice}
+                    onPlayVoice={onPlayVoice}
+                    isPlaying={currentlyPlayingVoiceId === voice.id}
                 />
             ))}
         </div>

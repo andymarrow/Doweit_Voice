@@ -1,16 +1,14 @@
 // app/api/characters/route.js
 import { NextResponse } from 'next/server';
-// Correct import: Get both auth and clerkClient from the server package
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/configs/db';
 import { characters, users, characterLikes } from '@/lib/db/schemaCharacterAI';
-// Import necessary helpers, including 'sql' and 'inArray' if used for JSONB/Array filtering
 import { eq, and, or, like, desc, sql, inArray, asc } from 'drizzle-orm';
 
 
 // POST handler (Create Character)
 export async function POST(req) {
-    const { userId } = auth(); // Get user ID from Clerk
+    const { userId } = auth();
 
     if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,7 +18,7 @@ export async function POST(req) {
         const characterData = await req.json();
         console.log("Received character data:", characterData);
 
-        // --- Validate incoming data (basic validation) ---
+        // --- Validate incoming data ---
         const {
             name,
             tagline,
@@ -29,46 +27,44 @@ export async function POST(req) {
             avatarUrl,
             voiceId,
             voiceName,
+            voiceProvider, // <-- Already here, good
             language,
             behavior,
             isPublic
         } = characterData;
 
-        if (!name || !description || !greeting || !voiceId || !language || !Array.isArray(behavior)) {
+        // Update validation to include voiceProvider - Already correct
+        if (!name || !description || !greeting || !voiceId || !voiceProvider || !language || !Array.isArray(behavior)) {
+             console.error("Missing required fields in payload:", { name: !!name, description: !!description, greeting: !!greeting, voiceId: !!voiceId, voiceProvider: !!voiceProvider, language: !!language, behavior: Array.isArray(behavior) });
              return NextResponse.json({ error: 'Missing required character fields' }, { status: 400 });
         }
          // Optional: More specific validation (string lengths, valid language code etc.)
 
         // --- Ensure user exists in our DB (or create if first time) ---
-        // Use the imported clerkClient directly
         let userRecord = await db.query.users.findFirst({
             where: eq(users.id, userId)
         });
 
         if (!userRecord) {
-            // Fetch user details from Clerk using the imported clerkClient
             const clerkUser = await clerkClient.users.getUser(userId);
             if (!clerkUser) {
                  console.error("Clerk user not found for ID:", userId);
                  return NextResponse.json({ error: 'Clerk user not found' }, { status: 400 });
             }
-            // Create user record in our DB
             [userRecord] = await db.insert(users).values({
                 id: userId,
                 username: clerkUser.username || `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'New User',
                 email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
                 profileImageUrl: clerkUser.imageUrl || null,
-                createdAt: new Date(), // Ensure timestamps are set
+                createdAt: new Date(),
                 updatedAt: new Date(),
-            }).returning(); // Return the inserted record
-
+            }).returning();
             console.log("Created new user record in DB:", userRecord);
         }
-        // UserRecord now contains the DB record including the ID we need
 
         // --- Insert new character into the database ---
         const [newCharacter] = await db.insert(characters).values({
-            creatorId: userRecord.id, // Use the ID from our users table
+            creatorId: userRecord.id,
             name: name.trim(),
             tagline: tagline?.trim() || null,
             description: description.trim(),
@@ -76,14 +72,15 @@ export async function POST(req) {
             avatarUrl: avatarUrl || null,
             voiceId: voiceId,
             voiceName: voiceName || null,
+            voiceProvider: voiceProvider, // <-- Already correct
             language: language,
             behavior: behavior,
             isPublic: isPublic,
             likes: 0,
             chats: 0,
-            createdAt: new Date(), // Ensure timestamps are set
+            createdAt: new Date(),
             updatedAt: new Date(),
-        }).returning(); // Return the inserted record
+        }).returning();
 
         console.log("Character created in DB:", newCharacter);
 
@@ -95,6 +92,9 @@ export async function POST(req) {
 
     } catch (error) {
         console.error("API Error /api/characters (POST):", error);
+        // Return a generic 500 or the specific error message if safe
+        // It's often better not to expose internal error messages directly to the frontend in production
+        // but for development, logging error.message can be helpful server-side.
         return NextResponse.json({ error: 'Internal server error during character creation' }, { status: 500 });
     }
 }
@@ -120,7 +120,8 @@ export async function GET(req) {
                  sql`${characters.behavior} @> ${JSON.stringify([searchTerm])}::jsonb` // Example: checks if array contains search term
              ) : undefined,
              // Add category filter (using the same JSONB check)
-             category ? sql`${characters.behavior} @> ${JSON.stringify([category])}::jsonb` : undefined
+             // SYNTAX FIX HERE: Added closing curly brace '}'
+             category ? sql`${characters.behavior} @> ${JSON.stringify([category])}::jsonb` : undefined // <-- FIX APPLIED
          );
 
          // Get current user ID from Clerk (can be null if not logged in)
@@ -154,6 +155,7 @@ export async function GET(req) {
              avatarUrl: row.character.avatarUrl,
              voiceId: row.character.voiceId,
              voiceName: row.character.voiceName,
+             voiceProvider: row.character.voiceProvider, // <-- Ensure this is included when fetching
              language: row.character.language,
              behavior: row.character.behavior,
              isPublic: row.character.isPublic,

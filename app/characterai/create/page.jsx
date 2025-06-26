@@ -1,11 +1,11 @@
 // characterai/create/page.jsx
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react'; // Import useMemo, useEffect
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { FiSave, FiPlusCircle, FiVolume2, FiAlertCircle } from 'react-icons/fi'; // Added FiAlertCircle
-import { useUser } from '@clerk/nextjs'; // Import Clerk's useUser hook
-import { useRouter } from 'next/navigation'; // Import Next.js router for redirection
+import { FiSave, FiAlertCircle } from 'react-icons/fi';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 
 // Import components
 import ImageUploadSection from './_components/ImageUploadSection';
@@ -14,25 +14,17 @@ import VoiceSelectionSection from './_components/VoiceSelectionSection';
 import VoiceModal from './_components/VoiceModal';
 import TagsInput from './_components/TagsInput';
 import VisibilityToggle from './_components/VisibilityToggle';
+// Import the new language selection component
+import LanguageSelectionSection from './_components/LanguageSelectionSection'; // <-- IMPORT THIS
 
 // Import constants - Adjusted path as necessary
-import { uiColors } from '../_constants/uiConstants';
-import { sectionVariants, itemVariants } from '../_constants/uiConstants';
+import { uiColors, sectionVariants, itemVariants } from '../_constants/uiConstants';
 
-// Define supported languages for the character's responses
-const supportedLanguages = [
-    { code: 'en', name: 'English' },
-    { code: 'am', name: 'Amharic' },
-    // Add more languages supported by Google AI Studio voices/models
-    { code: 'es', name: 'Spanish' },
-    { code: 'fr', name: 'French' },
-    { code: 'de', name: 'German' },
-    // ... etc.
-];
 
+// Removed supportedLanguages constant
 
 export default function CharacteraiCreatePage() {
-    const { user, isLoading: isUserLoading } = useUser(); // Get user info from Clerk
+    const { user, isLoading: isUserLoading } = useUser();
     const router = useRouter();
 
     // State for form data
@@ -41,9 +33,9 @@ export default function CharacteraiCreatePage() {
         tagline: '',
         description: '',
         greeting: '',
-        imageFile: null, // File object selected by user
-        selectedVoice: null, // Full voice object from VoiceModal
-        language: 'en', // Default language
+        imageFile: null,
+        selectedVoice: null, // Vapi voice object from VoiceModal (structure defined by your /api/voices backend)
+        selectedLanguage: 'en', // <-- ADD STATE FOR SELECTED LANGUAGE, default to English
         allowDynamicGreetings: true,
         tags: [],
         visibility: 'public',
@@ -52,13 +44,13 @@ export default function CharacteraiCreatePage() {
     // State for UI control
     const [isSaving, setIsSaving] = useState(false);
     const [showVoiceModal, setShowVoiceModal] = useState(false);
-    const [saveError, setSaveError] = useState(null); // State to show save errors
+    const [saveError, setSaveError] = useState(null);
 
-    // Memoize user ID for efficient checks
+    // Memoize user ID
     const currentUserId = useMemo(() => user?.id, [user]);
 
 
-    // Handlers for updating character data state - Kept similar
+    // Handlers for updating character data state
     const handleInputChange = (field) => (e) => {
         setCharacterData({ ...characterData, [field]: e.target.value });
     };
@@ -67,13 +59,22 @@ export default function CharacteraiCreatePage() {
         setCharacterData({ ...characterData, imageFile: file });
     };
 
+    // This handler receives the full Vapi voice object from VoiceModal
     const handleVoiceSelect = (voice) => {
         setCharacterData({ ...characterData, selectedVoice: voice });
+        // Optional: If the voice data *did* include language, you could set it here
+        // if (voice.language) {
+        //      setCharacterData(prevData => ({ ...prevData, selectedVoice: voice, selectedLanguage: voice.language }));
+        // } else {
+        //      setCharacterData(prevData => ({ ...prevData, selectedVoice: voice }));
+        // }
     };
 
-    const handleLanguageChange = (e) => {
-         setCharacterData({ ...characterData, language: e.target.value });
+    // Handler for language selection
+    const handleLanguageChange = (languageCode) => { // <-- ADD HANDLER FOR LANGUAGE CHANGE
+        setCharacterData({ ...characterData, selectedLanguage: languageCode });
     };
+
 
     const handleDynamicGreetingsToggle = () => {
         setCharacterData({ ...characterData, allowDynamicGreetings: !characterData.allowDynamicGreetings });
@@ -95,19 +96,16 @@ export default function CharacteraiCreatePage() {
     const uploadImage = async (file) => {
         if (!file || !currentUserId) {
              console.warn("No file or user ID for upload.");
-             return null; // Return null if no file or user
+             return null;
         }
 
         const formData = new FormData();
-        formData.append('avatar', file); // 'avatar' is the field name expected by the backend API
-        formData.append('userId', currentUserId); // Pass userId for folder structure
+        formData.append('avatar', file);
+        formData.append('userId', currentUserId);
 
         try {
-            // Call your backend API route for image upload
             const response = await fetch('/api/upload-avatar', {
                 method: 'POST',
-                // Do NOT set Content-Type for FormData, browser does it correctly
-                // headers: { 'Authorization': `Bearer ${await user.getSessionId()}` } // Optional: Add auth
                 body: formData,
             });
 
@@ -117,36 +115,33 @@ export default function CharacteraiCreatePage() {
             }
 
             const data = await response.json();
-            // Assuming the backend returns the Firebase Storage URL
-            // Expected data: { url: 'firebase-download-url' }
             if (!data.url) {
                  throw new Error("Image upload successful, but no URL returned.");
             }
-            return data.url; // Return the Firebase Storage URL
+            return data.url;
 
         } catch (err) {
             console.error("Error uploading image:", err);
             setSaveError(`Failed to upload image: ${err.message}`);
-            setIsSaving(false); // Stop saving process on upload failure
-            return null; // Return null on failure
+            setIsSaving(false);
+            return null;
         }
     };
 
     // --- Handle Character Creation (Save Button) ---
     const handleCreate = async () => {
-        setSaveError(null); // Clear previous errors
+        setSaveError(null);
         setIsSaving(true);
 
         if (!currentUserId) {
              setSaveError("User not logged in.");
              setIsSaving(false);
-             // Redirect to login if necessary
-             router.push('/sign-in'); // Example: redirect to Clerk sign-in
+             router.push('/sign-in');
             return;
         }
 
-        // Check if form is valid before proceeding
-         if (!isFormValid) {
+        // Update form validation to include language
+        if (!isFormValid) {
              setSaveError("Please fill in all required fields.");
              setIsSaving(false);
              return;
@@ -154,57 +149,48 @@ export default function CharacteraiCreatePage() {
 
 
         let avatarUrl = null;
-        // 1. Upload image if a file is selected
         if (characterData.imageFile) {
             avatarUrl = await uploadImage(characterData.imageFile);
             if (avatarUrl === null) {
-                 // uploadImage already sets error and sets isSaving to false
-                 return; // Stop the process if upload failed
+                 return;
             }
-        } else if (characterData.existingImageUrl) {
-             // If editing an existing character, use the existing URL if no new file is selected
-             // (This logic might be slightly different if this page is also for editing)
-             // For creation, if no new file, avatarUrl remains null, which is fine if image is optional
         }
+        // Note: If you support editing, handle retaining existing image URL here
 
 
-        // Ensure a voice is selected if required
-         // You might want to add validation if voice is mandatory
-        // if (!characterData.selectedVoice) {
-        //     setSaveError("Please select a voice.");
-        //     setIsSaving(false);
-        //     return;
-        // }
+        if (!characterData.selectedVoice) {
+            setSaveError("Please select a voice.");
+            setIsSaving(false);
+            return;
+        }
 
         // Prepare data for the backend API call
         const characterPayload = {
-            creatorId: currentUserId, // Add Clerk user ID
+            creatorId: currentUserId,
             name: characterData.name,
             tagline: characterData.tagline,
             description: characterData.description,
             greeting: characterData.greeting,
-            avatarUrl: avatarUrl, // Add the uploaded image URL
-            voiceId: characterData.selectedVoice?.platformVoiceId || null, // Add the platform voice ID, ensure it's null if no voice selected
-             voiceName: characterData.selectedVoice?.name || null, // Optional: save voice name too
-            language: characterData.language, // Add selected language
-            behavior: characterData.tags, // Use tags as behavior
-            isPublic: characterData.visibility === 'public', // Convert visibility to boolean
-            // Initial metrics - Backend should set these defaults
-            // likes: 0,
-            // chats: 0,
+            avatarUrl: avatarUrl,
+            // Use the Vapi voice details from the selected voice object
+            // The voice object from /api/voices now has 'voiceId', 'provider', and 'name' extracted from the assistant endpoint
+            voiceId: characterData.selectedVoice.voiceId,     // <-- Use the actual Vapi voice ID like "Elliot", "Hana"
+            voiceName: characterData.selectedVoice.name,      // <-- Friendly name like "Elliot (vapi)"
+            voiceProvider: characterData.selectedVoice.provider,// <-- Provider like "vapi", "elevenlabs"
+            language: characterData.selectedLanguage, // <-- INCLUDE SELECTED LANGUAGE FROM NEW STATE
+            behavior: characterData.tags,
+            isPublic: characterData.visibility === 'public',
+            // Add any Vapi-specific configuration needed for the chat endpoint later
         };
 
         console.log("Sending character data to backend:", characterPayload);
 
-        // 2. Send character data to the backend API
         try {
-             // Call your backend API route to create the character
              const response = await fetch('/api/characters', {
                  method: 'POST',
                  headers: {
                      'Content-Type': 'application/json',
                      // Add authorization header if your API requires it (e.g., with Clerk session token)
-                     // 'Authorization': `Bearer ${await user.getSessionId()}`
                  },
                  body: JSON.stringify(characterPayload),
              });
@@ -217,27 +203,24 @@ export default function CharacteraiCreatePage() {
              const result = await response.json();
              console.log("Character created successfully!", result);
 
-             // 3. Handle success (e.g., redirect to the new character's page)
              setIsSaving(false);
-             alert("Character created successfully!"); // Simple feedback
-             router.push(`/characterai/chat/${result.characterId}`); // Assuming backend returns the new character's ID
+             alert("Character created successfully!");
+             router.push(`/characterai/chat/${result.characterId}`);
 
 
         } catch (err) {
             console.error("Error creating character:", err);
             setSaveError(`Failed to create character: ${err.message}`);
             setIsSaving(false);
-            // Keep form data so user can try again
         }
     };
 
-     // Determine if the form is valid to enable the Save button
+     // Determine if the form is valid
      const isFormValid = characterData.name.trim() !== '' &&
                          characterData.description.trim() !== '' &&
                          characterData.greeting.trim() !== '' &&
-                        // Add validation for required fields here:
-                         (characterData.imageFile !== null || characterData.existingImageUrl) && // Require an image (new or existing)
-                         characterData.selectedVoice !== null; // Require a voice
+                         characterData.selectedVoice !== null &&
+                         characterData.selectedLanguage !== ''; // <-- ADD LANGUAGE TO VALIDATION
 
 
     // Show loading state or redirect if user is not loaded/logged in
@@ -245,8 +228,6 @@ export default function CharacteraiCreatePage() {
          return <div className={`flex items-center justify-center h-screen text-lg ${uiColors.textSecondary}`}>Loading user...</div>;
      }
      if (!user) {
-         // Redirect to login or show a login message if creation requires auth
-         // router.push('/sign-in'); // Example redirection
          return (
               <div className={`flex flex-col items-center justify-center h-screen text-lg ${uiColors.textDanger}`}>
                  <FiAlertCircle className="w-10 h-10 mb-4" />
@@ -257,8 +238,7 @@ export default function CharacteraiCreatePage() {
 
 
     return (
-        // The layout component already provides padding, so no need for extra large padding here
-        <div className="flex flex-col space-y-6 w-full h-full">
+        <div className="flex flex-col space-y-6 w-full h-full p-4">
 
             {/* Page Title */}
             <h1 className={`text-2xl font-bold mb-4 ${uiColors.textPrimary}`}>Create New Character</h1>
@@ -279,14 +259,12 @@ export default function CharacteraiCreatePage() {
 
 
             {/* Form Sections */}
-            <div className="space-y-8"> {/* Vertical space between main sections */}
+            <div className="space-y-8">
 
                 {/* Image Upload */}
                 <motion.div variants={sectionVariants} initial="hidden" animate="visible">
                     <ImageUploadSection
                          onImageSelect={handleImageSelect}
-                         // If editing, you'd pass existingImageUrl here
-                         // existingImageUrl={characterData.existingImageUrl}
                      />
                 </motion.div>
 
@@ -300,7 +278,7 @@ export default function CharacteraiCreatePage() {
                          placeholder="Enter character name"
                          value={characterData.name}
                          onChange={handleInputChange('name')}
-                         maxLength={50} // Increased length slightly
+                         maxLength={50}
                      />
                      <CharacterFormSection
                          id="characterTagline"
@@ -309,7 +287,7 @@ export default function CharacteraiCreatePage() {
                          placeholder="Enter tagline"
                          value={characterData.tagline}
                          onChange={handleInputChange('tagline')}
-                         maxLength={100} // Increased length
+                         maxLength={100}
                      />
                      <CharacterFormSection
                          id="characterDescription"
@@ -333,25 +311,13 @@ export default function CharacteraiCreatePage() {
                       />
                  </motion.div>
 
-                 {/* Language Selection */}
-                  <motion.div variants={sectionVariants} initial="hidden" animate="visible" className="space-y-2">
-                      <label htmlFor="characterLanguage" className={`block text-md font-medium ${uiColors.textSecondary}`}>
-                           Response Language
-                       </label>
-                       <p className={`text-sm ${uiColors.textPlaceholder}`}>
-                           Choose the primary language for your character's responses.
-                       </p>
-                       <select
-                            id="characterLanguage"
-                            value={characterData.language}
-                            onChange={handleLanguageChange}
-                            className={`block w-full sm:max-w-md p-2 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}
-                       >
-                           {supportedLanguages.map(lang => (
-                                <option key={lang.code} value={lang.code}>{lang.name}</option>
-                           ))}
-                       </select>
-                   </motion.div>
+                {/* Language Selection Section */}
+                 <motion.div variants={sectionVariants} initial="hidden" animate="visible">
+                     <LanguageSelectionSection // <-- ADD THIS SECTION
+                          selectedLanguage={characterData.selectedLanguage}
+                          onLanguageChange={handleLanguageChange}
+                      />
+                 </motion.div>
 
 
                  {/* Voice Selection */}
@@ -359,26 +325,22 @@ export default function CharacteraiCreatePage() {
                     <VoiceSelectionSection
                          selectedVoice={characterData.selectedVoice}
                          onChooseVoiceClick={() => setShowVoiceModal(true)}
-                         // You might need to pass a play handler here if you want a separate play button
-                         // for the *selected* voice on the main form, beyond the modal preview.
-                         // For now, VoiceSelectionSection has its own preview player.
                     />
                 </motion.div>
 
                  {/* Allow Dynamic Greetings Toggle */}
                  <motion.div variants={sectionVariants} initial="hidden" animate="visible">
-                      <div className="flex items-start justify-between w-full sm:max-w-md space-x-4"> {/* Added space-x */}
+                      <div className="flex items-start justify-between w-full sm:max-w-md space-x-4">
                          <div className="flex-grow">
-                             <label htmlFor="dynamicGreetingsToggle" className={`block text-md font-medium ${uiColors.textSecondary}`}> {/* Adjusted font size */}
+                             <label htmlFor="dynamicGreetingsToggle" className={`block text-md font-medium ${uiColors.textSecondary}`}>
                                   Allow dynamic greetings
                              </label>
-                              <p className={`text-sm ${uiColors.textPlaceholder}`}> {/* Adjusted font size */}
+                              <p className={`text-sm ${uiColors.textPlaceholder}`}>
                                   If enabled, the AI may adjust the greeting based on context.
                              </p>
                          </div>
-                          {/* Toggle Switch */}
                            <button
-                                type="button" // Added type="button"
+                                type="button"
                                 id="dynamicGreetingsToggle"
                               onClick={handleDynamicGreetingsToggle}
                                className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 ${uiColors.ringAccentShade} focus:ring-offset-2 ${uiColors.ringOffsetPrimary}
@@ -422,9 +384,9 @@ export default function CharacteraiCreatePage() {
                  className="flex justify-center mt-8 mb-4"
               >
                  <button
-                      type="button" // Added type="button"
+                      type="button"
                       onClick={handleCreate}
-                      disabled={isSaving || !isFormValid || isUserLoading || !user} // Disable while saving, invalid, or user loading/not logged in
+                      disabled={isSaving || !isFormValid || isUserLoading || !user}
                        className={`inline-flex items-center px-8 py-4 text-lg font-semibold rounded-md transition-colors shadow-lg
                                     ${uiColors.accentPrimaryGradient} text-white ${isSaving || !isFormValid || isUserLoading || !user ? 'opacity-50 cursor-not-allowed' : ''}`}
                  >
@@ -437,8 +399,7 @@ export default function CharacteraiCreatePage() {
              <VoiceModal
                 isOpen={showVoiceModal}
                 onClose={() => setShowVoiceModal(false)}
-                onVoiceSelect={handleVoiceSelect} // This handler now receives the full voice object
-                // VoiceModal itself manages its own playback, no need to pass playback handlers here
+                onVoiceSelect={handleVoiceSelect}
              />
 
         </div>
