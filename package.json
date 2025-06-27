@@ -26,6 +26,7 @@
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@vapi-ai/server-sdk": "^0.9.3",
+    "@vapi-ai/web": "^2.3.7",
     "add": "^2.0.6",
     "axios": "^1.7.7",
     "bufferutil": "^4.0.9",
