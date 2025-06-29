@@ -507,28 +507,29 @@
 // characterai/chat/[characterid]/page.jsx
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'; // Import useCallback
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useUser } from '@clerk/nextjs';
 import {
     FiSettings, FiMoreHorizontal, FiPlusCircle, FiImage, FiSend,
-    FiPhoneCall, FiPhoneMissed, FiAlertCircle, FiHeart, FiShare2, FiVolume2, FiVolumeX // Added Call/End icons
+    FiPhoneCall, FiPhoneMissed, FiAlertCircle, FiHeart, FiShare2, FiVolume2, FiVolumeX
 } from 'react-icons/fi';
-// Import Vapi Web SDK
-import Vapi from '@vapi-ai/web'; // <-- Import Vapi SDK
+import Vapi from '@vapi-ai/web';
 
 // Import components
 import Message from './_components/Message';
-import SimulatedCallModal from './_components/SimulatedCallModal'; // Keep if still needed for non-voice simulated calls
+import SimulatedCallModal from './_components/SimulatedCallModal';
 
 // Import constants
 import { uiColors, sectionVariants, itemVariants } from '../../_constants/uiConstants';
 
 
 // Initialize Vapi SDK outside the component to ensure it's a singleton
-// Use the public key here
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
+
+// Define linger duration for partial transcripts in milliseconds
+const PARTIAL_TRANSCRIPT_LINGER_DURATION = 8000; // 4 seconds
 
 export default function SingleCharacterChatRoom() {
     const params = useParams();
@@ -537,10 +538,9 @@ export default function SingleCharacterChatRoom() {
     const { user, isLoading: isUserLoading } = useUser();
 
     const [character, setCharacter] = useState(null);
-    // Messages will now primarily be transcripts from the Vapi call
-    // Initialize with an empty array to avoid issues with map
+    // Messages will store historical text messages AND final call transcripts
     const [messages, setMessages] = useState([]);
-    const [chatInput, setChatInput] = useState(''); // Keep for optional text input
+    const [chatInput, setChatInput] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -548,15 +548,37 @@ export default function SingleCharacterChatRoom() {
     const [isCallActive, setIsCallActive] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false); // Vapi indicates when AI is speaking
 
+    // State for real-time partial transcripts during a call
+    const [partialTranscripts, setPartialTranscripts] = useState({ user: '', character: '' });
+    // Ref to hold timers for clearing partial transcripts after a delay
+    const partialTranscriptTimers = useRef({});
+
+
     const [isCallModalOpen, setIsCallModalOpen] = useState(false); // Keep for simulated call if separate
 
-    const messagesEndRef = useRef(null);
+    const messagesEndRef = useRef(null); // Ref for scrolling to the bottom of main messages
+    const partialTranscriptAreaRef = useRef(null); // Ref for scrolling to partial transcript area
+
 
     const currentUserId = useMemo(() => user?.id, [user]);
 
-     // --- Handlers for Simulated Call Modal (ADD THESE BACK) ---
+    // Helper function to clear partial transcript timers
+    const clearPartialTranscriptTimer = useCallback((senderRole) => {
+        if (partialTranscriptTimers.current[senderRole]) {
+            clearTimeout(partialTranscriptTimers.current[senderRole]);
+            delete partialTranscriptTimers.current[senderRole];
+        }
+    }, []); // useCallback to memoize
+
+     // Helper function to clear all partial transcript timers
+    const clearAllPartialTranscriptTimers = useCallback(() => {
+        clearPartialTranscriptTimer('user');
+        clearPartialTranscriptTimer('character');
+    }, [clearPartialTranscriptTimer]); // Dependency on clearPartialTranscriptTimer
+
+
     const openCallModal = () => setIsCallModalOpen(true);
-    const closeCallModal = () => setIsCallModalOpen(false); // <-- ADD THIS DEFINITION BACK
+    const closeCallModal = () => setIsCallModalOpen(false);
 
     // --- Data Fetching Effect ---
     useEffect(() => {
@@ -565,7 +587,7 @@ export default function SingleCharacterChatRoom() {
                 setIsLoading(true);
                 setError(null);
                 try {
-                    // 1. Fetch character data (includes details for Vapi Assistant config)
+                    // 1. Fetch character data
                     const characterResponse = await fetch(`/api/characters/${characterId}`);
                     if (!characterResponse.ok) {
                          const errorBody = await characterResponse.text();
@@ -574,24 +596,28 @@ export default function SingleCharacterChatRoom() {
                     const characterData = await characterResponse.json();
                     setCharacter(characterData);
 
-                    // 2. Fetch chat history (Optional: display alongside call transcripts)
-                    // This GET route is in app/api/chat/[characterId]/route.js
-                    const messagesResponse = await fetch(`/api/chat/${characterId}?userId=${user.id}`);
-                    if (!messagesResponse.ok) {
-                         console.warn("Failed to fetch chat history:", messagesResponse.status);
-                         setMessages([]); // Initialize with empty array on error
+                    // 2. Fetch chat history (Includes previous text chats)
+                    // Only fetch if user is logged in
+                    if (user?.id) {
+                        const messagesResponse = await fetch(`/api/chat/${characterId}?userId=${user.id}`);
+                        if (!messagesResponse.ok) {
+                             console.warn("Failed to fetch chat history:", messagesResponse.status);
+                             setMessages([]);
+                        } else {
+                            const messagesData = await messagesResponse.json();
+                             // Ensure messagesData.messages is an array, default to empty
+                            setMessages(messagesData.messages || []);
+                        }
                     } else {
-                        const messagesData = await messagesResponse.json();
-                         // Add fetched history, perhaps distinguishing them visually from call transcripts
-                         // Ensure messagesData.messages is an array, default to empty
-                        setMessages(messagesData.messages || []);
+                         setMessages([]); // No user, no history
                     }
+
 
                 } catch (err) {
                     console.error("Failed to load chat data:", err);
                     setError(`Failed to load chat: ${err.message}`);
                     setCharacter(null);
-                    setMessages([]); // Ensure messages is empty on error
+                    setMessages([]);
                 } finally {
                     setIsLoading(false);
                 }
@@ -601,129 +627,219 @@ export default function SingleCharacterChatRoom() {
         } else if (!isUserLoading && !user) {
              setIsLoading(false);
              setError("Please log in to chat.");
+             setMessages([]); // Clear messages if user logs out
         } else if (!isUserLoading && user && !characterId) {
              setIsLoading(false);
              setError("Character ID is missing.");
+             setMessages([]); // Clear messages if characterId is missing
         }
 
-    }, [characterId, user?.id, isUserLoading]);
+    }, [characterId, user?.id, isUserLoading]); // Added user?.id dependency
 
+// Function to save call history to the database
+    const saveCallHistory = useCallback(async () => {
+         // Check if there are any messages to save (excluding system messages)
+         const messagesToSave = messages.filter(msg => msg.sender !== 'system');
+
+         if (!currentUserId || !characterId || messagesToSave.length === 0) {
+             console.warn("Skipping call history save: missing user, character, or no non-system messages to save.");
+             return;
+         }
+
+         console.log("Attempting to save call history...", messagesToSave);
+
+         try {
+             // Call the new backend API route
+             const response = await fetch(`/api/chat/${characterId}/save-call`, {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                 },
+                 // Send the CURRENT state of the messages array
+                 // The backend will filter system messages
+                 body: JSON.stringify({
+                     // userId: currentUserId, // Backend gets userId securely from auth()
+                     messages: messages, // Send the whole list including system msgs for backend to filter
+                 }),
+             });
+
+             if (!response.ok) {
+                 const errorBody = await response.text(); // Read error response body
+                 console.error("Failed to save call history:", response.status, errorBody);
+                 // Optionally show a user notification about save failure
+             } else {
+                 console.log("Call history saved successfully.");
+                 // Optionally show a user notification about successful save
+             }
+         } catch (error) {
+             console.error("Error saving call history:", error);
+             // Optionally show a user notification
+         }
+    }, [messages, currentUserId, characterId]); // Dependencies: messages state, currentUserId, characterId
 
     // --- Vapi SDK Event Handling Effect ---
     useEffect(() => {
-        // Attach Vapi event listeners
+        // Destructure clearPartialTranscriptTimer and clearAllPartialTranscriptTimers from props or closure
+        // They are memoized, so safe to include as dependencies.
         const handleCallStart = () => {
             console.log('Vapi Call Started');
             setIsCallActive(true);
-             setIsSpeaking(false); // Reset speaking state
+            setIsSpeaking(false); // Reset speaking state
+            setPartialTranscripts({ user: '', character: '' }); // Clear partial transcripts display
+            clearAllPartialTranscriptTimers(); // Clear any lingering timers
              setMessages(prev => [...prev, { // Add a system message indicating call start
-                 id: Date.now().toString() + '_start',
-                 sender: 'system', // Use a 'system' sender type
+                 id: Date.now().toString() + '_start', // Use unique ID for system message
+                 sender: 'system',
                  text: `--- Call with ${character?.name || 'Character'} started ---`,
                  timestamp: new Date().toISOString(),
-                 audioUrl: null // System messages have no audio
+                 audioUrl: null
              }]);
-             // Optionally clear previous text messages or separate UI
+             // Scroll to bottom when call starts
+             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         };
 
         const handleCallEnd = () => {
             console.log('Vapi Call Ended');
             setIsCallActive(false);
-             setIsSpeaking(false);
+            setIsSpeaking(false);
+            setPartialTranscripts({ user: '', character: '' }); // Clear any remaining partial transcripts display
+            clearAllPartialTranscriptTimers(); // Clear any lingering timers
               setMessages(prev => [...prev, { // Add a system message indicating call end
-                 id: Date.now().toString() + '_end',
+                 id: Date.now().toString() + '_end', // Use unique ID for system message
                  sender: 'system',
                  text: `--- Call ended ---`,
                  timestamp: new Date().toISOString(),
                  audioUrl: null
              }]);
+            // Scroll to bottom when call ends
+             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         };
 
          // Receive transcripts and audio status
         const handleMessage = (message) => {
             console.log('Vapi Message:', message);
-             // message types can be 'transcript', 'function-call', 'speech-update', etc.
+
             if (message.type === 'transcript') {
-                // Add transcript to messages. Vapi provides role ('user' or 'assistant').
-                 // Note: These are REAL-TIME transcripts, might update as user/AI speaks.
-                 // You might need logic to update existing messages instead of always adding new ones.
-                 // For simplicity, let's just add them for now.
-                 // Message structure: { type: 'transcript', role: 'user' | 'assistant', text: string, date: string }
-                 const newMessage = {
-                    id: message.date, // Use Vapi's date as ID (it's a timestamp string) - potentially unstable if multiple transcripts have same date quickly? Consider better unique ID.
-                    text: message.text,
-                    sender: message.role === 'assistant' ? 'character' : 'user', // Map Vapi role to your sender type
-                    timestamp: message.date, // Use Vapi's timestamp
-                     // Real-time transcripts don't typically have audioUrls like saved files
-                    audioUrl: null,
-                 };
-                 setMessages(prevMessages => {
-                      // Simple approach: add new transcript.
-                      // More complex: Find last message from this sender, update its text if it's a partial transcript.
-                      // For basic display, adding might suffice initially.
-                      // Check if the *very last* message is from the same sender and is a transcript, potentially update it?
-                      // This is tricky with Vapi's streaming. Adding new might be simpler for a start.
-                      // Ensure we don't add duplicates based on Vapi's date timestamp
-                      if (prevMessages.some(msg => msg.id === newMessage.id)) {
-                          // If message with this ID already exists, skip adding it again
-                          return prevMessages;
-                      }
-                      return [...prevMessages, newMessage];
-                 });
+                 const senderRole = message.role === 'assistant' ? 'character' : 'user';
+
+                 if (message.transcriptType === 'partial') {
+                      // Update the partial transcript state for the corresponding sender
+                      setPartialTranscripts(prev => ({
+                          ...prev,
+                          [senderRole]: message.transcript,
+                      }));
+                       // Clear any existing timer for this sender when a new partial arrives
+                      clearPartialTranscriptTimer(senderRole);
+
+                      // Optional: Scroll to the partial transcript area if it's appearing/updating
+                       if (partialTranscriptAreaRef.current) {
+                           partialTranscriptAreaRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                       }
+
+
+                 } else if (message.transcriptType === 'final') {
+                     // This is the final completed message for a turn
+                      const finalMessage = {
+                         // Use a combined ID: Vapi timestamp string + sender role
+                         // This makes the ID unique for each final message from a specific speaker
+                         id: `${message.date}_${senderRole}`,
+                         text: message.transcript,
+                         sender: senderRole,
+                         timestamp: message.date, // Use Vapi's timestamp for ordering if needed
+                         audioUrl: null, // Call transcripts don't have separate audio files in this model
+                      };
+
+                      // Add the final message to the main messages list
+                      setMessages(prevMessages => {
+                           // Check if a message with this UNIQUE ID already exists.
+                           if (prevMessages.some(msg => msg.id === finalMessage.id)) {
+                                console.warn("Attempted to add duplicate final message ID:", finalMessage.id, "Message text:", finalMessage.text);
+                                return prevMessages; // Don't add if already exists
+                           }
+                           console.log("Adding NEW final message to main chat:", finalMessage);
+                           // Add the new message to the end of the list
+                           return [...prevMessages, finalMessage];
+                      });
+
+                      // Set a timer to clear the partial transcript after a delay
+                      // Clear any existing timer first
+                       clearPartialTranscriptTimer(senderRole);
+                       // Set the new timer
+                       partialTranscriptTimers.current[senderRole] = setTimeout(() => {
+                           setPartialTranscripts(prev => ({
+                               ...prev,
+                               [senderRole]: '', // Clear the partial transcript for this sender
+                           }));
+                           console.log(`Cleared partial transcript display for ${senderRole} after delay.`);
+                           delete partialTranscriptTimers.current[senderRole]; // Clean up the timer reference
+                       }, PARTIAL_TRANSCRIPT_LINGER_DURATION);
+
+                       // Scroll to bottom after a final message is added to the main list
+                      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+                 }
+
             } else if (message.type === 'speech-update') {
-                 // Vapi sends speech-update events when the assistant starts/stops speaking
-                 // message structure: { type: 'speech-update', status: 'started' | 'stopped' }
-                 if (message.status === 'started') {
-                     setIsSpeaking(true);
-                 } else if (message.status === 'stopped') {
-                     setIsSpeaking(false);
+                 if (message.role === 'assistant') {
+                     if (message.status === 'started') {
+                         setIsSpeaking(true);
+                         console.log('AI Speaking Started');
+                          // When AI starts speaking, clear the user's partial transcript immediately
+                          // as their turn is likely over. Don'casts partial will be cleared by timer after final transcript.
+                          setPartialTranscripts(prev => ({ ...prev, user: '' }));
+                          clearPartialTranscriptTimer('user');
+                     } else if (message.status === 'stopped') {
+                         setIsSpeaking(false);
+                         console.log('AI Speaking Stopped');
+                          // AI partial will be cleared by timer after final transcript is received
+                          // (or on call end/error/unmount).
+                     }
                  }
              }
+             // Handle other Vapi message types if necessary (e.g., 'function-call')
         };
 
-         // Handle error events
          const handleError = (e) => {
              console.error('Vapi Error:', e);
              setError(`Call Error: ${e.message || 'An unknown error occurred'}`);
              setIsCallActive(false);
              setIsSpeaking(false);
+             setPartialTranscripts({ user: '', character: '' }); // Clear partial transcripts on error
+             clearAllPartialTranscriptTimers(); // Clear any lingering timers on error
          };
 
         // Register listeners
         vapi.on('call-start', handleCallStart);
         vapi.on('call-end', handleCallEnd);
-        vapi.on('message', handleMessage);
+        vapi.on('message', handleMessage); // <-- Use the updated handleMessage here
         vapi.on('error', handleError);
 
 
-        // Cleanup: Remove listeners when component unmounts
+        // Cleanup: Remove listeners and stop call
         return () => {
+            console.log("Component unmounting, removing Vapi listeners and stopping call.");
             vapi.removeListener('call-start', handleCallStart);
             vapi.removeListener('call-end', handleCallEnd);
             vapi.removeListener('message', handleMessage);
             vapi.removeListener('error', handleError);
 
-             // Ensure call is stopped if component unmounts while active
-             // No need to check isCallActive state here, vapi.stop() is safe to call
-             // even if no call is active.
-             // Checking isCallActive could lead to a stale closure issue if isCallActive
-             // changes state *within* the effect's lifetime but before cleanup runs.
-             console.log("Component unmounting, attempting to stop Vapi call if active.");
-             vapi.stop();
-        };
-    }, [character?.name]); // Dependencies: character name might be used in system message.
+            clearAllPartialTranscriptTimers(); // Clear timers on unmount
 
-    // Memoized handleEndCall because it's used in useEffect cleanup
+            // Attempt to stop the call if it's active upon unmount
+             vapi.stop(); // Safe to call even if not active
+        };
+    }, [character?.name, clearPartialTranscriptTimer, clearAllPartialTranscriptTimers]); // Dependencies include memoized helpers
+
+
+    // Memoized handleEndCall
     const handleEndCall = useCallback(() => {
         if (isCallActive) {
             console.log("Attempting to stop Vapi call.");
             vapi.stop();
-            // The 'call-end' event listener will update isCallActive state
+            // 'call-end' event listener will handle state updates and timer clearing
         }
-    }, [isCallActive]); // Dependency: only recreate if isCallActive changes
+    }, [isCallActive]);
 
     // --- Call Control Handlers ---
-
     const handleStartCall = () => {
         if (!character || !currentUserId || isCallActive) {
              console.warn("Cannot start call: Character not loaded, user not logged in, or call already active.");
@@ -734,63 +850,47 @@ export default function SingleCharacterChatRoom() {
              console.error("NEXT_PUBLIC_VAPI_PUBLIC_KEY environment variable is not set.");
              return;
          }
-
-         // Check for required character data for Vapi config
          if (!character.voiceProvider || !character.voiceId || !character.language) {
               setError("Character voice configuration is incomplete.");
-              console.error("Missing character voiceProvider, voiceId, or language.");
+              console.error("Missing character voiceProvider, voiceId, or language in character data.");
               return;
          }
 
-
         console.log("Attempting to start Vapi call with character:", character);
 
-        // Construct the Vapi Assistant configuration using fetched character data
         const assistantConfig = {
-             // You can either use an existing assistantId if you created one per character
-             // assistantId: character.vapiAssistantId, // If you save Vapi Assistant ID
-
-             // OR define the assistant configuration dynamically here
              model: {
-                 // ********** FIX APPLIED HERE **********
-                 // Change provider from "gemini" to "google" as per Vapi's supported list
                  provider: "google",
-                 model: "gemini-1.5-flash", // This model name is correct for the "google" provider
-                 temperature: 0.7, // Adjust as needed
-                 // Vapi allows providing initial messages/system prompts here
+                 model: "gemini-1.5-flash",
+                 temperature: 0.7,
                  messages: [
                      {
                          role: "system",
                          content: `You are roleplaying as a character named ${character.name}. Your personality is: ${character.description}. ${character.tagline ? `Your tagline is: ${character.tagline}.` : ''} ${character.greeting ? `Start the conversation with "${character.greeting}" if you are the first speaker.` : ''} Your behavior traits include: ${character.behavior && Array.isArray(character.behavior) && character.behavior.length > 0 ? character.behavior.join(', ') : 'friendly'}. Speak naturally as if in a real voice call. Be concise. Maintain this persona and language: ${character.language}.`,
                      },
-                     // Include recent history here if you want the AI to have context from text chat before the call
-                     // This is complex: you'd need to fetch the last N messages and format them for Vapi's assistant.messages array
+                     // Include recent FINAL messages (text or call transcripts) as context for Vapi
+                      // Filter out system messages and map sender to Vapi role
+                      ...(messages.filter(msg => msg.sender !== 'system').slice(-10).map(msg => ({
+                          role: msg.sender === 'user' ? 'user' : 'assistant',
+                           content: msg.text,
+                     })) || []),
                  ],
-                 // Add other model configs like functions/tools if needed
              },
              voice: {
-                 provider: character.voiceProvider, // e.g., "vapi", "elevenlabs"
-                 voiceId: character.voiceId,     // e.g., "Elliot", "Hana", "21m00Tcm4TlvDq8ikWAM"
-                 // Add other voice configs like speed, etc.
+                 provider: character.voiceProvider,
+                 voiceId: character.voiceId,
              },
-             language: character.language, // Specify the language
-             // Add other Assistant parameters as needed (e.g., firstMessage, endCallMessage, etc.)
-             // firstMessage: character.greeting, // Use the character's greeting as the first message
-             // endCallMessage: "Goodbye!",
-             // voicemailDetection: true, // Example
-             // silenceTimeoutSeconds: 30, // Example
+             language: character.language,
+             // firstMessage: character.greeting, // Can optionally set a specific first message via config
          };
 
         try {
-            // Use vapi.start() from the web SDK
-            vapi.start(assistantConfig); // Pass the dynamic configuration object
-
-            // The 'call-start' event listener will update isCallActive state
-
+            vapi.start(assistantConfig);
+            // States updated by 'call-start' event
         } catch (e) {
             console.error("Error starting Vapi call:", e);
             setError(`Failed to start call: ${e.message}`);
-            setIsCallActive(false); // Ensure state is correct
+            setIsCallActive(false);
         }
     };
 
@@ -800,47 +900,37 @@ export default function SingleCharacterChatRoom() {
          e.preventDefault();
          const text = chatInput.trim();
 
-         if (!text || !character || !currentUserId) {
-             console.warn("Cannot send text message: missing input, character, or user.");
+         if (!text || !character || !currentUserId || isCallActive) { // Added isCallActive check
+             console.warn("Cannot send text message: missing input, character, user, or call is active.");
              return;
          }
 
-         // Add user message to state immediately (optimistic update)
          const newUserMessage = {
-             id: Date.now().toString(), // Use timestamp as temporary ID
+             id: Date.now().toString(), // Use timestamp as temporary ID for text messages
              text: text,
              sender: 'user',
              timestamp: new Date().toISOString(),
+             audioUrl: null, // Text messages don't have associated Vapi audio URLs usually
          };
          setMessages(prevMessages => [...prevMessages, newUserMessage]);
          setChatInput('');
-
-         // Scroll to bottom *after* state update
+         // Scroll immediately after sending
          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
 
-         // Call your existing backend /api/chat/[characterId]/message route for text-only processing and DB save
-         // The backend will still use Gemini for text, but it will log Vapi TTS failure and skip audio/firebase
          try {
-             // Removed audioUrl from payload as it's not relevant for text-only send
               const response = await fetch(`/api/chat/${characterId}/message`, {
                   method: 'POST',
-                  headers: {
-                      'Content-Type': 'application/json',
-                  },
+                  headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                       userId: currentUserId,
                       text: text,
-                      // Sending history might be complex depending on whether you mix text/call history
-                      // For text-only, just sending recent text history might be enough.
-                      // For mixed, you'd need to filter/format history correctly.
-                      // Let's send a limited history for text context.
-                      history: messages.filter(msg => msg.sender !== 'system').slice(-20), // Send recent non-system history for context
+                       // Send recent non-system messages (text or final call transcripts) as context
+                      history: messages.filter(msg => msg.sender !== 'system').slice(-20),
                   }),
               });
 
               if (!response.ok) {
-                  // If backend processing fails, show error to user
                   const errorText = await response.text();
                   console.error("Backend text message processing failed:", response.status, errorText);
                   const errorAiMessage = {
@@ -851,10 +941,9 @@ export default function SingleCharacterChatRoom() {
                        audioUrl: null
                    };
                   setMessages(prevMessages => [...prevMessages, errorAiMessage]);
-                  return; // Stop here, don't add the backend's AI message if it returned error
+                  return;
               }
 
-             // Assuming the API returns the AI's message details (text, but audioUrl will be null)
              const responseData = await response.json();
              const aiMessage = responseData.aiMessage;
 
@@ -871,8 +960,11 @@ export default function SingleCharacterChatRoom() {
                    return;
              }
 
-             // Add AI message to state (will have text, but audioUrl: null)
-             setMessages(prevMessages => [...prevMessages, aiMessage]);
+             // Add AI message to state (will have text, but audioUrl: null from backend)
+             // Ensure it has an audioUrl field, even if null, for consistent Message component prop
+             setMessages(prevMessages => [...prevMessages, { ...aiMessage, audioUrl: aiMessage.audioUrl || null }]);
+             // Scroll after receiving AI response
+             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
 
          } catch (err) {
@@ -891,85 +983,89 @@ export default function SingleCharacterChatRoom() {
 
      // --- Scroll to Bottom Effect ---
     useEffect(() => {
+        // This effect should trigger any time 'messages' state changes.
+        // We only want to auto-scroll if the *latest* message added is relevant (not a partial)
+        // AND the user is already near the bottom of the chat.
+
         if (messagesEndRef.current) {
-            // Scroll into view smoothly when messages change, but only if user is near bottom
-            // This prevents unwanted scrolling if the user is reading older messages
              const element = messagesEndRef.current;
-             const parent = element.parentElement; // The container div
+             const parent = element.parentElement; // This is the div with overflow-y-auto
              if (parent) {
-                const isScrolledToBottom = parent.scrollHeight - parent.clientHeight <= parent.scrollTop + 1; // Give a small buffer (+1)
-                 // If scrolled to bottom, OR if there are very few messages (initial load)
-                 if (isScrolledToBottom || messages.length <= 5) { // Auto-scroll for first few messages too
+                // Check if the user is near the bottom of the scroll container
+                // scrollHeight: total height of content
+                // clientHeight: height of the visible part of the container
+                // scrollTop: how far the user has scrolled from the top
+                const isScrolledToBottom = parent.scrollHeight - parent.clientHeight <= parent.scrollTop + 50; // 50px buffer
+
+                // Check if the messages array was updated with a new message
+                // (This effect runs whenever 'messages' changes, including partial updates if they were in 'messages', but they aren't now)
+                // If the latest message is a system message or a final transcript/text message,
+                // AND the user was already at the bottom, then scroll.
+                 const isLastMessageAddedToMainList = messages.length > 0 && (
+                    messages[messages.length - 1].sender === 'system' ||
+                    messages[messages.length - 1].audioUrl === null // Assuming call transcripts and text replies have audioUrl: null
+                 );
+
+                 // Auto-scroll conditions:
+                 // 1. Very few messages (likely initial load)
+                 // 2. User is already near the bottom AND the latest message added is for the main list (system/final/text)
+                 if (messages.length <= 5 || (isScrolledToBottom && isLastMessageAddedToMainList)) {
                       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
                   }
+                 // Note: Partial transcripts in the top box do NOT trigger this scroll effect
+                 // because they update a *different* state (`partialTranscripts`), not `messages`.
+
             } else {
-                // Fallback if parent isn't found
+                 // Fallback if parent element logic fails (shouldn't happen with correct DOM structure)
                  messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
             }
         }
-    }, [messages]);
+    }, [messages]); // Scroll effect depends only on the main messages list state
 
 
     // --- Like and Share Handlers (Keep as is) ---
-     const [isLiked, setIsLiked] = useState(false);
-      // Assuming character object includes isLikedByCurrentUser boolean
+    const [isLiked, setIsLiked] = useState(false);
      useEffect(() => {
          if (character) {
-             // Use the boolean directly from the character data
              setIsLiked(character.isLikedByCurrentUser || false);
          } else {
-             // Reset like state if character data is not available
              setIsLiked(false);
          }
-     }, [character]); // Depend on character data
+     }, [character]);
 
      const handleLikeToggle = async () => {
           if (!currentUserId || !character) {
              console.warn("Cannot toggle like: user not logged in or character not loaded.");
              return;
           }
-
           const newLikedStatus = !isLiked;
-          setIsLiked(newLikedStatus); // Optimistic update
-
+          setIsLiked(newLikedStatus);
           try {
-              // Call your API to update like status
               const response = await fetch(`/api/characters/${character.id}/like`, {
-                   method: 'POST', // Or PUT/DELETE depending on your API design
-                   headers: {
-                       'Content-Type': 'application/json',
-                   },
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
                    body: JSON.stringify({ userId: currentUserId, isLiked: newLikedStatus }),
               });
-
               if (!response.ok) {
                    const errorText = await response.text();
                    console.error("Failed to update like status:", response.status, errorText);
-                   // Revert state if API call fails
-                   setIsLiked(!newLikedStatus);
-                   alert(`Failed to update like status: ${errorText}`); // User feedback
+                   setIsLiked(!newLikedStatus); // Revert state
+                   alert(`Failed to update like status: ${errorText}`);
               } else {
                   console.log(`Like status updated to ${newLikedStatus} for character ${character.id}`);
-                   // Optionally, fetch the updated character data to sync count etc.
-                   // Or update character state manually if the API returns the new data
               }
-
           } catch (err) {
               console.error("Error toggling like:", err);
-              // Revert state on network/unexpected errors
-              setIsLiked(!newLikedStatus);
-              alert(`Error updating like status: ${err.message}`); // User feedback
+              setIsLiked(!newLikedStatus); // Revert state
+              alert(`Error updating like status: ${err.message}`);
           }
      };
 
      const handleShareClick = async () => {
           if (!character) return;
-
-          const shareUrl = `${window.location.origin}/characterai/chat/${character.id}`; // Construct the URL
-
+          const shareUrl = `${window.location.origin}/characterai/chat/${character.id}`;
           try {
                if (navigator.share) {
-                   // Use Web Share API if available
                    await navigator.share({
                        title: `Chat with ${character.name} on CharacterAI`,
                        text: character.tagline || `Check out ${character.name}!`,
@@ -977,7 +1073,6 @@ export default function SingleCharacterChatRoom() {
                    });
                    console.log('Character shared successfully');
                } else {
-                   // Fallback for browsers without Web Share API: copy to clipboard
                    navigator.clipboard.writeText(shareUrl).then(() => {
                        alert('Chat link copied to clipboard!');
                        console.log('Chat link copied:', shareUrl);
@@ -1009,8 +1104,6 @@ export default function SingleCharacterChatRoom() {
      }
 
      if (!character) {
-          // This case should ideally be caught by the error state if fetching fails
-          // But added as a safeguard.
           return (
                <div className={`flex flex-col items-center justify-center h-full text-lg ${uiColors.textDanger} p-4`}>
                   <FiAlertCircle className="w-10 h-10 mb-4" />
@@ -1020,7 +1113,7 @@ export default function SingleCharacterChatRoom() {
      }
 
 
-    return (
+   return (
         <div className="flex flex-col h-full">
 
             {/* Chat Room Header */}
@@ -1048,7 +1141,7 @@ export default function SingleCharacterChatRoom() {
                          onClick={handleLikeToggle}
                           className={`p-2 rounded-md transition-colors ${uiColors.hoverBgSubtle} ${isLiked ? uiColors.textAccent : uiColors.textSecondary}`}
                          title={isLiked ? "Unlike Character" : "Like Character"}
-                          disabled={!user} // Disable if not logged in
+                          disabled={!user}
                      >
                          <FiHeart className={`w-5 h-5 ${isLiked ? uiColors.textAccent : uiColors.textSecondary}`} />
                      </button>
@@ -1057,16 +1150,16 @@ export default function SingleCharacterChatRoom() {
                           onClick={handleShareClick}
                           className={`p-2 rounded-md ${uiColors.hoverBgSubtle} ${uiColors.textSecondary}`}
                           title="Share Chat Link"
-                           disabled={!character} // Disable if character not loaded
+                           disabled={!character}
                       >
                          <FiShare2 className={`w-5 h-5 ${uiColors.textSecondary}`} />
                       </button>
                      {/* REAL-TIME CALL BUTTON */}
                        <button
-                          onClick={isCallActive ? handleEndCall : handleStartCall} // Toggle Start/End Call
-                          className={`p-2 rounded-md transition-colors ${uiColors.hoverBgSubtle} ${isCallActive ? uiColors.textDanger : uiColors.textSecondary}`}
+                          onClick={isCallActive ? handleEndCall : handleStartCall}
+                          className={`p-2 rounded-md transition-colors ${isCallActive ? uiColors.textDanger : uiColors.textSecondary} ${uiColors.hoverBgSubtle}`}
                           title={isCallActive ? "End Call" : "Start Voice Call"}
-                           disabled={!user || !character} // Disable if not logged in or character not loaded
+                           disabled={!user || !character}
                       >
                          {isCallActive ? (
                              <FiPhoneMissed className="w-5 h-5" />
@@ -1093,39 +1186,52 @@ export default function SingleCharacterChatRoom() {
                  </div>
             </div>
 
-            {/* Chat Messages Area (Displays Transcripts + History) */}
+             {/* Live Partial Transcript Area */}
+            {(isCallActive && (partialTranscripts.user || partialTranscripts.character)) && (
+                <div ref={partialTranscriptAreaRef} className={`flex-shrink-0 px-4 sm:px-6 lg:px-8 py-3 border-b ${uiColors.borderPrimary} ${uiColors.bgSecondary} text-sm italic ${uiColors.textSecondary}`}>
+                    {/* Conditionally render user partial */}
+                    {partialTranscripts.user && (
+                        <p className="text-right">{user?.username || 'You'}: {partialTranscripts.user}</p>
+                    )}
+                    {/* Conditionally render character partial */}
+                    {partialTranscripts.character && (
+                        <p className="text-left">{character?.name || 'Character'}: {partialTranscripts.character}</p>
+                    )}
+                </div>
+            )}
+
+
+            {/* Chat Messages Area (Displays Historical Text + Final Call Transcripts) */}
             <div className="flex-grow overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 hide-scrollbar">
                 <div className="flex flex-col justify-end min-h-full">
                      {/* Ensure messages is an array before mapping */}
                      {Array.isArray(messages) && messages.map(msg => (
+                         // Message component uses msg.sender to determine alignment and avatar
+                         // It correctly ignores audioUrl if null and only renders text.
                          <Message
                              key={msg.id}
-                             message={msg}
+                             message={msg} // Pass the whole message object { id, text, sender, timestamp, audioUrl }
                              characterAvatarUrl={character.avatarUrl}
                              characterName={character.name}
                              userAvatarUrl={user?.imageUrl || '/placeholder-user-avatar.jpg'}
                              userName={user?.username || 'User'}
-                             // onSpeak/isSpeaking props are NOT needed for real-time transcripts
-                             // as audio is handled by Vapi SDK directly
-                              onSpeak={undefined} // Explicitly pass undefined
-                              isSpeaking={false} // Explicitly pass false
                          />
                      ))}
-                    <div ref={messagesEndRef} />
+                    <div ref={messagesEndRef} /> {/* Scroll target for final messages */}
                 </div>
             </div>
 
-            {/* Chat Input Area (for text messages - kept as optional) */}
+            {/* Chat Input Area (for text messages) */}
             <div className={`flex-shrink-0 p-4 border-t ${uiColors.borderPrimary}`}>
                  <div className={`text-center text-xs ${uiColors.textSecondary} mb-3`}>
                      This is A.I. and not a real person. Treat everything it says as fiction <FiAlertCircle className="inline-block ml-1 w-3 h-3" />
                  </div>
                 <form onSubmit={handleSendMessage} className={`flex items-center rounded-md border ${uiColors.borderPrimary} ${uiColors.bgSecondary} p-2`}>
                     {/* Attachment/Image Buttons (Placeholders) */}
-                    <button type="button" className={`p-2 rounded-md ${uiColors.hoverBgSubtle} mr-2`} title="Add Attachment">
+                    <button type="button" className={`p-2 rounded-md ${uiColors.hoverBgSubtle} mr-2`} title="Add Attachment" disabled={isLoading || !user || !character || isCallActive}>
                          <FiPlusCircle className={`w-5 h-5 ${uiColors.textSecondary}`} />
                     </button>
-                     <button type="button" className={`p-2 rounded-md ${uiColors.hoverBgSubtle} mr-2`} title="Add Image">
+                     <button type="button" className={`p-2 rounded-md ${uiColors.hoverBgSubtle} mr-2`} title="Add Image" disabled={isLoading || !user || !character || isCallActive}>
                          <FiImage className={`w-5 h-5 ${uiColors.textSecondary}`} />
                     </button>
                     {/* Text Input */}
@@ -1134,26 +1240,26 @@ export default function SingleCharacterChatRoom() {
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
                         className={`flex-grow p-2 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} outline-none border-none`}
-                        placeholder={`Type a message to ${character.name}...`} // Adjusted placeholder
-                         disabled={isLoading || !user || !character || isCallActive} // Disable text input during a call
+                        placeholder={isCallActive ? 'Voice call active...' : `Type a message to ${character.name}...`}
+                         disabled={isLoading || !user || !character || isCallActive}
                     />
                     {/* Send Button */}
                     <button
                          type="submit"
-                         disabled={!chatInput.trim() || isLoading || !user || !character || isCallActive} // Disable text send during a call
-                         className={`p-2 rounded-md transition-colors ${(!chatInput.trim() || isLoading || !user || !character || isCallActive) ? 'opacity-50 cursor-not-allowed' : `${uiColors.accentPrimaryGradient} text-white hover:opacity-80`}`} // Adjusted hover style for gradient
+                         disabled={!chatInput.trim() || isLoading || !user || !character || isCallActive}
+                         className={`p-2 rounded-md transition-colors ${(!chatInput.trim() || isLoading || !user || !character || isCallActive) ? 'opacity-50 cursor-not-allowed' : `${uiColors.accentPrimaryGradient} text-white hover:opacity-80`}`}
                     >
                         <FiSend className="w-5 h-5" />
                     </button>
                 </form>
             </div>
 
-            {/* Simulated Call Modal (Keep if needed for non-voice option) */}
+            {/* Simulated Call Modal (Keep if needed) */}
              <SimulatedCallModal
                  isOpen={isCallModalOpen}
                  onClose={closeCallModal}
-                 characterName={character?.name || 'Character'} // Provide default name
-                 characterAvatarUrl={character?.avatarUrl} // Pass avatar URL
+                 characterName={character?.name || 'Character'}
+                 characterAvatarUrl={character?.avatarUrl}
              />
 
         </div>
