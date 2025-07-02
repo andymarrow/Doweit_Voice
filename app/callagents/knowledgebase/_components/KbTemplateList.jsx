@@ -2,88 +2,49 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FiSearch, FiDownload, FiHeart, FiLoader, FiGlobe, FiLock } from 'react-icons/fi'; // Icons
+import { FiSearch, FiDownload, FiHeart, FiLoader, FiGlobe, FiLock, FiEye, FiAlertTriangle } from 'react-icons/fi'; // Icons
+import { motion } from 'framer-motion';
 
 // Import constants
-import { uiColors } from '../../_constants/uiColors'; // Adjust path
-import { itemVariants } from '../../_constants/uiColors'; // Assuming variants
+import { uiColors } from '../../_constants/uiConstants'; // Adjust path
+import { itemVariants } from '../../_constants/uiConstants'; // Assuming variants
 
 
-// --- Placeholder Mock Data (Replace with API Call later) ---
-// Simulates fetching PUBLIC knowledge bases
+// --- API Helper Function ---
+// Helper function to fetch PUBLIC knowledge bases
 const fetchPublicKnowledgeBases = async () => {
-    console.log("Fetching mock public knowledge bases...");
-    await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
-
-    // Mock data structure matching the DB schema, specifically PUBLIC ones
-    const mockPublicData = [
-         {
-            id: 101,
-            creatorId: null, // System/Template creator
-            name: 'General Business FAQs Template',
-            description: 'A starting point for common business questions (hours, location, contact).',
-            isPublic: true, // Must be public
-            content: [{ type: 'text', value: '## Business Hours\n...\n## Location\n...' }], // Simulate content
-            status: 'ready',
-            createdAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000),
-            updatedAt: new Date(Date.now() - 300 * 24 * 60 * 60 * 1000),
-            // Add template-specific metadata if needed
-            downloads: 1500,
-            likes: 400,
-         },
-        {
-            id: 102,
-            creatorId: null,
-            name: 'eCommerce Product Details Template',
-            description: 'Structure for product descriptions and specifications.',
-            isPublic: true,
-             content: [{ type: 'text', value: '## Product Name: [Product Name]\n- Features: \n- Specs: \n- Price: ' }],
-            status: 'ready',
-            createdAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
-            updatedAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-            downloads: 900,
-            likes: 250,
-        },
-         {
-            id: 103,
-            creatorId: null,
-            name: 'Basic Support Bot KB',
-            description: 'Simple flows for troubleshooting common issues.',
-            isPublic: true,
-             content: [{ type: 'text', value: '## Troubleshooting Guide\n- Problem 1: Solution A\n- Problem 2: Solution B' }],
-            status: 'ready',
-            createdAt: new Date(Date.now() - 50 * 24 * 60 * 60 * 1000),
-            updatedAt: new Date(Date.now() - 50 * 24 * 60 * 60 * 1000),
-            downloads: 2100,
-            likes: 600,
-        },
-        // Add more mock public templates
-    ];
-
-    return mockPublicData; // Filtered to only include isPublic=true
+    console.log("[KbTemplateList] Calling GET /api/knowledgebases/templates...");
+    // *** Call your backend API endpoint for templates ***
+    const response = await fetch('/api/knowledgebases/templates');
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch templates');
+    }
+    const templates = await response.json();
+     console.log("[KbTemplateList] Fetched templates:", templates);
+     // API is expected to return an array of public KBs, including `isOwner: false` and potentially `author` field
+    return templates;
 };
 
 
-// Receive handler to use a template
-function KbTemplateList({ onCreateKb }) { // Reuse onCreateKb handler from the modal/page
+// Receive handler to create a KB (onCreateKb), handler for preview, and isCreating state
+function KbTemplateList({ onCreateKb, onPreviewTemplate, isCreating }) { // *** isCreating prop ***
 
     const [searchTerm, setSearchTerm] = useState('');
     const [publicTemplates, setPublicTemplates] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [fetchError, setFetchError] = useState(null);
+    const [isLoading, setIsLoading] = useState(true); // Loading templates list
+    const [fetchError, setFetchError] = useState(null); // Error for fetching templates
 
 
-    // --- Fetch Public Knowledge Bases (Templates) ---
+    // --- Fetch Public Knowledge Bases (Templates) on mount ---
     useEffect(() => {
         const loadTemplates = async () => {
             setIsLoading(true);
-            setFetchError(null);
+            setFetchError(null); // Clear previous fetch errors
             try {
-                // Replace with API call: const fetchedTemplates = await fetch('/api/knowledgebases?public=true');
-                // Handle API response and errors...
-                 const fetchedTemplates = await fetchPublicKnowledgeBases(); // Using mock data
+                // Call the API helper
+                 const fetchedTemplates = await fetchPublicKnowledgeBases();
                 setPublicTemplates(fetchedTemplates);
-                 console.log("[KbTemplateList] Fetched public templates:", fetchedTemplates);
             } catch (err) {
                 console.error('[KbTemplateList] Error loading templates:', err);
                 setFetchError(err.message);
@@ -100,34 +61,48 @@ function KbTemplateList({ onCreateKb }) { // Reuse onCreateKb handler from the m
     // Filter templates based on search term
     const filteredTemplates = publicTemplates.filter(template =>
         (template.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (template.description || '').toLowerCase().includes(searchTerm.toLowerCase())
-        // Could also search content if feasible/desired
+        (template.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (template.author || '').toLowerCase().includes(searchTerm.toLowerCase()) // Search author too
+        // Could also search content if feasible/desired and API supports it
     );
 
-    // Handler for clicking "Use Template"
+    // Handler for clicking "Use Template" button
     const handleUseTemplateClick = (template) => {
         console.log("[KbTemplateList] Using template:", template.name);
+         // Check if already creating (should be disabled by the prop, but extra check)
+         if (isCreating || isLoading) return;
+
         // Prepare data for creating a new KB based on this template
         const newKbData = {
             name: `Copy of ${template.name}`, // Suggest a name
             description: template.description || 'Created from template.',
-            content: template.content || [], // Copy content
+            content: template.content || [], // Copy content from template
             isPublic: false, // User's copy is private by default
-             // Add any other fields from template necessary for creation
+             status: 'processing', // New KB might need processing
+             // Include any other relevant fields from template necessary for creation
         };
-        // Call the parent handler to create the new KB using this data
-        onCreateKb(newKbData);
-        // Parent will handle the async creation and modal closing
+        // Call the parent handler (onCreateKb) with the data needed to create the new KB
+        onCreateKb(newKbData); // Parent handles the async creation AND modal closing/navigation
+        // Do NOT reset state or close modal here
     };
 
-    // Optional: Handler for Previewing a template (similar to Prompt modal)
-     const handlePreviewTemplate = (template) => {
-         console.log("Previewing template:", template.name);
-         // You would need a Preview Modal component for this
-         // setPreviewTemplateData(template);
-         // setIsPreviewModalOpen(true);
-         alert("Simulating template preview for: " + template.name); // Placeholder
+    // Handler for Previewing a template
+     const handlePreviewClick = (template) => {
+         // Check if already creating or loading
+         if (isCreating || isLoading) return;
+
+         console.log("[KbTemplateList] Previewing template:", template.name);
+         // Call parent's preview handler (if passed down from modal/page)
+          if (onPreviewTemplate) {
+              onPreviewTemplate(template); // Pass the template data for preview
+          } else {
+             // Fallback placeholder if no handler is provided
+             alert("Simulating template preview for: " + template.name);
+         }
      };
+
+     // Determine if buttons are disabled (during parent's creation or this component's loading)
+     const areButtonsDisabled = isCreating || isLoading;
 
 
     // --- Render ---
@@ -141,13 +116,14 @@ function KbTemplateList({ onCreateKb }) { // Reuse onCreateKb handler from the m
                     placeholder="Search templates..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`block w-full p-2 text-sm rounded-r-md ${uiColors.bgSecondary} ${uiColors.textPrimary} outline-none`}
+                    disabled={isLoading} // Disable search while fetching templates
+                    className={`block w-full p-2 text-sm rounded-r-md ${uiColors.bgSecondary} ${uiColors.textPrimary} outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
                 />
             </div>
 
              {fetchError && ( // Display fetch error message
                   <div className={`mb-4 p-3 rounded-md ${uiColors.alertDangerBg} ${uiColors.alertDangerText} text-sm`}>
-                     Error loading templates: {fetchError}
+                     <FiAlertTriangle className="inline-block mr-2 w-5 h-5" /> Error loading templates: {fetchError}
                   </div>
              )}
 
@@ -157,28 +133,30 @@ function KbTemplateList({ onCreateKb }) { // Reuse onCreateKb handler from the m
                  <div className={`text-center py-10 ${uiColors.textSecondary}`}>
                      <FiLoader className="animate-spin mx-auto w-6 h-6 mb-3" /> Loading templates...
                  </div>
-            ) : filteredTemplates.length === 0 ? (
+            ) : filteredTemplates.length === 0 && !fetchError ? ( // Show empty state if not loading, no error, and list empty
                 <div className={`text-center py-10 ${uiColors.textSecondary}`}>No templates found matching your search.</div>
-            ) : (
+            ) : ( // Show grid if not loading and list not empty
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      {filteredTemplates.map(template => (
-                          // You can reuse KnowledgeBaseCard or create a simpler card for templates
                           <motion.div
                               key={template.id} // Use template ID as key
                               variants={itemVariants} // Optional animation
-                              className={`${uiColors.bgSecondary} rounded-lg shadow-sm ${uiColors.borderPrimary} border p-4 space-y-3 flex flex-col`} // flex-col for layout
+                               // Use bgPrimary for cards within modal for contrast
+                              className={`${uiColors.bgPrimary} rounded-lg shadow-sm ${uiColors.borderPrimary} border p-4 space-y-3 flex flex-col`}
                           >
                              {/* Header: Name & Public Status */}
                              <div className="flex items-center justify-between">
                                   <h4 className={`font-semibold text-sm ${uiColors.textPrimary}`}>{template.name}</h4>
-                                   {template.isPublic && <FiGlobe className={`w-4 h-4 ${uiColors.textSecondary}`} title="Public Template" />} {/* Show globe icon */}
+                                   {template.isPublic && <FiGlobe className={`w-4 h-4 ${uiColors.textSecondary}`} title="Public Template" />}
                              </div>
+                             {/* Author (Added display) */}
+                             {template.author && <div className={`text-xs ${uiColors.textSecondary}`}>by {template.author}</div>}
                              {/* Description */}
-                             <p className={`text-xs ${uiColors.textSecondary} flex-grow`}> {/* flex-grow pushes buttons down */}
+                             <p className={`text-xs ${uiColors.textSecondary} flex-grow`}>
                                 {template.description || 'No description provided.'}
                              </p>
 
-                             {/* Stats/Metadata (Example: Downloads/Likes) */}
+                             {/* Stats/Metadata */}
                              <div className={`flex items-center text-xs ${uiColors.textPlaceholder} space-x-3`}>
                                  {template.downloads !== undefined && <span className="flex items-center"><FiDownload className="mr-1 w-3 h-3" /> {template.downloads}</span>}
                                  {template.likes !== undefined && <span className="flex items-center"><FiHeart className="mr-1 w-3 h-3" /> {template.likes}</span>}
@@ -186,17 +164,19 @@ function KbTemplateList({ onCreateKb }) { // Reuse onCreateKb handler from the m
 
                              {/* Actions Buttons */}
                               <div className="flex space-x-2 mt-3">
-                                   {/* Preview Button (Optional) */}
+                                   {/* Preview Button */}
                                    <button
-                                       onClick={() => handlePreviewTemplate(template)} // Call preview handler
-                                        className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${uiColors.bgPrimary} ${uiColors.textSecondary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}
+                                       onClick={() => handlePreviewClick(template)} // Call preview handler
+                                        disabled={areButtonsDisabled} // Disable button
+                                        className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle} disabled:opacity-50 disabled:cursor-not-allowed`}
                                    >
-                                       Preview
+                                       <FiEye className="mr-1 w-3 h-3" /> Preview
                                    </button>
                                    {/* Use Template Button */}
                                   <button
                                       onClick={() => handleUseTemplateClick(template)} // Call handler to use template
-                                       className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${uiColors.accentPrimaryGradient} text-white`}
+                                       disabled={areButtonsDisabled} // Disable button
+                                       className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${uiColors.accentPrimaryGradient} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
                                   >
                                       Use Template
                                   </button>
@@ -206,9 +186,7 @@ function KbTemplateList({ onCreateKb }) { // Reuse onCreateKb handler from the m
                  </div>
             )}
 
-            {/* Optional: Preview Modal */}
-             {/* Render a Preview Modal component here if implementing preview */}
-             {/* {showPreviewModal && <TemplatePreviewModal ... />} */}
+            {/* Preview Modal is handled by the parent modal component */}
 
         </div>
     );

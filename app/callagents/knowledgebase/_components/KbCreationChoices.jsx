@@ -5,7 +5,7 @@ import React from 'react';
 import { FiEdit3, FiFileText, FiCpu } from 'react-icons/fi'; // Icons
 
 // Import constants
-import { uiColors } from '../../_constants/uiColors'; // Adjust path
+import { uiColors } from '../../_constants/uiConstants'; // Adjust path
 
 // Receive handler to select a method
 function KbCreationChoices({ onSelectMethod }) {

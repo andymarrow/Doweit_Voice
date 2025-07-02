@@ -2,14 +2,22 @@
 
 import React, { useState, useEffect } from 'react'; // Keep useEffect if initial setup is needed
 import Image from 'next/image';
-import { FiCheck, FiTrash2, FiX } from 'react-icons/fi'; // Include FiX for vocab remove
+import { FiCheck, FiChevronRight, FiLoader, FiTrash2, FiX } from 'react-icons/fi'; // Include FiX for vocab remove
 
 // Import constants
 import { uiColors } from '@/app/callagents/_constants/uiConstants';  // Correct import path
 
+import SelectKnowledgeBaseModal from './SelectKnowledgeBaseModal'; // Adjust path
+
+
 // Receive config data and the change handler from the parent page
 // The agentId prop is still useful for the Delete Agent action
 function GeneralConfig({ config, onConfigChange, agentId }) {
+
+    // State for the Select KB Modal visibility
+     const [isSelectKbModalOpen, setIsSelectKbModalOpen] = useState(false);
+     // No need for state to store the selected KB ID locally, it's in `config.knowledgeBaseId`
+
 
     // No longer need individual useState for each form field like agentName, voiceEngine, etc.
     // Their values come from the 'config' prop.
@@ -55,6 +63,84 @@ function GeneralConfig({ config, onConfigChange, agentId }) {
             // router.push('/callagents');
         }
     };
+
+     // --- Handlers for the Select KB Modal ---
+     const handleOpenSelectKbModal = () => {
+         setIsSelectKbModalOpen(true);
+     };
+
+     const handleCloseSelectKbModal = () => {
+         setIsSelectKbModalOpen(false);
+     };
+
+     // Handler for when a KB is selected in the modal
+     // Receives the selected KB object OR null (if "No KB" is selected)
+     const handleKnowledgeBaseSelected = (selectedKb) => {
+         console.log("[GeneralConfig] Knowledge Base selected in modal:", selectedKb);
+         // Update the parent's state using onConfigChange
+          // Set the knowledgeBaseId field to the selected KB's ID or null
+         onConfigChange('knowledgeBaseId', selectedKb ? selectedKb.id : null);
+         // The modal is closed by its own handler after selection
+     };
+
+     // --- Fetch the name of the currently linked KB ---
+     // We need to display the *name* of the linked KB, not just the ID.
+     // This requires fetching the KB details based on config.knowledgeBaseId.
+     // This is a common pattern: fetch related data based on a foreign key.
+     const [linkedKbName, setLinkedKbName] = useState(null);
+     const [isLoadingLinkedKb, setIsLoadingLinkedKb] = useState(false);
+     const [linkedKbError, setLinkedKbError] = useState(null);
+
+     useEffect(() => {
+        // Fetch linked KB details only if knowledgeBaseId is set in config
+        if (config?.knowledgeBaseId) {
+             const loadLinkedKb = async () => {
+                 setIsLoadingLinkedKb(true);
+                 setLinkedKbError(null);
+                 setLinkedKbName(null); // Clear previous name while loading
+
+                 try {
+                      // *** Call the GET /api/knowledgebases/[kbid] API to get KB details ***
+                      // Pass config.knowledgeBaseId to the API
+                      const response = await fetch(`/api/knowledgebases/${config.knowledgeBaseId}`);
+                      if (!response.ok) {
+                          // If the linked KB doesn't exist or is private and not owned, this will return 404/403
+                           console.error(`[GeneralConfig] Failed to fetch linked KB ${config.knowledgeBaseId}:`, response.status);
+                           // Set error and name to indicate it's not found/accessible
+                           setLinkedKbError('Linked Knowledge Base not found or inaccessible.');
+                           setLinkedKbName('Error loading KB details'); // Indicate error in UI
+                           // Decide if you want to auto-unlink it in this case
+                           // if (response.status === 404 || response.status === 403) {
+                           //     onConfigChange('knowledgeBaseId', null);
+                           //     toast.error('Linked Knowledge Base not found or inaccessible, link removed.');
+                           // }
+                      } else {
+                          const linkedKb = await response.json();
+                          console.log("[GeneralConfig] Fetched linked KB details:", linkedKb);
+                          // Set the name from the fetched data
+                          setLinkedKbName(linkedKb.name || 'Unnamed Knowledge Base');
+                      }
+                 } catch (err) {
+                     console.error('[GeneralConfig] Error fetching linked KB details:', err);
+                     setLinkedKbError('Error loading linked KB details.');
+                     setLinkedKbName('Error loading KB details');
+                 } finally {
+                     setIsLoadingLinkedKb(false);
+                 }
+             };
+
+             loadLinkedKb();
+
+        } else {
+             // If knowledgeBaseId is null, set the linked KB name state to indicate nothing is linked
+            setLinkedKbName(null);
+             setIsLoadingLinkedKb(false); // Not loading
+             setLinkedKbError(null); // No error
+        }
+        // Dependency array: Re-run this effect whenever config.knowledgeBaseId changes
+    }, [config?.knowledgeBaseId]);
+
+
 
     // Guard clause: If config is not yet loaded, render nothing or a loader
      if (!config) {
@@ -218,23 +304,46 @@ function GeneralConfig({ config, onConfigChange, agentId }) {
 
             {/* Knowledge Base */}
              <div>
-                 <label htmlFor="knowledgeBase" className={`block text-lg font-medium ${uiColors.textSecondary}`}>
+                 <label className={`block text-lg font-medium ${uiColors.textSecondary}`}>
                      Knowledge Base
                  </label>
                  <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
-                     Fine-tune the agent to your needs.
+                     Fine-tune the agent by linking a knowledge base.
                  </p>
-                 {/* This UI element needs to correctly update config.knowledgeBaseId (integer or null) */}
-                 {/* This will likely involve fetching a list of available KBs and letting the user select one */}
-                 {/* For now, it remains a placeholder showing the current KB ID if available */}
-                 <div className={`p-3 rounded-md ${uiColors.bgSecondary} border ${uiColors.borderPrimary} w-full sm:max-w-md ${uiColors.textPlaceholder} text-sm flex items-center justify-between`}>
-                    <span>
-                        {config.knowledgeBaseId ? `Linked KB ID: ${config.knowledgeBaseId}` : 'No Knowledge Base linked'}
-                    </span>
-                     {/* Add buttons to link/unlink KB here, which would call onConfigChange('knowledgeBaseId', newKbId or null) */}
-                    {/* <button>Link KB</button> {config.knowledgeBaseId && <button>Unlink KB</button>} */}
+                 <div className={`p-3 rounded-md border ${uiColors.borderPrimary} w-full sm:max-w-md flex items-center justify-between ${uiColors.bgSecondary} cursor-pointer ${uiColors.hoverBgSubtle}`}
+                      onClick={handleOpenSelectKbModal} // *** Open modal on click ***
+                 >
+                    {isLoadingLinkedKb ? (
+                         <span className={`text-sm ${uiColors.textSecondary} flex items-center`}>
+                              <FiLoader className="animate-spin mr-2" /> Loading linked KB...
+                         </span>
+                    ) : linkedKbError ? (
+                         <span className={`text-sm ${uiColors.textDanger}`}>{linkedKbError}</span>
+                    ) : config.knowledgeBaseId ? (
+                         // Display the fetched linked KB name and ID
+                         <span className={`text-sm ${uiColors.textPrimary}`}>
+                              Linked: <strong className="font-medium">{linkedKbName || 'Loading...'}</strong> (ID: {config.knowledgeBaseId})
+                         </span>
+                    ) : (
+                         // Display 'No Knowledge Base linked' when ID is null
+                         <span className={`text-sm ${uiColors.textSecondary}`}>No Knowledge Base linked</span>
+                    )}
+                     {/* Icon indicating clickable */}
+                     <FiChevronRight className={`w-5 h-5 ${uiColors.textSecondary}`} />
                  </div>
-            </div>
+                  {/* Optional: Link to view the linked KB on the KB detail page (if exists and isOwner or public) */}
+                   {config.knowledgeBaseId && !isLoadingLinkedKb && !linkedKbError && (
+                       <div className="mt-2 text-sm">
+                           {/* You need to determine if the linked KB is accessible/owned to show this link */}
+                           {/* A more complex implementation might require fetching the KB's isOwner/isPublic status here */}
+                           {/* For now, assuming you can link, you can view if accessible */}
+                            {/* <a href={`/callagents/knowledgebase/${config.knowledgeBaseId}`} target="_blank" rel="noopener noreferrer" className={uiColors.textAccent}>
+                                View Knowledge Base <FiCheck className="inline w-3 h-3 ml-0.5 -mt-0.5" />
+                            </a> */}
+                       </div>
+                   )}
+             </div>
+
 
             {/* Custom Vocabulary */}
              <div>
@@ -347,6 +456,14 @@ function GeneralConfig({ config, onConfigChange, agentId }) {
                      Delete Agent
                  </button>
             </div>
+
+            {/* *** Render the Select KB Modal *** */}
+             <SelectKnowledgeBaseModal
+                 isOpen={isSelectKbModalOpen}
+                 onClose={handleCloseSelectKbModal}
+                 onSelectKb={handleKnowledgeBaseSelected} // Pass the selection handler
+                  selectedKbId={config.knowledgeBaseId} // Pass the currently selected KB ID for highlighting
+             />
 
 
         </div>

@@ -6,23 +6,30 @@ import { motion } from 'framer-motion';
 import { FiBookOpen, FiEdit3, FiTrash2, FiEye, FiLock, FiGlobe } from 'react-icons/fi'; // Icons
 
 // Import constants
-import { uiColors } from '../../_constants/uiConstants';
+import { uiColors } from '../../_constants/uiConstants'; // Adjust path
 import { itemVariants } from '../../_constants/uiConstants'; // Assuming variants
 
-function KnowledgeBaseCard({ kb, onView, onEdit, onDelete }) { // Receive KB data and optional handlers
+// Receive KB data and optional handlers, including onClick for navigation
+function KnowledgeBaseCard({ kb, onClick, onView, onEdit, onDelete }) { // *** Added onClick ***
 
     // Optional: Format date for display
     const formattedDate = kb.updatedAt ? new Date(kb.updatedAt).toLocaleDateString() : 'N/A';
 
+    // Determine if the card itself is clickable (only if an onClick prop is provided)
+    const isClickable = typeof onClick === 'function';
+
+
     return (
         <motion.div
              variants={itemVariants} // Apply item variants for animation
-             className={`${uiColors.bgPrimary} rounded-lg shadow-sm ${uiColors.borderPrimary} border p-4 space-y-3 flex flex-col`} // flex-col for bottom alignment
+             // Make the card clickable if onClick is provided
+             className={`${uiColors.bgPrimary} rounded-lg shadow-sm ${uiColors.borderPrimary} border p-4 space-y-3 flex flex-col ${isClickable ? `${uiColors.hoverBgSubtle} cursor-pointer` : ''}`} // Add hover/cursor styles
+             onClick={isClickable ? () => onClick(kb.id) : undefined} // Call onClick with KB ID, only if clickable
         >
             {/* Header: Name & Status/Public Indicator */}
             <div className="flex items-center justify-between">
                  <h3 className={`font-semibold text-base ${uiColors.textPrimary}`}>{kb.name || 'Unnamed Knowledge Base'}</h3>
-                 <div className="flex items-center space-x-2">
+                 <div className="flex items-center space-x-2 flex-shrink-0"> {/* Prevent shrinking */}
                      {/* Status Badge */}
                       {kb.status && (
                            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
@@ -55,39 +62,43 @@ function KnowledgeBaseCard({ kb, onView, onEdit, onDelete }) { // Receive KB dat
                  {/* <span> | {kb.content?.length || 0} chunks</span> */}
              </div>
 
-            {/* Actions Buttons */}
-             <div className="flex items-center space-x-2 mt-3">
-                  {/* View Button (Placeholder) */}
-                 {onView && (
-                     <button
-                          onClick={() => onView(kb)} // Pass the KB object to view handler
-                         className={`p-1 rounded-md ${uiColors.hoverBgSubtle} ${uiColors.textSecondary}`}
-                         title="View Details"
-                     >
-                         <FiEye className="w-4 h-4" />
-                     </button>
-                 )}
-                  {/* Edit Button (Placeholder) */}
-                 {onEdit && (
-                      <button
-                          onClick={() => onEdit(kb)} // Pass the KB object to edit handler
-                         className={`p-1 rounded-md ${uiColors.hoverBgSubtle} ${uiColors.textSecondary}`}
-                         title="Edit"
-                     >
-                         <FiEdit3 className="w-4 h-4" />
-                     </button>
-                 )}
-                  {/* Delete Button (Placeholder) */}
-                 {onDelete && (
-                      <button
-                          onClick={() => onDelete(kb.id)} // Pass the KB ID to delete handler
-                         className={`p-1 rounded-md ${uiColors.hoverBgSubtle} text-red-600 dark:text-red-400`}
-                         title="Delete"
-                     >
-                         <FiTrash2 className="w-4 h-4" />
-                     </button>
-                 )}
-             </div>
+            {/* Actions Buttons (Only show if specific handlers are provided, e.g., not on the main list card where the card itself navigates) */}
+             {/* If you want actions *in addition* to navigation on the main card, adjust this */}
+             {(onView || onEdit || onDelete) && (
+                 <div className="flex items-center space-x-2 mt-3">
+                      {/* View Button (Placeholder) */}
+                     {onView && (
+                         <button
+                              onClick={(e) => { e.stopPropagation(); onView(kb); }} // Stop propagation to prevent card click
+                             className={`p-1 rounded-md ${uiColors.hoverBgSubtle} ${uiColors.textSecondary}`}
+                             title="View Details"
+                         >
+                             <FiEye className="w-4 h-4" />
+                         </button>
+                     )}
+                      {/* Edit Button (Placeholder) */}
+                     {/* Note: Editing typically happens on the detail page now */}
+                     {onEdit && (
+                          <button
+                              onClick={(e) => { e.stopPropagation(); onEdit(kb); }} // Stop propagation
+                             className={`p-1 rounded-md ${uiColors.hoverBgSubtle} ${uiColors.textSecondary}`}
+                             title="Edit"
+                         >
+                             <FiEdit3 className="w-4 h-4" />
+                         </button>
+                     )}
+                      {/* Delete Button (Placeholder) */}
+                     {onDelete && (
+                          <button
+                              onClick={(e) => { e.stopPropagation(); onDelete(kb.id); }} // Stop propagation
+                             className={`p-1 rounded-md ${uiColors.hoverBgSubtle} text-red-600 dark:text-red-400`}
+                             title="Delete"
+                         >
+                             <FiTrash2 className="w-4 h-4" />
+                         </button>
+                     )}
+                 </div>
+             )}
         </motion.div>
     );
 }
