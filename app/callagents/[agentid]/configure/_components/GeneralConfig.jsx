@@ -1,54 +1,66 @@
-// voice-agents-CallAgents/[agentid]/_components/GeneralConfig.jsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Keep useEffect if initial setup is needed
 import Image from 'next/image';
-import { FiTrash2, FiX, FiCheck } from 'react-icons/fi'; // Include FiX for vocab remove
+import { FiCheck, FiTrash2, FiX } from 'react-icons/fi'; // Include FiX for vocab remove
 
 // Import constants
-import { uiColors } from '@/app/callagents/_constants/uiConstants';  // Ensure correct import path
+import { uiColors } from '@/app/callagents/_constants/uiConstants';  // Correct import path
 
-function GeneralConfig({ agentId }) {
-    // Placeholder states for form fields
-    const [agentName, setAgentName] = useState('Emma from AutoTrust');
-    const [voiceEngine, setVoiceEngine] = useState('v2'); // 'v1' or 'v2'
-    const [aiModel, setAiModel] = useState('gpt4o'); // 'gpt4o', 'openai', etc.
-    const [timezone, setTimezone] = useState('Africa/Addis_Ababa'); // Placeholder timezone
-    const [knowledgeBase, setKnowledgeBase] = useState(''); // Placeholder
-    const [customVocabulary, setCustomVocabulary] = useState([]); // Array of terms
-    const [newVocabTerm, setNewVocabTerm] = useState('');
-    const [useFillerWords, setUseFillerWords] = useState(true); // Toggle state
+// Receive config data and the change handler from the parent page
+// The agentId prop is still useful for the Delete Agent action
+function GeneralConfig({ config, onConfigChange, agentId }) {
 
-    // Placeholder for image handling (more complex in reality)
-    const [agentImage, setAgentImage] = useState('/voiceagents/1.jpg'); // Placeholder image path
+    // No longer need individual useState for each form field like agentName, voiceEngine, etc.
+    // Their values come from the 'config' prop.
+    // Only need state for temporary input like 'newVocabTerm'.
+     const [newVocabTerm, setNewVocabTerm] = useState('');
 
-    // Placeholder function for removing image
+    // Placeholder function for image handling (more complex in reality)
+    // This would ideally trigger an API call to remove/update the avatarUrl
     const handleRemoveImage = () => {
-        setAgentImage(null); // Or a default placeholder image
+        // In a real app, you'd call an API here, then update the state via onConfigChange
+        console.log(`[GeneralConfig] Removing image for agent ${agentId} (simulated)`);
+        onConfigChange('avatarUrl', null); // Update parent state to null
     };
 
-    // Placeholder function for adding vocabulary
+    // Handler for adding vocabulary
     const handleAddVocab = (e) => {
         e.preventDefault();
-        if (newVocabTerm.trim() && !customVocabulary.includes(newVocabTerm.trim())) {
-            setCustomVocabulary([...customVocabulary, newVocabTerm.trim()]);
-            setNewVocabTerm('');
+        const term = newVocabTerm.trim();
+        // Check if term is not empty and not already in the vocabulary list
+        if (term && !config.customVocabulary.includes(term)) {
+             // Create a new array and pass it to the parent handler
+            onConfigChange('customVocabulary', [...config.customVocabulary, term]);
+            setNewVocabTerm(''); // Clear the input field
         }
     };
 
-    // Placeholder function for removing vocabulary
+    // Handler for removing vocabulary
     const handleRemoveVocab = (termToRemove) => {
-        setCustomVocabulary(customVocabulary.filter(term => term !== termToRemove));
+        // Filter the current vocabulary list from the config prop
+        const updatedVocabulary = config.customVocabulary.filter(term => term !== termToRemove);
+        // Pass the new array to the parent handler
+        onConfigChange('customVocabulary', updatedVocabulary);
     };
 
     // Placeholder function for deleting agent
     const handleDeleteAgent = () => {
         if (confirm('Are you sure you want to delete this agent? This action cannot be undone.')) {
-            console.log(`Deleting agent ${agentId}`);
+            console.log(`[GeneralConfig] Deleting agent ${agentId}`);
             // Implement actual deletion logic (API call, redirect)
+            // This would be a separate API call (DELETE /api/callagents/[agentid])
             alert(`Agent ${agentId} deleted (simulated)`);
+            // After successful deletion, you'd redirect the user, likely to the main /callagents page
+            // router.push('/callagents');
         }
     };
+
+    // Guard clause: If config is not yet loaded, render nothing or a loader
+     if (!config) {
+         // This shouldn't happen if parent page waits for config, but is good practice
+         return null;
+     }
 
 
     return (
@@ -64,9 +76,9 @@ function GeneralConfig({ agentId }) {
                 </p>
                  <input
                      type="text"
-                     id="agentName" // Has ID
-                     value={agentName}
-                     onChange={(e) => setAgentName(e.target.value)}
+                     id="agentName"
+                     value={config.name || ''} // Use value from config, handle potential null/undefined
+                     onChange={(e) => onConfigChange('name', e.target.value)} // Call parent handler
                      className={`block w-full sm:max-w-md p-2 text-lg rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}
                      placeholder="Enter agent name"
                  />
@@ -81,14 +93,15 @@ function GeneralConfig({ agentId }) {
                     An optional image that will be displayed in your agents list.
                 </p>
                 <div className="flex items-center space-x-4">
-                     {agentImage && (
+                     {/* Use avatarUrl from config */}
+                     {config.avatarUrl && (
                          <div className="flex-shrink-0">
                              <Image
-                                 src={agentImage}
+                                 src={config.avatarUrl}
                                  alt="Agent Avatar"
                                  width={64}
                                  height={64}
-                                 className="rounded-md"
+                                 className="rounded-md object-cover" // Added object-cover
                              />
                          </div>
                      )}
@@ -97,12 +110,14 @@ function GeneralConfig({ agentId }) {
                              Recommended size: 250px x 250px
                          </p>
                          {/* Placeholder for file upload button */}
+                         {/* You'd replace this with actual file input logic */}
                          {/* <button className={`px-3 py-1.5 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}>
                              Upload Image
                          </button> */}
-                         {agentImage && (
+                         {/* Show remove button only if an image exists */}
+                         {config.avatarUrl && (
                               <button
-                                  onClick={handleRemoveImage}
+                                  onClick={handleRemoveImage} // Use the handler
                                   className={`inline-flex items-center px-3 py-1.5 text-lg rounded-md ${uiColors.bgSecondary} ${uiColors.textSecondary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}
                               >
                                   <FiTrash2 className="mr-1 w-4 h-4" /> Remove
@@ -120,27 +135,27 @@ function GeneralConfig({ agentId }) {
                 <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
                     The system that orchestrates your agent's speaking, listening, and reasoning capabilities
                      <a href="#" target="_blank" rel="noopener noreferrer" className={`ml-1 ${uiColors.textAccent} ${uiColors.hoverTextAccentContrast}`}>
-                         Learn more <FiCheck className="inline w-3 h-3 ml-0.5 -mt-0.5" />
+                         Learn more <FiCheck className="inline w-3 h-3 ml-0.5 -mt-0.5" /> {/* FiCheck seems odd here, maybe FiExternalLink? */}
                      </a>
                 </p>
                 <div className="flex rounded-md border ${uiColors.borderPrimary} overflow-hidden w-fit">
                     <button
                         className={`px-4 py-2 text-lg font-medium transition-colors ${
-                            voiceEngine === 'v1'
+                            config.voiceEngine === 'v1'
                                 ? `${uiColors.accentPrimaryGradient} text-white`
                                 : `${uiColors.bgSecondary} ${uiColors.textSecondary} ${uiColors.hoverBgSubtle}`
                         }`}
-                        onClick={() => setVoiceEngine('v1')}
+                        onClick={() => onConfigChange('voiceEngine', 'v1')} // Call parent handler
                     >
                         Version 1.0
                     </button>
                     <button
                         className={`px-4 py-2 text-lg font-medium transition-colors ${
-                            voiceEngine === 'v2'
+                            config.voiceEngine === 'v2'
                                 ? `${uiColors.accentPrimaryGradient} text-white`
                                 : `${uiColors.bgSecondary} ${uiColors.textSecondary} ${uiColors.hoverBgSubtle}`
                         }`}
-                        onClick={() => setVoiceEngine('v2')}
+                        onClick={() => onConfigChange('voiceEngine', 'v2')} // Call parent handler
                     >
                         Version 2.0
                     </button>
@@ -149,7 +164,6 @@ function GeneralConfig({ agentId }) {
 
              {/* AI Model */}
              <div>
-                 {/* Label with 'for' attribute */}
                  <label htmlFor="aiModel" className={`block text-lg font-medium ${uiColors.textSecondary}`}>
                      AI Model
                  </label>
@@ -157,21 +171,23 @@ function GeneralConfig({ agentId }) {
                      Opt for speed or depth to suit your agent's role
                  </p>
                  <div className="flex items-center space-x-4">
-                     {/* Placeholder for AI Model selection display */}
+                     {/* Display the current AI Model name from config */}
                      <div className={`flex items-center p-2 rounded-md ${uiColors.bgSecondary} border ${uiColors.borderPrimary}`}>
                          <div className={`w-5 h-5 mr-2 flex items-center justify-center rounded-full ${uiColors.accentBadgeBg} ${uiColors.accentBadgeText}`}>AI</div>
-                         <span className={`${uiColors.textPrimary} text-lg font-medium`}>GPT-4o</span>
+                         <span className={`${uiColors.textPrimary} text-lg font-medium`}>{config.aiModel || 'Not Selected'}</span> {/* Display current model */}
                      </div>
-                     {/* Select element with matching 'id' attribute */}
                       <select
-                         id="aiModel" // Added ID
-                         value={aiModel}
-                         onChange={(e) => setAiModel(e.target.value)}
+                         id="aiModel"
+                         value={config.aiModel || ''} // Use value from config
+                         onChange={(e) => onConfigChange('aiModel', e.target.value)} // Call parent handler
                          className={`form-select block p-2 w-fit text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.borderPrimary} border outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}
                      >
-                         <option value="gpt4o">GPT-4o</option>
-                         <option value="openai">OpenAI</option>
-                         <option value="other">Other</option>
+                         {/* Add available options. Hardcoded for now, but could be fetched */}
+                         <option value="">Select Model</option>
+                         <option value="gpt-4o">GPT-4o</option>
+                         <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                         <option value="claude-3-opus">Claude 3 Opus</option>
+                         {/* Add more options based on your backend */}
                      </select>
                  </div>
             </div>
@@ -185,14 +201,18 @@ function GeneralConfig({ agentId }) {
                      The region in which your agent will be.
                  </p>
                  <select
-                     id="timezone" // Has ID
-                     value={timezone}
-                     onChange={(e) => setTimezone(e.target.value)}
+                     id="timezone"
+                     value={config.timezone || ''} // Use value from config
+                     onChange={(e) => onConfigChange('timezone', e.target.value)} // Call parent handler
                      className={`form-select block p-2 w-fit text-lg rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.borderPrimary} border outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}
                  >
+                     {/* Add available options. Hardcoded for now, but could be fetched */}
+                     <option value="">Select Timezone</option>
                      <option value="Africa/Addis_Ababa">Africa/Addis_Ababa</option>
                      <option value="America/New_York">America/New_York</option>
                      <option value="Europe/London">Europe/London</option>
+                     <option value="Asia/Tokyo">Asia/Tokyo</option>
+                     {/* Add more options */}
                  </select>
             </div>
 
@@ -204,10 +224,15 @@ function GeneralConfig({ agentId }) {
                  <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
                      Fine-tune the agent to your needs.
                  </p>
-                 {/* Placeholder - this would likely be a link or a complex input */}
-                 {/* Note: This is a div, not a form field, doesn't need an ID/for match */}
-                 <div className={`p-3 rounded-md ${uiColors.bgSecondary} border ${uiColors.borderPrimary} w-full sm:max-w-md ${uiColors.textPlaceholder} text-sm`}>
-                    Knowledge Base Link/Component Placeholder
+                 {/* This UI element needs to correctly update config.knowledgeBaseId (integer or null) */}
+                 {/* This will likely involve fetching a list of available KBs and letting the user select one */}
+                 {/* For now, it remains a placeholder showing the current KB ID if available */}
+                 <div className={`p-3 rounded-md ${uiColors.bgSecondary} border ${uiColors.borderPrimary} w-full sm:max-w-md ${uiColors.textPlaceholder} text-sm flex items-center justify-between`}>
+                    <span>
+                        {config.knowledgeBaseId ? `Linked KB ID: ${config.knowledgeBaseId}` : 'No Knowledge Base linked'}
+                    </span>
+                     {/* Add buttons to link/unlink KB here, which would call onConfigChange('knowledgeBaseId', newKbId or null) */}
+                    {/* <button>Link KB</button> {config.knowledgeBaseId && <button>Unlink KB</button>} */}
                  </div>
             </div>
 
@@ -222,9 +247,9 @@ function GeneralConfig({ agentId }) {
                 <form onSubmit={handleAddVocab} className="flex space-x-2 w-full sm:max-w-md">
                      <input
                          type="text"
-                         id="newVocabTerm" // Has ID
+                         id="newVocabTerm"
                          value={newVocabTerm}
-                         onChange={(e) => setNewVocabTerm(e.target.value)}
+                         onChange={(e) => setNewVocabTerm(e.target.value)} // newVocabTerm uses local state
                          className={`flex-grow p-2 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}
                          placeholder="Start typing to add"
                      />
@@ -235,16 +260,17 @@ function GeneralConfig({ agentId }) {
                             !newVocabTerm.trim() ? 'opacity-50 cursor-not-allowed' : `${uiColors.accentPrimaryGradient}`
                          }`}
                      >
-                         Enter
+                         Add
                      </button>
                  </form>
-                 {customVocabulary.length > 0 && (
+                 {/* Use customVocabulary from config */}
+                 {config.customVocabulary && config.customVocabulary.length > 0 && (
                      <div className="mt-3 flex flex-wrap gap-2">
-                         {customVocabulary.map((term, index) => (
-                              <span key={index} className={`inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded ${uiColors.accentSubtleBg} ${uiColors.accentBadgeText}`}>
+                         {config.customVocabulary.map((term, index) => (
+                              <span key={term + index} className={`inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded ${uiColors.accentSubtleBg} ${uiColors.accentBadgeText}`}>
                                   {term}
                                   <button
-                                      onClick={() => handleRemoveVocab(term)}
+                                      onClick={() => handleRemoveVocab(term)} // Use the handler
                                       className={`ml-1.5 -mr-0.5 h-3 w-3 flex-shrink-0 ${uiColors.accentBadgeText} ${uiColors.hoverTextSecondary}`}
                                   >
                                        <FiX className="h-3 w-3" />
@@ -256,7 +282,6 @@ function GeneralConfig({ agentId }) {
             </div>
 
             {/* Use Realistic Filler Words Toggle */}
-             {/* Label targets the button's ID */}
              <div className="flex items-center justify-between w-full sm:max-w-md">
                  <div>
                      <label htmlFor="fillerWordsToggle" className={`block text-lg font-medium ${uiColors.textSecondary}`}>
@@ -266,25 +291,48 @@ function GeneralConfig({ agentId }) {
                           If enabled, the agent will include natural filler words like 'uh' and 'um'.
                      </p>
                  </div>
-                 {/* Button acting as toggle, has ID */}
+                 {/* Toggle button */}
                  <button
-                      id="fillerWordsToggle" // Has ID
-                     onClick={() => setUseFillerWords(!useFillerWords)}
+                      id="fillerWordsToggle"
+                      // Use value from config, pass new boolean to handler
+                     onClick={() => onConfigChange('useFillerWords', !config.useFillerWords)}
                      className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 ${uiColors.ringAccentShade} focus:ring-offset-2 ${uiColors.ringOffsetPrimary}
-                                 ${useFillerWords ? `${uiColors.accentPrimaryGradient}` : `${uiColors.bgSecondary} border ${uiColors.borderPrimary}`}`} // Fixed string interpolation
+                                 ${config.useFillerWords ? `${uiColors.accentPrimaryGradient}` : `${uiColors.bgSecondary} border ${uiColors.borderPrimary}`}`}
                  >
                      <span className={`sr-only`}>Use realistic filler words</span>
                       <span
                          aria-hidden="true"
                          className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200
-                                     ${useFillerWords ? 'translate-x-5' : 'translate-x-0'}`}
+                                     ${config.useFillerWords ? 'translate-x-5' : 'translate-x-0'}`}
                      ></span>
                  </button>
             </div>
 
+             {/* Agent Status (Optional field to configure here) */}
+             <div>
+                 <label htmlFor="agentStatus" className={`block text-lg font-medium ${uiColors.textSecondary}`}>
+                     Agent Status
+                 </label>
+                 <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
+                     Control whether your agent is active or paused.
+                 </p>
+                 <select
+                     id="agentStatus"
+                     value={config.status || ''} // Use value from config
+                     onChange={(e) => onConfigChange('status', e.target.value)} // Call parent handler
+                     className={`form-select block p-2 w-fit text-lg rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.borderPrimary} border outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}
+                 >
+                     {/* Add available status options */}
+                     <option value="draft">Draft</option>
+                     <option value="active">Active</option>
+                     <option value="paused">Paused</option>
+                     <option value="archived">Archived</option>
+                 </select>
+            </div>
+
 
             {/* Delete Agent */}
-            {/* This is a button for an action, not a form field for data entry, no label needed */}
+            {/* This button doesn't update config state, it performs a separate action */}
             <div className={`p-4 rounded-md border ${uiColors.alertDangerBorder} ${uiColors.alertDangerBg} w-full sm:max-w-md`}>
                 <label className={`block text-lg font-medium ${uiColors.textSecondary}`}>
                      Delete Agent
@@ -293,7 +341,7 @@ function GeneralConfig({ agentId }) {
                     Deleting agents will mean erasing personalized data, voice profiles, and integrations.
                 </p>
                  <button
-                     onClick={handleDeleteAgent}
+                     onClick={handleDeleteAgent} // Use the delete handler
                       className={`px-4 py-2 text-lg font-semibold rounded-md transition-colors ${uiColors.alertDangerButtonBg} ${uiColors.alertDangerButtonText} ${uiColors.alertDangerButtonHoverBg}`}
                  >
                      Delete Agent

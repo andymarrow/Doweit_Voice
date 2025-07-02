@@ -12,7 +12,7 @@ import TestAgentSidePanel from './_components/TestAgentSidePanel';
 import { CallAgentProvider } from './_context/CallAgentContext'; // Adjust path!
 
 // Import constants
-import { uiColors } from '../_constants/uiColors'; // Assuming uiColors is correct here
+import { uiColors } from '../_constants/uiConstants';  // Assuming uiColors is correct here
 
 
 // This component receives the fetched agent data from the Server Layout

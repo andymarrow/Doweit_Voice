@@ -1,13 +1,13 @@
 // voice-agents-CallAgents/[agentid]/calls/_components/DownloadDeleteTab.jsx
 "use client";
 
-import React, { useState } from 'react'; // Need useState for loading state
+import React, { useState } from 'react';
 import { FiDownload, FiTrash2, FiCheck, FiAlertTriangle, FiLoader } from 'react-icons/fi'; // Icons
 
 // Import constants - Adjust path if necessary
-import { uiColors } from '@/app/callagents/_constants/uiConstants'; 
+import { uiColors } from '@/app/callagents/_constants/uiConstants';
 
-// Helper function to simulate file download
+// Helper function to simulate file download (Keep as is)
 const simulateDownload = (filename, content, type) => {
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
@@ -20,35 +20,44 @@ const simulateDownload = (filename, content, type) => {
     URL.revokeObjectURL(url); // Clean up the object URL
 };
 
-function DownloadDeleteTab({ callData, onDeleteCall }) { // Receive callData and onDeleteCall handler
+// Receive callData, onDeleteCall handler, and isDeleting state
+function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) { // *** Added isDeleting ***
 
-    const [isDeleting, setIsDeleting] = useState(false); // State for delete loading
-    const [isDownloadingTranscript, setIsDownloadingTranscript] = useState(false); // State for download loading
-    const [isDownloadingAudio, setIsDownloadingAudio] = useState(false); // State for download loading
+    // Keep local states for download loading, they are specific to this tab's actions
+    const [isDownloadingTranscript, setIsDownloadingTranscript] = useState(false);
+    const [isDownloadingAudio, setIsDownloadingAudio] = useState(false);
+
+    // Determine if the delete button itself is disabled (overall deleting state from parent OR local download states)
+     const isDeleteButtonDisabled = isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData;
+
+    // Determine if download buttons are disabled (overall deleting state OR local download states)
+     const isDownloadButtonDisabled = isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData;
 
 
     const handleDownloadTranscript = async () => {
+        // Use callData.transcript received from the modal/page
         if (!callData || !callData.transcript || callData.transcript.length === 0) {
-            alert("No transcript available to download.");
+            alert("No transcript available to download."); // Or use toast
             return;
         }
         setIsDownloadingTranscript(true);
-        // Simulate asynchronous operation
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const transcriptText = callData.transcript.map(entry =>
-            `${entry.timestamp ? `[${entry.timestamp}] ` : ''}${entry.type.toUpperCase()}: ${entry.text}`
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate processing
+        // API should return transcript as an array of { type, text, timestamp }
+        const transcriptText = (callData.transcript || []).map(entry =>
+            `${entry.timestamp ? `[${entry.timestamp}] ` : ''}${(entry.type || '').toUpperCase()}: ${entry.text || ''}` // Safely access properties
         ).join('\n');
         simulateDownload(`call_${callData.id}_transcript.txt`, transcriptText, 'text/plain');
         setIsDownloadingTranscript(false);
     };
 
     const handleDownloadAudio = async () => {
+         // Use callData.audioUrl received from the modal/page
         if (!callData || !callData.audioUrl) {
-             alert("No audio recording available to download.");
+             alert("No audio recording available to download."); // Or use toast
              return;
          }
          setIsDownloadingAudio(true);
-         // In a real app, you'd fetch the audio blob/file from the audioUrl
+         // In a real app, you'd fetch the audio blob/file from callData.audioUrl
          // and then use simulateDownload (or a better download library)
          // For simulation, we'll just fake the download success
          await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate download time
@@ -57,21 +66,21 @@ function DownloadDeleteTab({ callData, onDeleteCall }) { // Receive callData and
          setIsDownloadingAudio(false);
     };
 
-    const handleDeleteCall = async () => {
+    const handleDeleteCall = () => {
+        // onDeleteCall is the handler passed from the parent page
         if (confirm(`Are you sure you want to delete call ${callData.id}? This action cannot be undone.`)) {
-            setIsDeleting(true);
-            console.log(`Deleting call ${callData.id}`);
-            // Simulate asynchronous operation
-            await new Promise(resolve => setTimeout(resolve, 800));
-            onDeleteCall(callData.id); // Call parent handler with call ID
-            setIsDeleting(false); // State will reset as modal closes
-            // Modal will be closed by parent after deletion is successful
+             // Parent page will handle setting isDeleting=true, calling the API,
+             // updating state, showing toast, and closing the modal.
+             // This component just needs to trigger that process via the prop.
+            onDeleteCall(callData.id);
+            // Do NOT set isDeleting(true) locally here, parent controls it.
+            // Do NOT close the modal here, parent controls it after API response.
         }
     };
 
 
     return (
-        <div className="space-y-6"> {/* Container with vertical spacing */}
+        <div className="space-y-6">
 
             {/* Download Section */}
              <div className={`p-4 rounded-md ${uiColors.bgPrimary} border ${uiColors.borderPrimary} space-y-3`}>
@@ -82,9 +91,8 @@ function DownloadDeleteTab({ callData, onDeleteCall }) { // Receive callData and
                  <div className="flex flex-wrap gap-4">
                      <button
                          onClick={handleDownloadTranscript}
-                         disabled={isDownloadingTranscript || isDownloadingAudio || isDeleting || !callData || !callData.transcript || callData.transcript.length === 0}
-                         className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none
-                                     ${isDownloadingTranscript || isDownloadingAudio || isDeleting || !callData || !callData.transcript || callData.transcript.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                         disabled={isDownloadButtonDisabled || !callData?.transcript || callData.transcript.length === 0} // *** Use isDownloadButtonDisabled ***, check transcript availability
+                         className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
                      >
                          {isDownloadingTranscript ? (
                               <FiLoader className="mr-2 w-4 h-4 animate-spin" />
@@ -95,9 +103,8 @@ function DownloadDeleteTab({ callData, onDeleteCall }) { // Receive callData and
                      </button>
                      <button
                          onClick={handleDownloadAudio}
-                          disabled={isDownloadingTranscript || isDownloadingAudio || isDeleting || !callData || !callData.audioUrl}
-                          className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none
-                                      ${isDownloadingTranscript || isDownloadingAudio || isDeleting || !callData || !callData.audioUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          disabled={isDownloadButtonDisabled || !callData?.audioUrl} // *** Use isDownloadButtonDisabled ***, check audioUrl availability
+                          className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
                      >
                          {isDownloadingAudio ? (
                               <FiLoader className="mr-2 w-4 h-4 animate-spin" />
@@ -121,12 +128,11 @@ function DownloadDeleteTab({ callData, onDeleteCall }) { // Receive callData and
                       </div>
                  </div>
                  <button
-                     onClick={handleDeleteCall}
-                     disabled={isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData} // Disable while deleting or if any other operation is in progress
-                      className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.alertDangerButtonBg} ${uiColors.alertDangerButtonText} ${uiColors.alertDangerButtonHoverBg}
-                                  ${isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData ? 'opacity-50 cursor-not-allowed' : ''}`}
+                     onClick={handleDeleteCall} // Call the handler
+                     disabled={isDeleteButtonDisabled} // *** Use isDeleteButtonDisabled ***
+                      className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.alertDangerButtonBg} ${uiColors.alertDangerButtonText} ${uiColors.alertDangerButtonHoverBg} disabled:opacity-50 disabled:cursor-not-allowed`}
                  >
-                     {isDeleting ? (
+                     {isDeleting ? ( // *** Use isDeleting state from parent ***
                          <FiLoader className="mr-2 w-4 h-4 animate-spin" />
                      ) : (
                           <FiTrash2 className="mr-2 w-4 h-4" />

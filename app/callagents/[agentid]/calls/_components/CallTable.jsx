@@ -5,9 +5,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 
 // Import constants - Adjust path if necessary
-import { uiColors } from '@/app/callagents/_constants/uiConstants'; 
+import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Ensure correct path
 import { itemVariants, sectionVariants } from '@/app/callagents/_constants/uiConstants'; // Assuming variants
-import { accentClasses } from '@/app/callagents/_constants/uiConstants'; 
+// Removed accentClasses import as it wasn't used directly in the button class
 
 function CallTable({ calls, onViewDetails }) { // Receive calls data and detail handler
 
@@ -24,10 +24,18 @@ function CallTable({ calls, onViewDetails }) { // Receive calls data and detail 
         );
     }
 
+     // Helper to format duration from seconds (if stored as number)
+     const formatDuration = (durationInSeconds) => {
+         if (durationInSeconds === undefined || durationInSeconds === null) return 'N/A';
+         const minutes = Math.floor(durationInSeconds / 60);
+         const seconds = durationInSeconds % 60;
+         return `${minutes}m ${seconds}s`;
+     };
+
     return (
-        <motion.div variants={sectionVariants} initial="hidden" animate="visible" className="overflow-x-auto"> {/* Allow horizontal scrolling on small screens */}
-            <table className={`min-w-full divide-y ${uiColors.borderPrimary}`}> {/* Full width table */}
-                <thead className={`${uiColors.bgSecondary}`}> {/* Header background */}
+        <motion.div variants={sectionVariants} initial="hidden" animate="visible" className="overflow-x-auto">
+            <table className={`min-w-full divide-y ${uiColors.borderPrimary}`}>
+                <thead className={`${uiColors.bgSecondary}`}>
                     <tr>
                         {/* Table Headers */}
                         <th scope="col" className={`px-4 py-3 text-left text-xs font-medium ${uiColors.textSecondary} uppercase tracking-wider`}>
@@ -49,49 +57,54 @@ function CallTable({ calls, onViewDetails }) { // Receive calls data and detail 
                             Status
                         </th>
                         <th scope="col" className={`relative px-4 py-3 `}>
-                            <span className="sr-only">Details</span> {/* Accessible label */}
+                            <span className="sr-only">Details</span>
                         </th>
                     </tr>
                 </thead>
-                <tbody className={`divide-y ${uiColors.borderPrimary} ${uiColors.bgPrimary}`}> {/* Body background and dividers */}
+                <tbody className={`divide-y ${uiColors.borderPrimary} ${uiColors.bgPrimary}`}>
                     {calls.map((call) => (
                         <motion.tr
                             key={call.id} // Unique key for each row
-                            variants={itemVariants} // Optional animation for rows
-                            className={`${uiColors.hoverBgSubtle}`} // Hover effect on rows
+                            variants={itemVariants}
+                            className={`${uiColors.hoverBgSubtle}`}
                         >
                             {/* Table Data */}
                             <td className={`px-4 py-4 whitespace-nowrap text-sm font-medium ${uiColors.textPrimary}`}>
-                                {call.agentName}
+                                {/* Access nested agent name if available, fallback to agentName string */}
+                                {call.agent ? call.agent.name : call.agentName || 'N/A'}
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-sm ${uiColors.textSecondary}`}>
-                                {call.callerName}
+                                {call.callerName || 'Unknown'} {/* Use callerName from DB */}
                             </td>
                             <td className={`px-4 py-4 whitespace-nowrap text-sm ${uiColors.textSecondary}`}>
-                                {call.callerNumber}
+                                {call.phoneNumber || 'N/A'} {/* Use phoneNumber from DB */}
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-sm ${uiColors.textSecondary}`}>
-                                {/* Format date nicely */}
-                                {new Date(call.startTime).toLocaleString()}
+                                {/* Format start time */}
+                                {call.startTime ? new Date(call.startTime).toLocaleString() : 'N/A'}
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-sm ${uiColors.textSecondary}`}>
-                                {call.duration}
+                                {/* Use duration from DB (can be number or string), format if needed */}
+                                 {typeof call.duration === 'number' ? formatDuration(call.duration) : call.duration || 'N/A'}
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-sm`}>
-                                {/* Status Badge (Example) */}
+                                {/* Status Badge */}
                                  <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${
                                      call.status === 'Completed' ? `${uiColors.statusBadgeSuccessBg} ${uiColors.statusBadgeSuccessText}` :
                                      call.status === 'Failed' ? `${uiColors.statusBadgeDangerBg} ${uiColors.statusBadgeDangerText}` :
-                                     `${uiColors.statusBadgeWarningBg} ${uiColors.statusBadgeWarningText}` // Default/Other status
+                                     call.status === 'Busy' ? `${uiColors.statusBadgeWarningBg} ${uiColors.statusBadgeWarningText}` : // Added Busy status
+                                     call.status ? `${uiColors.statusBadgeInfoBg} ${uiColors.statusBadgeInfoText}` : // Default/Other status (use info color)
+                                     '' // No status
                                  }`}>
-                                     {call.status}
+                                     {call.status || 'N/A'}
                                  </span>
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-right text-sm font-medium`}>
                                  {/* Details Button */}
                                  <button
                                      onClick={() => onViewDetails(call)} // Call handler with call data
-                                      className={`text-${uiColors.accentPrimaryText} hover:text-${uiColors.accentContrast} ${accentClasses.buttonBg} p-2 rounded-lg transition-colors`}
+                                     // Adjusted button styling assuming accentPrimary is a color name in uiColors
+                                     className={`text-${uiColors.textAccent} hover:text-${uiColors.textAccentContrast} focus:outline-none focus:underline`} // Simple link-style button or apply your standard button styles
                                  >
                                      Details
                                  </button>

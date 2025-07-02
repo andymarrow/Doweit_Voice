@@ -6,7 +6,7 @@ import React from 'react';
 // import Link from 'next/link';
 
 // Import constants - Adjust path if necessary
-import { uiColors } from '@/app/callagents/_constants/uiConstants'; 
+import { uiColors } from '@/app/callagents/_constants/uiConstants';
 
 // Define action tab structure
 const actionTabs = [

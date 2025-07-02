@@ -1,10 +1,9 @@
-// voice-agents-CallAgents/[agentid]/_components/UseTemplateModal.jsx
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
     FiX, FiSearch, FiCheck, FiLock, FiDownload, FiHeart, FiBookOpen, // General icons
-    FiCopy // For copy icon (optional)
+    FiCopy, FiLoader // Added FiLoader for KB upload simulation
 } from 'react-icons/fi'; // Import necessary icons
 
 // Import constants - Adjust path as necessary
@@ -20,7 +19,22 @@ const mockMarketplaceTemplates = [
         lines: 120,
         downloads: 500,
         likes: 150,
-        promptText: '... (Full prompt text for hospital)'
+        promptText: `# Hospital Appointment Setter
+
+## Agent Information
+Agent Name: [Hospital Name] Scheduler
+Personality: Calm, clear, empathetic
+Role: Schedule, confirm, or reschedule patient appointments
+
+## Conversation Flow
+1. Greet patient, confirm identity (DOB/name).
+2. Ask purpose (schedule, reschedule, confirm).
+3. If scheduling: Get patient details, doctor, required date/time, reason for visit. Check availability. Offer options.
+4. If rescheduling: Confirm existing appointment, find new time.
+5. If confirming: Provide details, ask if any questions.
+6. Handle cancellations.
+7. Confirm all details at the end.
+... (more prompt text)`
     },
     {
         id: 'template-restaurant',
@@ -82,7 +96,7 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
     const [kbMethod, setKbMethod] = useState('paste'); // 'paste' or 'upload'
     const [kbTextInput, setKbTextInput] = useState('');
     const [kbFile, setKbFile] = useState(null); // Placeholder for file object
-    const [isLoadingKB, setIsLoadingKB] = useState(false); // For loading file content
+    const [isReadingFile, setIsReadingFile] = useState(false); // State for file reading
 
     // State for the Preview Modal
     const [showPreview, setShowPreview] = useState(false);
@@ -101,17 +115,19 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
             }, 500); // Simulate network delay
             // --- End Simulate API Call ---
         }
-         // Reset states when modal opens/closes
-         if (!isOpen) {
-             setActiveTab('marketplace'); // Reset to marketplace on close
-             setMarketplaceSearchTerm('');
-             setKbMethod('paste');
-             setKbTextInput('');
-             setKbFile(null);
-             setShowPreview(false);
-             setPreviewPromptText('');
+         // Reset states when modal opens
+         if (isOpen) {
+            // Don't reset activeTab immediately on open, user might want KB tab
+            // setMarketplaceSearchTerm(''); // Maybe keep search term?
+             setKbMethod('paste'); // Reset KB method
+             setKbTextInput(''); // Clear KB text input
+             setKbFile(null); // Clear KB file input
+             setShowPreview(false); // Hide preview
+             setPreviewPromptText(''); // Clear preview text
+             setIsReadingFile(false); // Reset file reading state
          }
     }, [isOpen, activeTab, marketplaceTemplates.length]); // Depend on isOpen, activeTab, and whether templates are already loaded
+
 
      // Handle clicks outside the modal to close it
      useEffect(() => {
@@ -144,8 +160,9 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
     };
 
     const handleUseTemplateClick = (promptText) => {
-         onUseTemplate(promptText); // Use the passed handler
-         // onClose(); // Handlers from parent are expected to close the modal
+         onUseTemplate(promptText); // Call the passed handler from the parent
+         // The parent handler is responsible for closing the modal if desired
+         // onClose(); // Uncomment this line if the parent handler *doesn't* close the modal
     };
 
     // Handlers for Knowledge Base actions
@@ -153,23 +170,30 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
          setKbMethod(method);
          setKbTextInput(''); // Clear text when switching method
          setKbFile(null); // Clear file when switching
+         setIsReadingFile(false); // Reset file reading state
      };
 
      const handleKbFileChange = (e) => {
          const file = e.target.files[0];
          if (file) {
               setKbFile(file);
-              // Optional: Read file content here if feasible (e.g., text files)
-              // setIsLoadingKB(true);
-              // const reader = new FileReader();
-              // reader.onload = (event) => {
-              //      setKbTextInput(event.target.result); // Put file content in text area
-              //      setIsLoadingKB(false);
-              // };
-              // reader.readAsText(file); // Or readAsDataURL for other types
+              // Read file content for preview/processing
+              setIsReadingFile(true);
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                   setKbTextInput(event.target.result); // Put file content in text area for preview
+                   setIsReadingFile(false);
+              };
+              reader.onerror = (event) => {
+                   console.error("Error reading file:", event.target.error);
+                   setKbTextInput(`Error reading file: ${event.target.error.message}`);
+                   setIsReadingFile(false);
+              };
+              reader.readAsText(file); // Read as text assuming text/markdown files
          } else {
              setKbFile(null);
               setKbTextInput('');
+              setIsReadingFile(false);
          }
      };
 
@@ -177,21 +201,27 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
          let contentToUse = '';
          if (kbMethod === 'paste' && kbTextInput.trim()) {
              contentToUse = kbTextInput.trim();
-         }
-         // For upload method, you'd need to handle file reading.
-         // This placeholder just uses the text input, even for upload method for now.
-         if (kbMethod === 'upload' && kbFile) {
-             // In a real app, read content from kbFile here
-             // For simulation, maybe just use a placeholder or the text input value
-             contentToUse = `## Content from ${kbFile.name}\n\n` + kbTextInput; // Placeholder structure
-             // If you read file content fully, use that here
+         } else if (kbMethod === 'upload' && kbFile && kbTextInput.trim()) {
+             // Use the content read from the file (stored in kbTextInput)
+             // You might want to prefix it with file name or structure it
+             contentToUse = `## Content from ${kbFile.name}\n\n` + kbTextInput.trim();
          }
 
         if (contentToUse) {
-            onAddKnowledgeBase(contentToUse); // Use the passed handler
-             // onClose(); // Handlers from parent are expected to close the modal
+            onAddKnowledgeBase(contentToUse); // Call the passed handler from the parent
+             // The parent handler is responsible for closing the modal if desired
+             // onClose(); // Uncomment this line if the parent handler *doesn't* close the modal
          } else {
-             alert("Please provide content to add to Knowledge Base."); // Or show a less intrusive message
+             // Improve error message based on method
+             if (kbMethod === 'paste') {
+                 alert("Please paste content into the text area.");
+             } else if (kbMethod === 'upload') {
+                  if (!kbFile) alert("Please select a file to upload.");
+                  else if (isReadingFile) alert("Please wait for the file to finish reading.");
+                  else alert("Could not read content from the selected file.");
+             } else {
+                  alert("Please provide content to add to Knowledge Base.");
+             }
          }
     };
 
@@ -260,7 +290,10 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
 
                             {/* Template List/Grid */}
                             {isLoadingMarketplace ? (
-                                <div className={`text-center py-10 ${uiColors.textSecondary}`}>Loading templates...</div>
+                                <div className={`text-center py-10 ${uiColors.textSecondary}`}>
+                                     <FiLoader className="animate-spin mx-auto w-6 h-6 mb-3" />
+                                     Loading templates...
+                                </div>
                             ) : filteredMarketplaceTemplates.length === 0 ? (
                                 <div className={`text-center py-10 ${uiColors.textSecondary}`}>No templates found.</div>
                             ) : (
@@ -290,10 +323,10 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
                                                         Preview
                                                     </button>
                                                      <button
-                                                         onClick={() => handleUseTemplateClick(template.promptText)}
+                                                         onClick={() => handleUseTemplateClick(template.promptText)} // Calls parent handler
                                                          className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${uiColors.accentPrimaryGradient} text-white`}
                                                      >
-                                                         Use
+                                                         Use Template
                                                      </button>
                                                 </div>
                                             )}
@@ -339,9 +372,9 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
                             {/* Input Area (conditional based on method) */}
                             {kbMethod === 'paste' && (
                                 <div>
-                                     <label htmlFor="kbPasteInput" className="sr-only">Paste your prompt or knowledge base content</label> {/* Accessible label */}
+                                     <label htmlFor="kbPasteInput" className="sr-only">Paste your prompt or knowledge base content</label>
                                     <textarea
-                                         id="kbPasteInput" // Added ID
+                                         id="kbPasteInput"
                                         placeholder="Paste your prompt or knowledge base content here..."
                                         value={kbTextInput}
                                         onChange={(e) => setKbTextInput(e.target.value)}
@@ -352,16 +385,22 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
 
                             {kbMethod === 'upload' && (
                                  <div>
-                                      <label htmlFor="kbUploadInput" className="sr-only">Upload knowledge base file</label> {/* Accessible label */}
+                                      <label htmlFor="kbUploadInput" className="sr-only">Upload knowledge base file</label>
                                      <input
                                           type="file"
-                                          id="kbUploadInput" // Added ID
+                                          id="kbUploadInput"
                                           onChange={handleKbFileChange}
-                                          className={`block w-full text-sm  file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold   file:transition-colors `} // Custom file input styling
+                                          className={`block w-full text-sm ${uiColors.fileInput}`} // Apply custom file input styling from uiColors
                                       />
-                                      {kbFile && <p className={`mt-2 text-sm ${uiColors.textSecondary}`}>Selected file: {kbFile.name}</p>}
+                                       {isReadingFile && (
+                                             <p className={`mt-2 text-sm ${uiColors.textSecondary} flex items-center`}>
+                                                  <FiLoader className="animate-spin mr-2" /> Reading file...
+                                             </p>
+                                       )}
+                                      {kbFile && !isReadingFile && <p className={`mt-2 text-sm ${uiColors.textSecondary}`}>Selected file: {kbFile.name}</p>}
                                       {/* Optional: Textarea to preview file content if read */}
-                                       {kbMethod === 'upload' && kbTextInput && ( // Show text area preview if file was read into text input
+                                       {/* Show text area preview if file was read into text input */}
+                                        {kbMethod === 'upload' && kbTextInput && !isReadingFile && (
                                             <textarea
                                                 readOnly // Read-only preview
                                                  placeholder="File content preview..."
@@ -376,11 +415,11 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
                              {/* Action button for KB tab - positioned logically within the tab content */}
                              <div className="flex justify-end">
                                  <button
-                                     onClick={handleUseKnowledgeBaseClick}
-                                     disabled={isLoadingKB || (kbMethod === 'paste' && !kbTextInput.trim()) || (kbMethod === 'upload' && !kbFile)} // Disable if loading or inputs empty
-                                     className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors text-white ${uiColors.accentPrimaryGradient} ${isLoadingKB || (kbMethod === 'paste' && !kbTextInput.trim()) || (kbMethod === 'upload' && !kbFile) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                     onClick={handleUseKnowledgeBaseClick} // Calls parent handler
+                                     disabled={isReadingFile || (kbMethod === 'paste' && !kbTextInput.trim()) || (kbMethod === 'upload' && (!kbFile || !kbTextInput.trim()))} // Disable if reading file, or inputs empty
+                                     className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors text-white ${uiColors.accentPrimaryGradient} ${isReadingFile || (kbMethod === 'paste' && !kbTextInput.trim()) || (kbMethod === 'upload' && (!kbFile || !kbTextInput.trim())) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                  >
-                                      <FiBookOpen className="mr-2 w-4 h-4" /> Add Knowledge Base
+                                      <FiBookOpen className="mr-2 w-4 h-4" /> Add Knowledge Base to Prompt
                                  </button>
                              </div>
                         </div>
@@ -402,11 +441,11 @@ function UseTemplateModal({ isOpen, onClose, onUseTemplate, onAddKnowledgeBase }
                               {/* Scrollable Prompt Text */}
                              <div className="flex-grow overflow-y-auto p-6">
                                   {/* Use prose for basic markdown-like styling if uiColors supports it */}
-                                   <div className={`prose prose-sm max-w-none ${uiColors.textPrimary}`}>
-                                       <pre className={`${uiColors.bgSecondary} p-4 rounded-md whitespace-pre-wrap break-words`}> {/* Use pre for preserving formatting */}
+                                   {/* <div className={`prose prose-sm max-w-none ${uiColors.textPrimary}`}> */}
+                                       <pre className={`${uiColors.bgSecondary} p-4 rounded-md whitespace-pre-wrap break-words ${uiColors.textPrimary} text-sm`}> {/* Use pre for preserving formatting */}
                                             {previewPromptText}
                                        </pre>
-                                  </div>
+                                  {/* </div> */}
                               </div>
                          </div>
                      </div>

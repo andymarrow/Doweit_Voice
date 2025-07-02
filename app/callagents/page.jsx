@@ -1,242 +1,198 @@
-// voice-agents-CallAgents/[agentid]/page.jsx
+// voice-agents-dashboard/CallAgentsMainPage.jsx
 "use client";
-
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-// useParams is not strictly necessary here anymore as agent is in context,
-// but you might keep it for other page-specific logic if needed.
-// import { useParams } from 'next/navigation';
-import { FiAlertTriangle, FiRefreshCcw, FiPhone, FiBarChart2, FiLoader } from 'react-icons/fi';
+import {
+    FiRefreshCw,
+    FiSearch,
+    FiFilter,
+    FiPlus,
+    FiHelpCircle
+} from 'react-icons/fi';
+import AgentTable from './_components/AgentTable';
+import CreateAgentModal from './_components/CreateAgentModal';
+import CreateAgentFromScratchModal from './_components/CreateAgentFromScratchModal';
 
-// Import constants
-import { sectionVariants, itemVariants, uiColors } from './_constants/uiConstants'; // Adjust path!
-
-// Import the custom hook to get agent data from context
-import { useCallAgent } from './[agentid]/_context/CallAgentContext'; 
-
-
-// Simulate fetching dashboard metrics data (calls, actions counts)
-// This data might be aggregated and fetched separately from the main agent details
-const fetchDashboardMetrics = async (agentId) => {
-     console.log(`Fetching dashboard metrics for agent ${agentId}...`);
-     // In a real app, this would call an API endpoint like /api/callagents/:agentId/metrics
-     // Simulate API call delay
-     await new Promise(resolve => setTimeout(resolve, 700));
-     return {
-         callsData: { total: 15, minutesUsed: 45.5, avgDuration: 3.0 }, // Example data
-         actionsData: { total: 25, apptsScheduled: 3, liveTransfers: 1, smsSent: 5 }, // Example data
-     };
-};
+// Import shared constants
+import {
+    accentButtonClasses,
+    uiAccentClasses
+} from './_constants/uiConstants';
 
 
-export default function AgentDetailMainPage() {
-    // Get the full agent object from context
-    const agent = useCallAgent(); // This hook will throw if context is not available
+function CallAgentsMainPage() {
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isCreateFromScratchModalOpen, setIsCreateFromScratchModalOpen] = useState(false);
+    const [agentTypeToCreate, setAgentTypeToCreate] = useState(null);
 
-    // Use agent.id for fetching page-specific data (metrics)
-    const agentId = agent.id;
-
-    // State for dashboard metrics data
-    const [dashboardMetrics, setDashboardMetrics] = useState({
-         callsData: { total: 0, minutesUsed: 0.0, avgDuration: 0.0 },
-         actionsData: { total: 0, apptsScheduled: 0, liveTransfers: 0, smsSent: 0 },
-    });
-    const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
-    const [metricsError, setMetricsError] = useState(null); // State for metrics fetch error
+    // State to hold the actual list of agents from the DB
+    const [agents, setAgents] = useState([]);
+    const [isLoadingAgents, setIsLoadingAgents] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
 
 
-    // Fetch dashboard metrics when the agentId (from context) is available
-    const loadMetrics = async () => {
-        if (!agentId) return; // Ensure agentId is available before fetching
-        setIsLoadingMetrics(true);
-        setMetricsError(null);
+    // --- loadAgents function now fetches from the API ---
+    const loadAgents = async () => {
+        setIsLoadingAgents(true);
         try {
-            const fetchedMetrics = await fetchDashboardMetrics(agentId);
-            setDashboardMetrics(fetchedMetrics);
-             console.log("Fetched metrics:", fetchedMetrics);
-        } catch (err) {
-            console.error('Error loading metrics:', err);
-            setMetricsError(err.message);
-             // Reset metrics on error
-             setDashboardMetrics({
-                callsData: { total: 0, minutesUsed: 0.0, avgDuration: 0.0 },
-                actionsData: { total: 0, apptsScheduled: 0, liveTransfers: 0, smsSent: 0 },
-             });
+            const response = await fetch('/api/callagents/create'); // Call the new GET API route
+            if (!response.ok) {
+                // Handle potential errors from the API
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to fetch agents.');
+            }
+            const fetchedAgents = await response.json();
+            setAgents(fetchedAgents);
+        } catch (error) {
+            console.error('Error loading agents:', error);
+            // Optionally set an error state to display to the user
+            // setErrorFetchingAgents(error.message);
+            setAgents([]); // Clear agents on error
         } finally {
-            setIsLoadingMetrics(false);
+            setIsLoadingAgents(false);
         }
     };
+    // --- End of loadAgents function ---
 
+
+    // Fetch agents when the component mounts
     useEffect(() => {
-        loadMetrics(); // Initial load when agentId is available on mount
-    }, [agentId]); // Re-run effect if the agentId changes (though unlikely in this layout)
+        loadAgents();
+    }, []); // Empty dependency array means this runs once on mount
 
+    // Filter agents based on search term
+     const filteredAgents = agents.filter(agent =>
+         agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         agent.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (agent.phoneNumber && agent.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase())) // Check phone number if it exists
+     );
 
-    // Use agent.name from context for display
-    const agentName = agent?.name || 'Unnamed Agent';
-    // Check if agent has phone number from context for alert banner
-    const hasPhoneNumber = !!agent?.phoneNumber;
+    // Handlers for the first Create Agent modal
+    const handleCreateAgentClick = () => {
+        setIsCreateModalOpen(true);
+    };
+    const handleCloseCreateModal = () => {
+        setIsCreateModalOpen(false);
+    };
+
+    // Handler called from the first modal when "Start from Scratch" is selected
+    const handleSelectScratchMethod = (selectedType) => {
+         setAgentTypeToCreate(selectedType);
+         setIsCreateFromScratchModalOpen(true);
+         // First modal calls onClose() itself
+    };
+
+    // Handlers for the second Create From Scratch modal
+    const handleCloseCreateFromScratchModal = () => {
+        setIsCreateFromScratchModalOpen(false);
+        setAgentTypeToCreate(null);
+    };
+
+    // Handler called from the second modal when an agent is successfully created
+    const handleAgentCreated = (newAgent) => {
+        console.log("New agent received in Main Page:", newAgent);
+        // Add the new agent to the list immediately
+         setAgents(prevAgents => [newAgent, ...prevAgents]); // Add new agent to top of list
+
+        // Close the scratch modal (handled by modal, but clear state)
+        handleCloseCreateFromScratchModal(); // Clear state associated with this modal
+
+        // Optional: Re-fetch all agents after creating to ensure data is fully synced
+        // This is safer but might be slower than adding the new agent to state.
+        // loadAgents();
+    };
 
 
     return (
-        <div className="flex flex-col space-y-6 w-full h-full">
+        <div className={`relative flex flex-col h-full overflow-y-auto p-2 md:p-3 lg:p-4 hide-scrollbar ${uiAccentClasses.bgPage}`}>
+            {/* Header Bar */}
+            <div className={`flex flex-col md:flex-row items-center justify-between mb-6 p-2 rounded-lg ${uiAccentClasses.bgPrimary} shadow-sm ${uiAccentClasses.borderColor} border space-y-4 md:space-y-0`}>
 
-            {/* Important Alert Banner (Show if agent does NOT have a phone number) */}
-             {!hasPhoneNumber && (
-                 <motion.div
-                      className={`flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 p-4 rounded-md border ${uiColors.alertWarningBorder} ${uiColors.alertWarningBg} ${uiColors.alertWarningText}`}
-                      variants={itemVariants} initial="hidden" animate="visible"
-                 >
-                     <div className="flex items-center flex-1">
-                         <FiAlertTriangle className="flex-shrink-0 w-5 h-5 mr-3" />
-                          <span className="text-sm">Important! Your agent doesn't have a phone number and can't receive calls.</span>
-                     </div>
-                      <button className={`w-full sm:w-auto px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.accentPrimaryGradient}`}>
-                          Assign number
-                      </button>
-                  </motion.div>
-             )}
-
-
-            {/* Dashboard Header/Controls */}
-            <motion.div
-                 className={`flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0 p-4 ${uiColors.bgPrimary} rounded-lg shadow-sm ${uiColors.borderPrimary} border`}
-                 variants={itemVariants} initial="hidden" animate="visible"
-            >
-                {/* Left: Title and Refresh */}
-                <div className="flex items-center space-x-4 flex-shrink-0">
-                     <h2 className={`text-xl font-bold ${uiColors.textPrimary}`}>Dashboard</h2>
-                     {/* Add onClick to refresh metrics */}
+                {/* Left side: Tabs & Refresh */}
+                <div className="flex items-center space-x-4">
+                    {/* Tabs */}
+                    <div className={`flex rounded-md overflow-hidden border ${uiAccentClasses.borderColor}`}>
+                        <button className={`px-4 py-2 text-sm font-medium transition-colors ${uiAccentClasses.activeTabBg} ${uiAccentClasses.activeTabText}`}>
+                            Agents
+                        </button>
+                        <button className={`px-4 py-2 text-sm font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300`}>
+                            Teams
+                        </button>
+                    </div>
+                    {/* Refresh Button - Now correctly calls loadAgents */}
                      <button
-                         className={`p-2 rounded-md ${uiColors.hoverBgSubtle} text-gray-600 dark:text-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
-                         onClick={loadMetrics} // Calls the function to refresh metrics for the current agentId
-                         disabled={isLoadingMetrics || !agentId} // Disable while loading or if no agentId
+                         className={`p-2 rounded-md transition-colors ${uiAccentClasses.hoverBgSubtle}`}
+                         onClick={loadAgents} // <-- Correctly calls the loadAgents function
+                         disabled={isLoadingAgents}
                      >
-                         <FiRefreshCcw className={`w-5 h-5 ${isLoadingMetrics ? 'animate-spin' : ''}`} />
+                         <FiRefreshCw className={`text-gray-600 dark:text-gray-300 ${isLoadingAgents ? 'animate-spin' : ''}`} />
                      </button>
                 </div>
 
-                {/* Right: Filters */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                    {/* Type Filter */}
-                     <div className="flex items-center space-x-1">
-                         <span className={`text-sm ${uiColors.textSecondary}`}>Type:</span>
-                         <select className={`form-select block w-fit text-sm rounded-md p-2 ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.borderPrimary} border outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}>
-                             <option>Live</option>
-                             <option>Test</option>
-                         </select>
-                     </div>
-                     {/* Date Range Filter */}
-                     <div className="flex items-center space-x-1">
-                          <span className={`text-sm ${uiColors.textSecondary}`}>Period:</span>
-                         <select className={`form-select block w-fit text-sm rounded-md p-2 ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.borderPrimary} border outline-none ${uiColors.ringAccentShade} focus:ring-1 transition-colors`}>
-                             <option>Last week</option>
-                             <option>Last month</option>
-                             <option>Last year</option>
-                         </select>
-                     </div>
+                {/* Right side: Search, Filter, Create */}
+                <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4 w-full md:w-auto">
+                    {/* Search Input */}
+                    <div className={`flex items-center border rounded-md px-3 py-1.5 ${uiAccentClasses.borderColor} ${uiAccentClasses.bgSecondary} w-full md:w-auto`}>
+                        <FiSearch className="text-gray-400 mr-2 flex-shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                             value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={`outline-none text-sm ${uiAccentClasses.textPrimary} placeholder-gray-400 dark:placeholder-gray-500 ${uiAccentClasses.bgSecondary} flex-grow min-w-0`}
+                             disabled={isLoadingAgents}
+                        />
+                    </div>
+                    {/* Filter Button */}
+                    <button className={`p-2 rounded-md transition-colors ${uiAccentClasses.hoverBgSubtle} flex-shrink-0`}>
+                        <FiFilter className="text-gray-600 dark:text-gray-300" />
+                    </button>
+                    {/* Create Agent Button */}
+                    <button
+                        className={`inline-flex items-center text-sm font-semibold px-4 py-2 rounded-md shadow ${accentButtonClasses} flex-shrink-0`}
+                        onClick={handleCreateAgentClick}
+                        disabled={isLoadingAgents || isCreateModalOpen || isCreateFromScratchModalOpen}
+                    >
+                        <FiPlus className="mr-2" />
+                        Create Agent
+                    </button>
                 </div>
-            </motion.div>
+            </div>
 
-            {/* Dashboard Content Cards */}
-             {isLoadingMetrics ? (
-                 <div className={`text-center py-20 ${uiColors.textSecondary}`}>
-                      <FiLoader className="animate-spin mx-auto w-8 h-8 mb-4" /> Loading dashboard data...
+            {/* Render the AgentTable component, pass data and loading state */}
+             {isLoadingAgents ? (
+                 <div className={`text-center py-20 ${uiAccentClasses.textSecondary}`}>Loading Agents...</div>
+             ) : filteredAgents.length === 0 && searchTerm === '' ? (
+                 <div className={`text-center py-10 ${uiAccentClasses.textSecondary}`}>
+                      No agents found. Click "Create Agent" to add one.
                  </div>
-             ) : metricsError ? (
-                 <div className={`p-4 rounded-md ${uiColors.alertDangerBg} ${uiColors.alertDangerText} text-sm text-center`}>
-                     Failed to load dashboard metrics: {metricsError}
+             ) : filteredAgents.length === 0 && searchTerm !== '' ? (
+                 <div className={`text-center py-10 ${uiAccentClasses.textSecondary}`}>
+                      No agents match your search.
                  </div>
              ) : (
-                 <>
-                     {/* Calls Card */}
-                     <motion.div
-                          className={`${uiColors.bgPrimary} rounded-lg shadow-sm ${uiColors.borderPrimary} border p-6`}
-                          variants={sectionVariants} initial="hidden" animate="visible"
-                     >
-                         <h3 className={`text-lg font-semibold mb-4 ${uiColors.textPrimary}`}>Calls</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Left: Empty State / Chart (Placeholder) */}
-                               {dashboardMetrics.callsData.total === 0 ? (
-                                   <div className={`flex flex-col items-center justify-center h-48 ${uiColors.textPlaceholder}`}>
-                                       <FiPhone className="w-10 h-10 mb-4" />
-                                       <p className="text-sm text-center">{agentName} has no calls recorded yet.</p>
-                                       <p className="text-xs text-center mt-1">A metric will appear here after your first call.</p>
-                                   </div>
-                               ) : (
-                                    // Render Chart component here when data is available
-                                    <div className={`flex flex-col items-center justify-center h-48 ${uiColors.textPlaceholder}`}>
-                                         {/* Placeholder for Chart */}
-                                         <FiBarChart2 className="w-10 h-10 mb-4" />
-                                         <p className="text-sm">Call Chart Placeholder</p>
-                                    </div>
-                               )}
-                              {/* Right: Metrics - Use data from state */}
-                              <div className="flex flex-col space-y-4">
-                                  <div className="flex justify-between items-center">
-                                      <span className={`text-sm font-medium ${uiColors.textSecondary}`}>Total calls</span>
-                                      <span className={`text-xl font-bold ${uiColors.textPrimary}`}>{dashboardMetrics.callsData.total}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                      <span className={`text-sm font-medium ${uiColors.textSecondary}`}>Minutes used</span>
-                                      <span className={`text-xl font-bold ${uiColors.textPrimary}`}>{dashboardMetrics.callsData.minutesUsed.toFixed(1)}min</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                      <span className={`text-sm font-medium ${uiColors.textSecondary}`}>Avg. call duration</span>
-                                      <span className={`text-xl font-bold ${uiColors.textPrimary}`}>{dashboardMetrics.callsData.avgDuration.toFixed(1)}min</span>
-                                  </div>
-                              </div>
-                          </div>
-                     </motion.div>
-
-                     {/* Actions Card */}
-                     <motion.div
-                          className={`${uiColors.bgPrimary} rounded-lg shadow-sm ${uiColors.borderPrimary} border p-6`}
-                          variants={sectionVariants} initial="hidden" animate="visible"
-                     >
-                         <h3 className={`text-lg font-semibold mb-4 ${uiColors.textPrimary}`}>Actions</h3>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Left: Empty State / Chart (Placeholder) */}
-                              {dashboardMetrics.actionsData.total === 0 ? (
-                                  <div className={`flex flex-col items-center justify-center h-48 ${uiColors.textPlaceholder}`}>
-                                      <FiBarChart2 className="w-10 h-10 mb-4" />
-                                      <p className="text-sm text-center">No actions collected for this agent yet.</p>
-                                  </div>
-                              ) : (
-                                   // Render Chart component here when data is available
-                                   <div className={`flex flex-col items-center justify-center h-48 ${uiColors.textPlaceholder}`}>
-                                        {/* Placeholder for Chart */}
-                                        <FiBarChart2 className="w-10 h-10 mb-4" />
-                                        <p className="text-sm">Action Chart Placeholder</p>
-                                   </div>
-                              )}
-                             {/* Right: Metrics - Use data from state */}
-                             <div className="flex flex-col space-y-4">
-                                  <div className="flex justify-between items-center">
-                                       <span className={`text-sm font-medium ${uiColors.textSecondary}`}>Total actions collected</span>
-                                       <span className={`text-xl font-bold ${uiColors.textPrimary}`}>{dashboardMetrics.actionsData.total}</span>
-                                  </div>
-                                 <div className="flex justify-between items-center">
-                                     <span className={`text-sm font-medium ${uiColors.textSecondary}`}>Appts. scheduled</span>
-                                     <span className={`text-xl font-bold ${uiColors.textPrimary}`}>{dashboardMetrics.actionsData.apptsScheduled}</span>
-                                 </div>
-                                 <div className="flex justify-between items-center">
-                                     <span className={`text-sm font-medium ${uiColors.textSecondary}`}>Live transfers</span>
-                                     <span className={`text-xl font-bold ${uiColors.textPrimary}`}>{dashboardMetrics.actionsData.liveTransfers}</span>
-                                 </div>
-                                  <div className="flex justify-between items-center">
-                                       <span className={`text-sm font-medium ${uiColors.textSecondary}`}>SMS sent</span>
-                                       <span className={`text-xl font-bold ${uiColors.textPrimary}`}>{dashboardMetrics.actionsData.smsSent}</span>
-                                  </div>
-                              </div>
-                          </div>
-                      </motion.div>
-                 </>
+                 // Pass the filtered agents to the table
+                 <AgentTable agents={filteredAgents} />
              )}
 
 
-            {/* Add more dashboard sections/cards here */}
+            {/* Render the first Create Agent Modal */}
+            <CreateAgentModal
+                isOpen={isCreateModalOpen}
+                onClose={handleCloseCreateModal}
+                onSelectScratch={handleSelectScratchMethod}
+            />
+
+            {/* Render the second Create From Scratch Modal */}
+             {isCreateFromScratchModalOpen && agentTypeToCreate && (
+                 <CreateAgentFromScratchModal
+                    isOpen={isCreateFromScratchModalOpen}
+                    onClose={handleCloseCreateFromScratchModal}
+                    agentType={agentTypeToCreate}
+                    onAgentCreated={handleAgentCreated}
+                 />
+             )}
 
         </div>
     );
 }
+export default CallAgentsMainPage;

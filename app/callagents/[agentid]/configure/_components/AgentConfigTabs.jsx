@@ -1,17 +1,12 @@
-// voice-agents-CallAgents/[agentid]/_components/AgentConfigTabs.jsx
 "use client";
 
 import React from 'react';
-// Remove usePathname and Link imports as we'll use buttons
-// import { usePathname } from 'next/navigation';
-// import Link from 'next/link';
-
 import {
     FiSettings, FiVolume2, FiPhoneCall // Icons for tabs
 } from 'react-icons/fi';
 
 // Import constants
-import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Ensure correct import path
+import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Correct import path
 
 const configTabs = [
     { name: 'General', key: 'general', icon: FiSettings },
@@ -19,12 +14,8 @@ const configTabs = [
     { name: 'Call Configuration', key: 'call-configuration', icon: FiPhoneCall },
 ];
 
-// No need for agentId prop here anymore, it's only used to construct URLs in the sidebar
-// function AgentConfigTabs({ agentId, activeTab, onTabChange }) {
-function AgentConfigTabs({ activeTab, onTabChange }) { // Remove agentId prop
-
-    // usePathname is no longer needed here
-    // const pathname = usePathname();
+// Receiving activeTab and onTabChange from the parent page
+function AgentConfigTabs({ activeTab, onTabChange }) {
 
     return (
         <div className={`flex border-b ${uiColors.borderPrimary} mb-6`}>
@@ -32,7 +23,7 @@ function AgentConfigTabs({ activeTab, onTabChange }) { // Remove agentId prop
                  const isActive = activeTab === tab.key;
 
                 return (
-                     // Use a button instead of a Link
+                     // Use a button to trigger the parent's state update
                      <button
                          key={tab.key}
                          onClick={() => onTabChange(tab.key)} // Call parent handler

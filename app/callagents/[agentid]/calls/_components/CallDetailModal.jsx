@@ -11,7 +11,7 @@ import ActionsDataTab from './ActionsDataTab';
 import DownloadDeleteTab from './DownloadDeleteTab';
 
 // Import constants - Adjust path if necessary
-import { uiColors } from '@/app/callagents/_constants/uiConstants'; 
+import { uiColors } from '@/app/callagents/_constants/uiConstants';
 
 const detailTabs = [
     { name: 'Transcript', key: 'transcript' },
@@ -25,8 +25,8 @@ const tabContentComponents = {
     download: DownloadDeleteTab,
 };
 
-
-function CallDetailModal({ isOpen, onClose, callData, onDeleteCall }) { // Receive callData and delete handler
+// Receive callData, onDeleteCall handler, and isDeleting state
+function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting }) { // *** Added isDeleting ***
 
     const [activeTab, setActiveTab] = useState('transcript'); // Default active tab
     const modalRef = useRef(null); // Ref for modal content
@@ -37,22 +37,30 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall }) { // Recei
              setActiveTab('transcript'); // Always start on the Transcript tab
              // Reset scroll position if needed - often handled by overflow styles
         }
-    }, [isOpen, callData]); // Re-run when modal opens or a different call is selected
+         // Reset scroll position of the modal content area on tab change
+         const contentArea = modalRef.current?.querySelector('.flex-grow.overflow-y-auto');
+         if (contentArea) {
+             contentArea.scrollTop = 0;
+         }
+    }, [isOpen, callData, activeTab]); // Re-run when modal opens, different call selected, or tab changes
+
 
      // Handle clicks outside the modal to close it
      useEffect(() => {
          const handleClickOutside = (event) => {
-             if (modalRef.current && !modalRef.current.contains(event.target) && isOpen) {
+             // Only close if the click is outside the modal content AND not during deletion
+             if (modalRef.current && !modalRef.current.contains(event.target) && isOpen && !isDeleting) { // *** Added !isDeleting ***
                  onClose();
              }
          };
+         // Add or remove the event listener based on modal state
          if (isOpen) {
              document.addEventListener("mousedown", handleClickOutside);
          }
          return () => {
              document.removeEventListener("mousedown", handleClickOutside);
          };
-     }, [isOpen, onClose]);
+     }, [isOpen, onClose, isDeleting]); // Depend on isOpen, onClose, isDeleting
 
 
     // Render nothing if not open or no data
@@ -61,47 +69,55 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall }) { // Recei
     // Get the content component based on the active tab
     const CurrentTabComponent = tabContentComponents[activeTab];
 
+    // Format start time and duration for display in the header
+     const formattedStartTime = callData.startTime ? new Date(callData.startTime).toLocaleString() : 'N/A';
+     // You might need a helper to format duration from seconds if not already stored as string
+     const formattedDuration = callData.duration !== undefined && callData.duration !== null ? `${callData.duration}s` : callData.duration || 'N/A'; // Assuming duration is in seconds if number
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={onClose}>
             <div
                 ref={modalRef} // Attach ref
-                className={`relative ${uiColors.bgPrimary} rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col`} // Max width, height, flex column layout
+                className={`relative ${uiColors.bgPrimary} rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col ${isDeleting ? 'pointer-events-none' : ''}`} // Max width, height, flex column, *** Disable pointer events when deleting ***
                 onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing
             >
                 {/* Header */}
-                <div className={`flex items-center justify-between border-b ${uiColors.borderPrimary} px-6 py-4 flex-shrink-0`}> {/* Padding adjusted */}
-                    <h3 className={`text-lg font-semibold ${uiColors.textPrimary}`}>Call Details</h3>
-                    <button onClick={onClose} className={`p-1 rounded-md ${uiColors.hoverBgSubtle}`} title="Close">
+                <div className={`flex items-center justify-between border-b ${uiColors.borderPrimary} px-6 py-4 flex-shrink-0`}>
+                    <h3 className={`text-lg font-semibold ${uiColors.textPrimary}`}>Call Details ({callData.id})</h3> {/* Display call ID */}
+                    {/* Disable close button when deleting */}
+                    <button onClick={onClose} className={`p-1 rounded-md ${uiColors.hoverBgSubtle} ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`} title="Close" disabled={isDeleting}> {/* *** Disable when deleting *** */}
                         <FiX className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                     </button>
                 </div>
 
                 {/* Agent/Caller Info (Optional - display summary here) */}
-                 <div className={`px-6 py-3 text-sm ${uiColors.textSecondary} flex items-center justify-between border-b ${uiColors.borderPrimary} flex-shrink-0`}>
-                     <span>Agent: <strong className={`${uiColors.textPrimary}`}>{callData.agentName}</strong></span>
-                     <span>Caller: <strong className={`${uiColors.textPrimary}`}>{callData.callerName || callData.callerNumber || 'Unknown'}</strong></span>
-                      {/* Add more key details if desired */}
+                 <div className={`px-6 py-3 text-sm ${uiColors.textSecondary} flex items-center justify-between border-b ${uiColors.borderPrimary} flex-shrink-0 flex-wrap gap-2`}> {/* Added flex-wrap and gap */}
+                     <span>Agent: <strong className={`${uiColors.textPrimary}`}>{callData.agent ? callData.agent.name : (callData.agentName || 'N/A')}</strong></span> {/* Use nested agent name if available, fallback to flat agentName */}
+                     <span>Caller: <strong className={`${uiColors.textPrimary}`}>{callData.callerName || callData.phoneNumber || 'Unknown'}</strong></span> {/* Use phoneNumber from DB */}
+                      <span>Status: <strong className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${
+                          callData.status === 'Completed' ? `${uiColors.statusBadgeSuccessBg} ${uiColors.statusBadgeSuccessText}` :
+                          callData.status === 'Failed' ? `${uiColors.statusBadgeDangerBg} ${uiColors.statusBadgeDangerText}` :
+                           callData.status ? `${uiColors.statusBadgeWarningBg} ${uiColors.statusBadgeWarningText}` : // Default/Other status
+                           ''
+                      }`}>{callData.status || 'N/A'}</strong></span> {/* Status badge */}
+                      <span>Start: <strong className={`${uiColors.textPrimary}`}>{formattedStartTime}</strong></span>
+                       <span>Duration: <strong className={`${uiColors.textPrimary}`}>{formattedDuration}</strong></span>
                  </div>
 
 
                 {/* Tabs */}
-                 <div className="px-6 pt-4 flex-shrink-0"> {/* Padding and prevent shrinking */}
+                 <div className="px-6 pt-4 flex-shrink-0">
                     <CallDetailTabs activeTab={activeTab} onTabChange={setActiveTab} />
                  </div>
 
 
                 {/* Tab Content Area */}
-                {/* flex-grow to take remaining space, overflow-y-auto to make content scrollable */}
-                 <div className="flex-grow overflow-y-auto px-6 py-4 hide-scrollbar"> {/* Added padding here */}
-                     {/* Render the active tab component */}
+                 <div className="flex-grow overflow-y-auto px-6 py-4 hide-scrollbar">
                      {CurrentTabComponent ? (
                          <CurrentTabComponent
                              callData={callData} // Pass all call data to tabs
-                             // Or pass specific data:
-                             // transcript={callData.transcript}
-                             // actionsData={callData.actionsData}
-                             // audioUrl={callData.audioUrl}
-                             onDeleteCall={onDeleteCall} // Pass delete handler to Download/Delete tab
+                             onDeleteCall={onDeleteCall} // Pass delete handler only to Download/Delete tab
+                             isDeleting={isDeleting} // *** Pass deleting state to tabs ***
                          />
                      ) : (
                          <div className={`text-center ${uiColors.textDanger} py-10`}>

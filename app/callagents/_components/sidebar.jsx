@@ -52,7 +52,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     // Define the FLAT list of navigation items based on the image
     const sidebarNavItems = [
         { name: 'Agents', icon: FiBriefcase, href: '/callagents', active: true }, // Active item based on image
-        { name: 'Knowledge Base', icon: FiBookOpen, href: '/knowledge-base' },
+        { name: 'Knowledge Base', icon: FiBookOpen, href: '/callagents/knowledgebase' },
         { name: 'Actions', icon: FiZap, href: '/callagents/actions' },
         { name: 'Workflows', icon: FiShare2, href: '/workflows' },
         { name: 'Contacts', icon: FiUsers, href: '/contacts' },
