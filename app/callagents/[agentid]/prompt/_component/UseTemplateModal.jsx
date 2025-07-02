@@ -16,7 +16,7 @@ const mockMarketplaceTemplates = [
         id: 'template-hospital',
         locked: true, // Example locked template
         name: 'Hospital Appointment Setter',
-        author: 'Synthflow Team',
+        author: 'Doweit voice Team',
         lines: 120,
         downloads: 500,
         likes: 150,
@@ -50,7 +50,7 @@ Role: Take customer food orders
         id: 'template-realestate',
         locked: false,
         name: 'Real Estate Lead Qualifier',
-        author: 'Synthflow Partner',
+        author: 'Doweit voice Partner',
         lines: 150,
         downloads: 800,
         likes: 250,

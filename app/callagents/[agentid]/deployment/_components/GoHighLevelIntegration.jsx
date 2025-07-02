@@ -22,9 +22,9 @@ function GoHighLevelIntegration({ agentId }) {
                      <div className={`flex items-start space-x-3 ${uiColors.textSecondary}`}>
                          <div className="flex-shrink-0 mt-0.5">1</div> {/* Step number */}
                          <div>
-                             <div className={`font-medium ${uiColors.textPrimary}`}>Install the Synthflow app</div>
+                             <div className={`font-medium ${uiColors.textPrimary}`}>Install the Doweit voice app</div>
                              <p className="text-sm">
-                                 Install the Synthflow app on your agency or chosen subaccount via the
+                                 Install the Doweit voice app on your agency or chosen subaccount via the
                                   <a href="#" className={`ml-1 ${uiColors.textAccent} ${uiColors.hoverTextAccentContrast}`} target="_blank" rel="noopener noreferrer">marketplace</a>.
                              </p>
                          </div>
@@ -37,7 +37,7 @@ function GoHighLevelIntegration({ agentId }) {
                              <div className={`font-medium ${uiColors.textPrimary}`}>Documentation & Video Guide</div>
                              <p className="text-sm">
                                   <a href="#" className={`inline-flex items-center mr-4 ${uiColors.textAccent} ${uiColors.hoverTextAccentContrast}`} target="_blank" rel="noopener noreferrer">
-                                      <FiBookOpen className="mr-1 w-4 h-4" /> Learn how to install Synthflow in your GHL app
+                                      <FiBookOpen className="mr-1 w-4 h-4" /> Learn how to install Doweit voice in your GHL app
                                   </a>
                                   <a href="#" className={`inline-flex items-center ${uiColors.textAccent} ${uiColors.hoverTextAccentContrast}`} target="_blank" rel="noopener noreferrer">
                                       <FiBookOpen className="mr-1 w-4 h-4" /> Watch the video guide

@@ -1,41 +1,77 @@
 // voice-agents-CallAgents/[agentid]/_components/sidebar.jsx
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Added useState, useEffect
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 
 import {
     FiLayers, FiEdit3, FiZap, FiCompass, FiPhoneCall, FiFileText, FiUploadCloud, // Example Icons
-    FiChevronLeft, FiChevronRight // Icons for collapse
+    FiChevronLeft, FiChevronRight,
+    FiCopy, FiCheck // Added Copy and Check icons
 } from 'react-icons/fi';
 
 // Import constants
-import { uiColors } from '../../_constants/uiConstants';
+import { uiColors } from '../../_constants/uiConstants'; // Adjust path!
+
+// Import the custom hook to get agent data from context
+import { useCallAgent } from '../_context/CallAgentContext'; // Adjust path!
+
 
 const detailSidebarNavItems = [
-    { name: 'Dashboard', icon: FiLayers, hrefSegment: '' }, // This will correctly resolve to /[agentid]
-    { name: 'Configure', icon: FiEdit3, hrefSegment: 'configure' }, // This will correctly resolve to /[agentid]/configure
+    { name: 'Dashboard', icon: FiLayers, hrefSegment: '' },
+    { name: 'Configure', icon: FiEdit3, hrefSegment: 'configure' },
     { name: 'Prompt', icon: FiFileText, hrefSegment: 'prompt' },
     { name: 'Actions', icon: FiZap, hrefSegment: 'actions' },
     { name: 'Deployment', icon: FiUploadCloud, hrefSegment: 'deployment' },
     { name: 'Calls', icon: FiPhoneCall, hrefSegment: 'calls' },
-    { name: 'Template', icon: FiFileText, hrefSegment: 'template' },
+    { name: 'Template', icon: FiFileText, hrefSegment: 'template' }, // Assuming a Template page exists
 ];
 
 const hireExpertData = {
     badge: '0%',
     title: 'Hire an Expert',
-    description: 'Hire a certified Synthflow expert to help you build your AI project with Synthflow. Submit your project below to be matched with our top experts.',
+    description: 'Hire a certified Doweit voice expert to help you build your AI project with Doweit voice. Submit your project below to be matched with our top experts.',
     buttonText: 'Hire Now',
     buttonLink: '#hire-expert'
 };
 
 
-// Receive isCollapsed, toggleCollapse, and onTestButtonClick props
-function DetailAgentSidebar({ agentId, isCollapsed, toggleCollapse, onTestButtonClick }) {
+function DetailAgentSidebar({ isCollapsed, toggleCollapse, onTestButtonClick }) {
      const pathname = usePathname();
+     const agent = useCallAgent(); // Get the agent data from context
+
+     // State to manage the "Copied!" feedback
+     const [isCopied, setIsCopied] = useState(false);
+
+     // --- Copy ID Logic ---
+     const handleCopyClick = async () => {
+         if (!agent || !agent.id) return; // Can't copy if no agent or ID
+
+         try {
+             // Use the modern Clipboard API
+             await navigator.clipboard.writeText(String(agent.id));
+             setIsCopied(true); // Set copied state to true
+
+             // Reset copied state after a few seconds
+             setTimeout(() => {
+                 setIsCopied(false);
+             }, 2000); // Show "Copied!" for 2 seconds
+
+         } catch (err) {
+             console.error('Failed to copy agent ID:', err);
+             // Optionally show an error message to the user
+             // alert('Failed to copy ID.');
+         }
+     };
+     // --- End Copy ID Logic ---
+
+
+     // Agent data is guaranteed to be available here because the layout handles the notFound case.
+     // You can destructure properties directly:
+     const { id: agentId, name: agentName, type: agentType, avatarUrl: agentAvatarUrl, voiceEngine: agentVoiceEngine } = agent;
+
 
      return (
         <div className={`flex flex-col h-full ${isCollapsed ? 'items-center' : 'space-y-6'}`}>
@@ -59,16 +95,46 @@ function DetailAgentSidebar({ agentId, isCollapsed, toggleCollapse, onTestButton
             </div>
 
 
-            {/* Agent Info (Avatar, Name, Type, Status) - Adjust based on collapsed state */}
+            {/* Agent Info (Avatar, Name, Type, Status) - Use data from the 'agent' object */}
              <div className={`flex flex-col ${isCollapsed ? 'items-center text-center' : ''} pb-4 border-b ${uiColors.borderPrimary} ${isCollapsed ? '' : 'mb-4'}`}>
                  <div className={`flex items-center justify-center ${isCollapsed ? 'mb-0' : 'mb-2'}`}>
-                     <Image src="/voiceagents/1.jpg" alt="Emma from AutoTrust" width={isCollapsed ? 32 : 48} height={isCollapsed ? 32 : 48} className="rounded-full" />
+                     {/* Use agentAvatarUrl */}
+                     {agentAvatarUrl ? (
+                          <div className={`${isCollapsed ? 'w-8 h-8' : 'w-12 h-12'} rounded-full overflow-hidden flex-shrink-0 relative`}>
+                             {/* Use Next/Image with fill and sizes */}
+                             <Image src={agentAvatarUrl} alt={`${agentName || 'Agent'}'s avatar`} fill style={{objectFit:"cover"}} sizes={isCollapsed ? "32px" : "48px"} priority /> {/* Added priority */}
+                          </div>
+                     ) : (
+                          <div className={`${isCollapsed ? 'w-8 h-8' : 'w-12 h-12'} rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-gray-700 dark:text-gray-300`}>
+                             {/* Use first letter of agent name */}
+                             {agentName ? agentName.charAt(0).toUpperCase() : ''}
+                          </div>
+                     )}
                  </div>
                  {!isCollapsed && (
                      <>
-                         <div className={`font-semibold text-lg ${uiColors.textPrimary}`}>Emma from AutoTrust</div>
-                         <div className={`text-sm ${uiColors.textSecondary}`}>Inbound - ID: ...887</div>
-                         <div className={`text-xs ${uiColors.textPlaceholder}`}>V2</div>
+                         {/* Use agentName */}
+                         <div className={`font-semibold text-lg ${uiColors.textPrimary} truncate`}>{agentName || 'Unnamed Agent'}</div>
+                         {/* Use agentType and agentId, add Copy button */}
+                          <div className={`text-sm ${uiColors.textSecondary} flex items-center justify-center`}> {/* Added flex and justify-center */}
+                             <span>{agentType ? agentType.charAt(0).toUpperCase() + agentType.slice(1) : 'Unknown Type'} - ID: ...{agentId ? String(agentId).slice(-3) : 'N/A'}</span> {/* Display truncated ID */}
+                             {/* Add Copy Button next to the ID */}
+                             {agentId && ( // Only show copy button if agentId exists
+                                 <button
+                                     onClick={handleCopyClick} // Call the copy handler
+                                     className={`p-0.5 rounded-md ${uiColors.hoverBgSubtle} ${uiColors.textSecondary} ${uiColors.hoverText} transition-colors ml-1 flex items-center`} // Added ml-1, flex items-center
+                                     title={isCopied ? 'Copied!' : 'Copy Agent ID'} // Tooltip feedback
+                                 >
+                                     {isCopied ? <FiCheck className="w-3 h-3 text-green-500 dark:text-green-400" /> : <FiCopy className="w-3 h-3" />} {/* Icon changes */}
+                                      {/* Optional text feedback */}
+                                      <span className={`text-xs ml-1 transition-opacity ${isCopied ? 'opacity-100' : 'opacity-0'} ${uiColors.textSecondary}`}>
+                                          {isCopied ? 'Copied!' : ''}
+                                      </span>
+                                 </button>
+                             )}
+                         </div>
+                          {/* Use agentVoiceEngine */}
+                         <div className={`text-xs ${uiColors.textPlaceholder}`}>{agentVoiceEngine || 'N/A'}</div>
                      </>
                  )}
             </div>
@@ -76,7 +142,7 @@ function DetailAgentSidebar({ agentId, isCollapsed, toggleCollapse, onTestButton
 
             {/* Test Agent Button - Adjust based on collapsed state */}
              <button
-                 onClick={onTestButtonClick}
+                 onClick={onTestButtonClick} // This handler is passed from the parent Client Layout
                  className={`w-full text-center ${isCollapsed ? 'px-0 py-2' : 'px-4 py-2'} rounded-md font-semibold transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none`}
             >
                  {isCollapsed ? <FiPhoneCall className="w-5 h-5 mx-auto" /> : 'Test Agent'}
@@ -86,9 +152,10 @@ function DetailAgentSidebar({ agentId, isCollapsed, toggleCollapse, onTestButton
             {/* Navigation Links */}
             <nav className="flex-grow overflow-y-auto hide-scrollbar mt-4">
                 {detailSidebarNavItems.map(item => {
-                     // CORRECTED href construction here:
+                     // Construct href using the real agentId from context
                      const href = `/callagents/${agentId}${item.hrefSegment ? '/' + item.hrefSegment : ''}`;
-                     const isActive = pathname === href || (pathname === `/callagents/${agentId}` && item.hrefSegment === ''); // Ensure base path /[[agentid]] matches Dashboard when hrefSegment is ''
+                     // Check if the current pathname starts with the item's href
+                     const isActive = pathname === href || (item.hrefSegment !== '' && pathname.startsWith(`${href}/`)) || (pathname === `/callagents/${agentId}` && item.hrefSegment === '');
 
                     return (
                         <Link key={item.name} href={href} legacyBehavior>
@@ -98,7 +165,8 @@ function DetailAgentSidebar({ agentId, isCollapsed, toggleCollapse, onTestButton
                                                 ? `${uiColors.accentSubtleBg} ${uiColors.accentBadgeText}`
                                                 : `${uiColors.textSecondary} ${uiColors.hoverBgSubtle} ${uiColors.hoverText}`
                                             }`}>
-                                 <item.icon className={`${isCollapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'}`} />
+                                 {/* Apply dynamic icon size based on collapse state */}
+                                 <item.icon className={`${isCollapsed ? 'w-6 h-6' : 'w-5 h-5 mr-3'} flex-shrink-0`} />
                                  {!isCollapsed && item.name}
                             </a>
                         </Link>

@@ -53,7 +53,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     const sidebarNavItems = [
         { name: 'Agents', icon: FiBriefcase, href: '/callagents', active: true }, // Active item based on image
         { name: 'Knowledge Base', icon: FiBookOpen, href: '/knowledge-base' },
-        { name: 'Actions', icon: FiZap, href: '/actions' },
+        { name: 'Actions', icon: FiZap, href: '/callagents/actions' },
         { name: 'Workflows', icon: FiShare2, href: '/workflows' },
         { name: 'Contacts', icon: FiUsers, href: '/contacts' },
         { name: 'Phone Numbers', icon: FiPhone, href: '/phone-numbers' },

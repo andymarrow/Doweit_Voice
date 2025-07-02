@@ -470,11 +470,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                         </div>
 
                                       {/* Link to Clerk's Sign Out */}
-                                       <Link href="/sign-out" legacyBehavior> {/* Assuming you have a /sign-out route configured with Clerk */}
+                                       {/* <Link href="/sign-out" legacyBehavior> 
                                           <a className={`w-full text-left px-3 py-2 rounded transition-colors ${uiColors.hoverBgSubtle}`}>
                                                Logout
                                           </a>
-                                       </Link>
+                                       </Link> */}
                                  </div>
                              </motion.div>
                          )}

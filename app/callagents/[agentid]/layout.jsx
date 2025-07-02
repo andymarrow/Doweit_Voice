@@ -1,82 +1,102 @@
-// voice-agents-CallAgents/[agentid]/layout.jsx
-"use client";
+// app/callagents/[agentid]/layout.jsx
+// This is a Server Component by default
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { FiArrowLeft } from 'react-icons/fi';
+import { notFound } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server'; // Use server-side auth
+import { db } from '@/configs/db'; // Direct DB access in Server Component
+// Assuming your combined schema is in schemaCharacterAI.js
+import { callAgents } from '@/lib/db/schemaCharacterAI';
+import { eq, and } from 'drizzle-orm';
 
-// Import components
-import DetailAgentSidebar from './_components/sidebar';
-import TestAgentSidePanel from './_components/TestAgentSidePanel'; // Import the new component
+// Import the Client Component wrapper
+import AgentDetailLayoutClient from './AgentLayoutClient';
 
-// Import constants
-import { uiColors } from '../_constants/uiConstants';
+// Utility to safely parse agentId from params
+function parseAgentId(params) {
+    const id = parseInt(params.agentid, 10);
+    return isNaN(id) ? null : id;
+}
 
-export default function AgentDetailPageLayout({ children }) {
-    const params = useParams();
-    const agentId = params.agentid;
+// Fetch agent data on the server
+async function getAgentData(agentId, userId) {
+    if (!agentId || !userId) {
+        return null;
+    }
+    console.log(`[AGENT DETAIL LAYOUT] Server fetching agent ID ${agentId} for user ${userId}`);
 
-    // State to manage sidebar collapse
-    const [isCollapsed, setIsCollapsed] = useState(false);
-    // State to manage test panel visibility
-    const [isTestPanelOpen, setIsTestPanelOpen] = useState(false);
+    try {
+        // Direct DB query in Server Component for performance
+        const agent = await db.query.callAgents.findFirst({
+            where: and(
+                eq(callAgents.id, agentId),
+                eq(callAgents.creatorId, userId)
+            ),
+            // Select specific fields needed for the layout and child components
+            columns: {
+                 id: true,
+                 name: true,
+                 type: true, // Needed for display
+                 avatarUrl: true, // Needed for display
+                 voiceEngine: true, // Needed for display
+                 phoneNumber: true, // Needed for the alert banner on dashboard page
+                 // ... include any other fields required immediately by sidebar or dashboard
+                 // If you need full config, remove the columns filter
+                 config: true, // Include config for pages that need it
+                 voiceConfig: true, // Include voice config
+                 callConfig: true, // Include call config
+                 prompt: true, // Include prompt
+                 greetingMessage: true, // Include greeting
+                 knowledgeBaseId: true, // Include KB link
+                 status: true, // Include status
+                 createdAt: true, // Include timestamps
+                 updatedAt: true,
+            }
+        });
+
+        console.log(`[AGENT DETAIL LAYOUT] Fetch result for agent ID ${agentId}:`, agent ? `Found Agent: ${agent.name}` : 'Not Found');
+
+        return agent;
+
+    } catch (error) {
+        console.error(`[AGENT DETAIL LAYOUT] Database error fetching agent ${agentId} for user ${userId}:`, error);
+        // In a real app, you might log this error more robustly
+        return null; // Return null if DB error occurs
+    }
+}
 
 
-    // Define sidebar widths
-    const normalWidth = 250; // px (adjust as needed)
-    const collapsedWidth = 60; // px (adjust as needed, should fit icon + padding)
+// This Server Component layout fetches data and renders the Client wrapper
+export default async function AgentDetailLayout({ children, params }) {
+    const { userId } = auth(); // Get user ID in Server Component
 
-    // Calculate current width based on state
-    const currentWidth = isCollapsed ? collapsedWidth : normalWidth;
+    // Handle unauthenticated access immediately on the server
+    if (!userId) {
+        // Use next/navigation redirect or notFound if appropriate
+         console.warn("[AGENT DETAIL LAYOUT] User not authenticated. Redirecting or showing not found.");
+        notFound(); // Or redirect('/sign-in');
+    }
 
-    // Function to toggle the test panel
-    const toggleTestPanel = () => {
-        setIsTestPanelOpen(!isTestPanelOpen);
-    };
+    const agentId = parseAgentId(params); // Get agent ID from params
 
-     // Function to close the test panel
-     const closeTestPanel = () => {
-         setIsTestPanelOpen(false);
-     };
+    // If agentId is not valid or missing, render 404
+     if (!agentId) {
+         console.warn(`[AGENT DETAIL LAYOUT] Invalid or missing agentId in params: ${params.agentid}. Showing not found.`);
+         notFound();
+     }
 
+    // Fetch the agent data on the server
+    const agent = await getAgentData(agentId, userId);
 
+    // If agent is not found for this user, render a 404 page
+    if (!agent) {
+        console.warn(`[AGENT DETAIL LAYOUT] Agent data null for ID ${agentId}, user ${userId}. Showing not found.`);
+        notFound();
+    }
+
+    // Pass the fetched agent data to the Client Component wrapper
     return (
-        // Main container relative for potential fixed/absolute children positioning
-        <div className="relative flex h-full overflow-hidden">
-
-            {/* Nested Layout Content Container */}
-            <div className="flex flex-1 overflow-hidden flex-nowrap">
-
-                 {/* Agent Detail Sidebar */}
-                 <div
-                     className={`flex-shrink-0 overflow-y-auto border-r ${uiColors.borderPrimary} ${uiColors.bgPrimary} p-4 transition-width duration-300 ease-in-out`}
-                     style={{ width: `${currentWidth}px` }}
-                 >
-                    <DetailAgentSidebar
-                        agentId={agentId}
-                        isCollapsed={isCollapsed}
-                        toggleCollapse={() => setIsCollapsed(!isCollapsed)}
-                        onTestButtonClick={toggleTestPanel} // Pass the toggle function
-                    />
-                 </div>
-
-                {/* Agent Detail Main Content Area */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                    {children} {/* This is where the AgentDetailMainPage component will render */}
-                </div>
-            </div>
-
-           
-
-            {/* Render the Test Agent Side Panel */}
-            {/* Positioned outside the main flex container so it can overlay */}
-            <TestAgentSidePanel
-                 isOpen={isTestPanelOpen}
-                 onClose={closeTestPanel}
-                 agentId={agentId} // Pass agentId if needed by panel logic later
-             />
-
-        </div>
+        <AgentDetailLayoutClient agent={agent}>
+            {children} {/* The specific page component (dashboard, configure, etc.) */}
+        </AgentDetailLayoutClient>
     );
 }

@@ -278,7 +278,7 @@ export default function CharacteraiCreatePage() {
                          placeholder="Enter character name"
                          value={characterData.name}
                          onChange={handleInputChange('name')}
-                         maxLength={50}
+                         maxLength={100}
                      />
                      <CharacterFormSection
                          id="characterTagline"
@@ -287,7 +287,7 @@ export default function CharacteraiCreatePage() {
                          placeholder="Enter tagline"
                          value={characterData.tagline}
                          onChange={handleInputChange('tagline')}
-                         maxLength={100}
+                         maxLength={500000000}
                      />
                      <CharacterFormSection
                          id="characterDescription"
@@ -296,7 +296,7 @@ export default function CharacteraiCreatePage() {
                          placeholder="Enter description"
                          value={characterData.description}
                          onChange={handleInputChange('description')}
-                         maxLength={500}
+                         maxLength={500000000}
                          isTextArea
                      />
                       <CharacterFormSection
@@ -306,7 +306,7 @@ export default function CharacteraiCreatePage() {
                           placeholder="Enter greeting"
                           value={characterData.greeting}
                           onChange={handleInputChange('greeting')}
-                          maxLength={4096}
+                          maxLength={5000}
                           isTextArea
                       />
                  </motion.div>
