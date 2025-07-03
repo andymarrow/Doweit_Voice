@@ -850,7 +850,7 @@ export default function SingleCharacterChatRoom() {
              vapi.stop(); // Safe to call even if not active
         };
     // Add dependencies used by the callbacks defined inside this effect
-    }, [character?.name, clearPartialTranscriptTimer, clearAllPartialTranscriptTimers, saveCallHistory]); // saveCallHistory is a dependency because handleCallEnd uses it
+    }, [characterId, user?.id]); // saveCallHistory is a dependency because handleCallEnd uses it
 
 
     // Memoized handleEndCall - Calls vapi.stop(), which triggers the 'call-end' event
