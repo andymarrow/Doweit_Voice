@@ -232,8 +232,9 @@ const mapVoiceProviderToVapi = (provider) => {
     voice: {
         // *** FIX: Map 'elevenlabs' (spelled out) to '11labs' (numeric) if that's the provider ***
         // Also handle other providers you might support based on Vapi's allowed list
-        provider: (agent?.voiceConfig?.voiceProvider === 'elevenlabs' ? '11labs' : agent?.voiceConfig?.voiceProvider) || '11labs', // Use 11labs as default fallback
-        voiceId: agent?.voiceConfig?.voiceId || 'savannah', // Use voice ID from agent config, with fallback
+        // provider: (agent?.voiceConfig?.voiceProvider === 'elevenlabs' ? '11labs' : agent?.voiceConfig?.voiceProvider) || '11labs', // Use 11labs as default fallback
+       provider : 'vapi',
+        voiceId: agent?.voiceConfig?.voiceId || 'Savannah', // Use voice ID from agent config, with fallback
         // Add other voice specific parameters if supported by Vapi config object (e.g., stability, similarityBoost)
         // stability: agent?.voiceConfig?.stability, // Add if you store and need to pass this
         // similarityBoost: agent?.voiceConfig?.similarity, // Add if you store and need to pass this
@@ -256,7 +257,7 @@ const mapVoiceProviderToVapi = (provider) => {
 console.log("[Workflow Page] Starting Vapi call with agent config:", vapiAgentConfig);
 
 try {
-    vapi.start(vapiAgentConfig);
+    vapiRef.current.start(vapiAgentConfig);
     // States updated by 'call-start' event listener
 } catch (e) {
     console.error("Error starting Vapi call:", e);
