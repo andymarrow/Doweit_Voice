@@ -901,7 +901,7 @@ export default function SingleCharacterChatRoom() {
                              role: msg.sender === 'user' ? 'user' : 'assistant', // Map 'character' to 'assistant' for Vapi
                              content: msg.text,
                              // Add date field from timestamp for Vapi context if available
-                             ...(msg.timestamp && { date: new Date(msg.timestamp).toISOString() }),
+                            //  ...(msg.timestamp && { date: new Date(msg.timestamp).toISOString() }),
                          })) || []
                       ),
                  ],
@@ -1299,7 +1299,7 @@ export default function SingleCharacterChatRoom() {
 
             {/* Chat Input Area (for text messages) */}
             {/* Added fixed positioning and background to keep it visible at the bottom */}
-            <div className={`flex-shrink-0 p-4 border-t ${uiColors.borderPrimary} bg-white dark:bg-gray-900 w-full fixed bottom-0 left-0`}>
+            <div className={`flex-shrink-0 p-4 border-t ${uiColors.borderPrimary} bg-white dark:bg-gray-900 w-full fixed bottom-0 `}>
                  <div className={`text-center text-xs ${uiColors.textSecondary} mb-3`}>
                      This is A.I. and not a real person. Treat everything it says as fiction <FiAlertCircle className="inline-block ml-1 w-3 h-3" />
                  </div>
