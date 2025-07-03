@@ -54,7 +54,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Agents', icon: FiBriefcase, href: '/callagents', active: true }, // Active item based on image
         { name: 'Knowledge Base', icon: FiBookOpen, href: '/callagents/knowledgebase' },
         { name: 'Actions', icon: FiZap, href: '/callagents/actions' },
-        { name: 'Workflows', icon: FiShare2, href: '/workflows' },
+        { name: 'Workflows', icon: FiShare2, href: '/callagents/workflow' },
         { name: 'Contacts', icon: FiUsers, href: '/contacts' },
         { name: 'Phone Numbers', icon: FiPhone, href: '/phone-numbers' },
         { name: 'Integrations', icon: FiSettings, href: '/integrations' },
