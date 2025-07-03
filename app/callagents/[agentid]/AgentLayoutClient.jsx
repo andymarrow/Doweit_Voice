@@ -1,4 +1,4 @@
-// app/callagents/[agentid]/AgentDetailLayoutClient.jsx
+// app/callagents/[agentid]/AgentLayoutClient.jsx
 "use client";
 
 import React, { useState } from 'react';
@@ -6,10 +6,10 @@ import React, { useState } from 'react';
 
 // Import components
 import DetailAgentSidebar from './_components/sidebar';
-import TestAgentSidePanel from './_components/TestAgentSidePanel';
+import TestAgentSidePanel from './_components/TestAgentSidePanel'; // Import the panel
 
 // Import context provider
-import { CallAgentProvider } from './_context/CallAgentContext'; // Adjust path!
+import { CallAgentProvider, useCallAgent } from './_context/CallAgentContext'; // Adjust path! // *** Import useCallAgent ***
 
 // Import constants
 import { uiColors } from '../_constants/uiConstants';  // Assuming uiColors is correct here
@@ -17,6 +17,7 @@ import { uiColors } from '../_constants/uiConstants';  // Assuming uiColors is c
 
 // This component receives the fetched agent data from the Server Layout
 // and provides the Client-side interactivity (state, context, etc.)
+// *** This component receives the agent prop from the server layout ***
 export default function AgentDetailLayoutClient({ agent, children }) {
     // State to manage sidebar collapse
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -80,14 +81,15 @@ export default function AgentDetailLayoutClient({ agent, children }) {
                     </div>
                 </div>
 
-               
+
                 {/* Render the Test Agent Side Panel */}
                 {/* Positioned outside the main flex container so it can overlay */}
                 {/* Pass agentId and handlers */}
+                {/* *** Pass the entire agent object to TestAgentSidePanel *** */}
                 <TestAgentSidePanel
                      isOpen={isTestPanelOpen}
                      onClose={closeTestPanel}
-                     agentId={agentId} // Pass the real agent ID
+                     agent={agent} // Pass the full agent object
                  />
 
             </div>
