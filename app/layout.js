@@ -1,11 +1,10 @@
-import { Inter, Outfit } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider, GoogleOneTap } from "@clerk/nextjs";
-
-
-import { ThemeProvider as NextThemesProvider } from 'next-themes';
+import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "react-hot-toast";
 
+// 1. Import your new ThemeProvider client component
+import { ThemeProvider } from "./theme-provider"; 
 
 const inter = Outfit({ subsets: ["latin"] });
 
@@ -17,15 +16,18 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
-      {/* <GoogleOneTap /> */}
       <html lang="en" suppressHydrationWarning>
-
         <body className={inter.className}>
-          <NextThemesProvider attribute="class" defaultTheme="light" enableSystem>
+          {/* 2. Use your new ThemeProvider component here */}
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange // Optional but recommended for smoother transitions
+          >
             <Toaster position="top-right" />
             {children}
-
-          </NextThemesProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

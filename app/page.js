@@ -1,3 +1,4 @@
+// ./app/page.js
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Header from "./_components/Header";

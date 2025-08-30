@@ -18,7 +18,7 @@ export default function Header({ toggleSidebar, isSidebarOpen }) {
         <Image src={'/logo.svg'} width={230} height={230} />
       </div>
 
-        <Link href={'/dashboard'}><Button>Go Home</Button></Link>
+        <Link href={'/voice-agents'}><Button>Go Home</Button></Link>
    
         
     </div>

@@ -16,7 +16,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="p-3 bg-gray-200 dark:bg-gray-800 text-black dark:text-white rounded-full transition-all duration-300 ease-in-out hover:scale-105 transform"
+      className="p-2 bg-gray-200 dark:bg-gray-800 text-black dark:text-white rounded-full transition-all duration-300 ease-in-out hover:scale-105 transform"
     >
       {theme === 'dark' ? (
         <HiSun className="w-6 h-6" /> // Sun icon for light mode

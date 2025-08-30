@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import ThemeToggle from '@/components/Themetoggle'; // Assuming this path is correct
 import { Settings, Search, Menu, X } from 'lucide-react'; // Import Menu and X icons
+import { UserButton } from '@clerk/nextjs';
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); // State to manage mobile menu visibility
@@ -73,12 +74,15 @@ function Header() {
 
            {/* Theme Toggle */}
            <ThemeToggle />
+           <UserButton />
         </div>
 
 
         {/* Mobile Menu Toggle & Theme Toggle (Visible on small devices) */}
         <div className="lg:hidden flex items-center space-x-3">
             <ThemeToggle /> {/* Keep theme toggle visible on mobile */}
+            <UserButton />
+            
             <button onClick={toggleMenu} className="text-gray-700 dark:text-white">
                 {isMenuOpen ? <X size={24} /> : <Menu size={24} />} {/* Show X icon when menu is open */}
             </button>

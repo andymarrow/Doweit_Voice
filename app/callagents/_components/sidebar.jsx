@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from 'next-themes';
+
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -46,7 +46,6 @@ const dropdownVariants = {
 
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
-    const { theme } = useTheme();
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
     // Define the FLAT list of navigation items based on the image

@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ThemeProvider } from 'next-themes';
 import Sidebar from './_components/sidebar'; // Import the Sidebar component
 
 // Import global styles (make sure you have these)
@@ -26,12 +25,11 @@ export default function CharacterAiLayout({ children }) {
   const collapsedWidth = 70; // px
 
   return (
-    <html lang="en">
+   <>
       {/* Wrap in ThemeProvider if you are using next-themes */}
       {/* Make sure your root layout or a parent component includes ClerkProvider */}
       {/* <ClerkProvider> */}
-      <ThemeProvider attribute="class" defaultTheme="dark">
-       {/* Main layout container: flex to create side-by-side layout */}
+     {/* Main layout container: flex to create side-by-side layout */}
           <div className="flex h-screen overflow-hidden">
 
             {/* Sidebar */}
@@ -62,8 +60,7 @@ export default function CharacterAiLayout({ children }) {
                  <FiHelpCircle className="mr-2 text-lg" />
                  Help
             </button>
-      </ThemeProvider>
       {/* </ClerkProvider> */} {/* Close ClerkProvider if added here */}
-    </html>
+  </>
   );
 }

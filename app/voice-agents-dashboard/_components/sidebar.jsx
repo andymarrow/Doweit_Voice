@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from 'next-themes';
+
 import Image from 'next/image'; // Keep Image if you decide to use a logo image later
 import Link from 'next/link';
 import {
@@ -28,7 +28,6 @@ const dropdownVariants = {
 
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
-    const { theme } = useTheme(); // Only need theme, ThemeToggle handles setTheme
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const [isRecruitmentDropdownOpen, setIsRecruitmentDropdownOpen] = useState(false);
 

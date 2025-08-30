@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from 'next-themes';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs'; // Import Clerk's useUser hook
@@ -67,7 +67,7 @@ const lowerNavItems = [
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const { user, isLoading: isUserLoading } = useUser(); // Get user info from Clerk
 
-    const { theme } = useTheme();
+  
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState(''); // Not used for API search from sidebar directly, but can be kept for local filtering if needed
 
