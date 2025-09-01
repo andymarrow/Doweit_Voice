@@ -59,7 +59,7 @@ export async function POST(req) {
 
         // Basic validation matching frontend form data structure
         // Frontend sends { name, type (broad), details (config) }
-        const { name, type, details } = body; // 'type' from frontend is the broad type, e.g., 'Information Extractor'
+        const { name, type,isRequired, details } = body; // 'type' from frontend is the broad type, e.g., 'Information Extractor'
 
         // Validate required fields
         if (!name || typeof name !== 'string' || !name.trim()) {
@@ -71,6 +71,10 @@ export async function POST(req) {
           if (!details.type) {
                return NextResponse.json({ error: 'Action detail type (Text, Boolean, Choice, Action) is required in details configuration.' }, { status: 400 });
           }
+// ***** NEW: Validate isRequired *****
+        if (isRequired === undefined || typeof isRequired !== 'boolean') {
+             return NextResponse.json({ error: '"isRequired" must be a boolean value.' }, { status: 400 });
+        }
 
          // Basic validation based on details.type config
          if (details.type === 'Boolean') {
@@ -111,6 +115,7 @@ export async function POST(req) {
              displayName: body.displayName || name.trim().replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
              description: body.description || '', // Use provided description or empty string
              type: type, // Broad type from frontend
+             isRequired: isRequired,
              config: details, // Save the detailed config object
              source: 'custom', // Assuming user-created actions are 'custom'
              // createdAt and updatedAt will be set by defaultNow()

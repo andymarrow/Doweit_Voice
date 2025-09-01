@@ -37,7 +37,7 @@ export async function PUT(req, { params }) {
         }
 
         // Define fields we allow updating directly from the Edit modal
-        const { name, displayName, description, config } = body;
+        const { name, displayName, description, isRequired, config } = body;
 
         // Build update data object, explicitly checking for undefined
         const updateData = {};
@@ -45,6 +45,7 @@ export async function PUT(req, { params }) {
         if (displayName !== undefined) updateData.displayName = displayName;
         if (description !== undefined) updateData.description = description;
         if (config !== undefined) updateData.config = config; // Assume config structure is validated below
+if (isRequired !== undefined) updateData.isRequired = isRequired;
 
 
         // --- Validation ---
@@ -63,7 +64,9 @@ export async function PUT(req, { params }) {
         if (updateData.description !== undefined && typeof updateData.description !== 'string') {
              return NextResponse.json({ error: 'Description must be a string' }, { status: 400 });
         }
-
+if (updateData.isRequired !== undefined && typeof updateData.isRequired !== 'boolean') {
+            return NextResponse.json({ error: '"isRequired" must be a boolean value' }, { status: 400 });
+        }
 
         // 3. Validate config if it's being updated
          if (updateData.config !== undefined) {

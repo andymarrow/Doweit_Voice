@@ -20,6 +20,7 @@ function EditActionModal({ isOpen, onClose, action, onUpdateAction }) {
         name: '',
         // Initialize description and displayName
         description: '',
+        isRequired: true, // ***** NEW *****
         displayName: '',
         // Map 'config' from the database structure to 'details' for the form component
         details: { type: 'Text' }, // Provide a default structure
@@ -41,6 +42,7 @@ function EditActionModal({ isOpen, onClose, action, onUpdateAction }) {
                  name: action.name || '',
                  // Map description and displayName from the action prop
                  description: action.description || '',
+                 isRequired: action.isRequired ?? true, // ***** NEW: Load isRequired, default to true if null/undefined *****
                  displayName: action.displayName || '',
                  // Map 'config' from action prop to 'details' for the form
                  details: action.config ? { ...action.config } : { type: 'Text' }, // Ensure details has a type
@@ -84,25 +86,14 @@ function EditActionModal({ isOpen, onClose, action, onUpdateAction }) {
 
 
     // Handlers for form changes (passed down to ActionConfigForm)
-    const handleFormChange = (e) => {
-        const { name, value } = e.target;
-        // Handle changes for universal fields (name, description, displayName)
-        if (name === 'actionName') {
-             setFormData(prev => ({ ...prev, name: value }));
-         } else if (name === 'description') {
-              setFormData(prev => ({ ...prev, description: value }));
-         } else if (name === 'displayName') { // If you add displayName input
-              setFormData(prev => ({ ...prev, displayName: value }));
+   const handleFormChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        const newValue = type === 'checkbox' ? checked : value;
+        if (name === 'actionName' || name === 'description' || name === 'isRequired') {
+            setFormData(prev => ({ ...prev, [name]: newValue }));
         } else if (name.startsWith('detail-')) {
-             // Handle changes within the details structure (for type-specific fields)
-             const detailKey = name.substring('detail-'.length);
-             setFormData(prev => ({
-                 ...prev,
-                 details: {
-                     ...prev.details,
-                     [detailKey]: value
-                 }
-             }));
+            const detailKey = name.substring('detail-'.length);
+            setFormData(prev => ({ ...prev, details: { ...prev.details, [detailKey]: newValue } }));
         }
     };
 
@@ -203,6 +194,7 @@ function EditActionModal({ isOpen, onClose, action, onUpdateAction }) {
                  name: formData.name.trim(),
                  displayName: formData.displayName?.trim() || null, // Include trimmed displayName or null
                  description: formData.description?.trim() || null, // Include trimmed description or null
+                 isRequired: formData.isRequired,
                  // Map 'details' (internal form state) back to 'config' (DB column name)
                  config: details.type === 'Choice' && Array.isArray(details.options) && details.options[0]?.id !== undefined // Check if options have temp IDs
                     ? details.options.map(opt => { // If temp IDs are present, remove them

@@ -119,6 +119,8 @@ function ViewActionModal({ isOpen, onClose, action }) {
                      <div>
                          <p className={`text-sm ${uiColors.textSecondary}`}>Action Name: <span className={`font-medium ${uiColors.textPrimary}`}>{action.name || 'N/A'}</span></p>
                          <p className={`text-sm ${uiColors.textSecondary}`}>Broad Type: <span className={`font-medium ${uiColors.textPrimary}`}>{action.type || 'N/A'}</span></p>
+                         {/* ***** NEW: Display isRequired status ***** */}
+                         <p className={`text-sm ${uiColors.textSecondary}`}>Is Required: <span className={`font-medium ${uiColors.textPrimary}`}>{action.isRequired ? 'Yes' : 'No'}</span></p>
                           {/* Display the description if it exists */}
                           {action.description && (
                               <p className={`text-sm ${uiColors.textSecondary}`}>Description: <span className={`font-normal italic ${uiColors.textPrimary}`}>{action.description}</span></p>

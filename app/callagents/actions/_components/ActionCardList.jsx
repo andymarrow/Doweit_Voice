@@ -4,8 +4,7 @@ import { motion } from 'framer-motion';
 import { FiBookOpen, FiList, FiCheckCircle, FiXCircle, FiEye, FiEdit, FiTrash2, FiPhoneCall } from 'react-icons/fi';
 
 // Import constants - Adjust path as necessary
-import { uiColors } from '../../_constants/uiConstants';
-import { itemVariants } from '../../_constants/uiConstants';
+import { uiColors,itemVariants } from '../../_constants/uiConstants';
 
 
 // Helper function to render action details based on action.config (from DB)
@@ -84,9 +83,17 @@ function ActionCardList({ actions, onView, onEdit, onDelete }) {
                     <div className="space-y-2 flex-grow">
                         {/* Type Badge */}
                          {/* Display the broad type from action.type */}
-                        <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${uiColors.accentSubtleBg} ${uiColors.accentBadgeText}`}>
-                            {action.type || 'Unknown Type'}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                            <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${uiColors.accentSubtleBg} ${uiColors.accentBadgeText}`}>
+                                {action.type || 'Unknown Type'}
+                            </span>
+                             {/* ***** NEW: Required Badge ***** */}
+                             {action.isRequired && (
+                                <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                    Required
+                                </span>
+                             )}
+                        </div>
                         {/* Action Name */}
                          {/* Display the action name from action.name */}
                         <div className={`font-semibold text-base ${uiColors.textPrimary} break-words`}>

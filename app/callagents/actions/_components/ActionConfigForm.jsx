@@ -164,7 +164,7 @@ function ActionConfigForm({
                 <input
                     type="text"
                     id="actionName"
-                    name="actionName" // Use name="actionName"
+                    name="name" // Use name="actionName"
                     value={formData.name || ''} // Use empty string if null/undefined
                     onChange={onChange}
                     className={`block w-full rounded-md border-gray-300 shadow-sm text-sm px-3 py-2 ${uiColors.bgPrimary} ${uiColors.textPrimary} ${uiColors.borderPrimary} focus:border-${uiColors.accentPrimaryText} focus:ring-${uiColors.accentPrimaryText} outline-none`}
@@ -190,7 +190,25 @@ function ActionConfigForm({
                  />
             </div>
 
-
+{/* ***** NEW FIELD FOR isRequired ***** */}
+            <div className={`flex items-center p-3 rounded-md border ${uiColors.borderPrimary} ${uiColors.bgSecondary}`}>
+                <input
+                    type="checkbox"
+                    id="isRequired"
+                    name="isRequired"
+                    checked={formData.isRequired ?? true} // Default to checked if undefined
+                    onChange={onChange}
+                    className={`h-4 w-4 rounded ${uiColors.accentPrimary} focus:ring-${uiColors.accentPrimaryText} border-gray-300`}
+                    disabled={isSaving}
+                />
+                <div className="ml-3">
+                    <label htmlFor="isRequired" className={`block text-sm font-medium ${uiColors.textPrimary}`}>
+                        Required Action
+                    </label>
+                    <p className={`text-xs ${uiColors.textSecondary}`}>If checked, the AI will try to ensure this information is captured.</p>
+                </div>
+            </div>
+            
             {/* Render type-specific fields below name and description */}
             {renderTypeSpecificFields()}
 

@@ -21,6 +21,7 @@ function CreateActionModal({ isOpen, onClose, onCreateAction }) {
     const [selectedType, setSelectedType] = useState(null); // e.g., 'Boolean', 'Text', 'Choice'
     const [formData, setFormData] = useState({
         name: '',
+        isRequired: true, // ***** NEW: Default isRequired to true *****
         // Add description to form state
         description: '',
         details: {}
@@ -36,7 +37,7 @@ function CreateActionModal({ isOpen, onClose, onCreateAction }) {
             setCurrentStep(STEPS.SELECT_TYPE);
             setSelectedType(null);
             // Reset description state too
-            setFormData({ name: '', description: '', details: {} });
+            setFormData({ name: '', description: '',isRequired: true, details: {} });
             setError('');
             setIsSaving(false);
         }
@@ -85,20 +86,17 @@ function CreateActionModal({ isOpen, onClose, onCreateAction }) {
 
     // --- Handlers for Step 2: Configure Details ---
     const handleFormChange = (e) => {
-        const { name, value } = e.target;
-        if (name === 'actionName') {
-             setFormData(prev => ({ ...prev, name: value }));
-        } else if (name === 'description') { // Handle changes to the new description field
-             setFormData(prev => ({ ...prev, description: value }));
+        const { name, value, type, checked } = e.target;
+        const newValue = type === 'checkbox' ? checked : value;
+
+        if (name === 'name' || name === 'description' || name === 'isRequired') {
+            setFormData(prev => ({ ...prev, [name]: newValue }));
         } else if (name.startsWith('detail-')) {
-             const detailKey = name.substring('detail-'.length);
-             setFormData(prev => ({
-                 ...prev,
-                 details: {
-                     ...prev.details,
-                     [detailKey]: value
-                 }
-             }));
+            const detailKey = name.substring('detail-'.length);
+            setFormData(prev => ({
+                ...prev,
+                details: { ...prev.details, [detailKey]: newValue }
+            }));
         }
     };
 
@@ -186,6 +184,7 @@ function CreateActionModal({ isOpen, onClose, onCreateAction }) {
                  name: formData.name.trim(),
                  // Add description to the payload
                  description: formData.description?.trim() || null, // Send trimmed description or null if empty
+                 isRequired: formData.isRequired,
                  type: 'Information Extractor', // Hardcoded broad type for this modal
                  details: formData.details,
              };
@@ -215,7 +214,7 @@ function CreateActionModal({ isOpen, onClose, onCreateAction }) {
 
             // Call the parent handler with the newly created action data (including DB ID)
             onCreateAction(newAction); // This handler should also close the modal
-
+onClose(); 
         } catch (err) {
             console.error('Error creating action:', err);
             setError(err.message || 'An unexpected error occurred.');

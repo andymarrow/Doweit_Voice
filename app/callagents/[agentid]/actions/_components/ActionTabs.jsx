@@ -10,9 +10,9 @@ import { uiColors } from '@/app/callagents/_constants/uiConstants';
 
 // Define action tab structure
 const actionTabs = [
-    { name: 'Before the Call', key: 'before' },
+    { name: 'Start of Call', key: 'before' },
     { name: 'During the Call', key: 'during' },
-    { name: 'After the Call', key: 'after' },
+    { name: 'end of Call', key: 'after' },
 ];
 
 // Receive activeTab string, onTabChange function, and counts object
