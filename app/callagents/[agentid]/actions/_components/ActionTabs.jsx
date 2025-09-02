@@ -2,10 +2,6 @@
 "use client";
 
 import React from 'react';
-// No Link needed as these are internal tab switches
-// import Link from 'next/link';
-
-// Import constants - Adjust path if necessary
 import { uiColors } from '@/app/callagents/_constants/uiConstants';
 
 // Define action tab structure
