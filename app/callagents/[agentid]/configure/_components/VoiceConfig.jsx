@@ -29,7 +29,7 @@ function VoiceConfig({ config, onConfigChange, agentId }) {
         // Update the voiceConfig in the parent state with the new voice details
         onConfigChange('voiceConfig', {
             ...voiceConfig, // Keep existing voiceConfig properties
-            voiceId: voice.id,
+            voiceId: voice.voiceId,
             voiceName: voice.name,
             voiceProvider: voice.platform, // Map platform to provider
             // You might want to store other voice details here too
