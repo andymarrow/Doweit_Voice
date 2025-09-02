@@ -1,3 +1,4 @@
+
 // voice-agents-CallAgents/[agentid]/_components/TestAgentSidePanel.jsx
 "use client";
 
@@ -193,15 +194,43 @@ const mapVoiceProviderToVapi = (provider) => {
 
          try {
 
-            const systemMessageContent = `
-                 You are an AI assistant roleplaying as a character named ${agent?.name || 'Assistant'}.
-                 ${agent?.prompt ? `Your core instructions and persona details are: ${agent.prompt}` : 'Your purpose is to assist the user.'}
-                 ${agent?.voiceConfig?.language ? `Maintain conversations in the ${agent.voiceConfig.language} language.` : 'Use the default language of the call (likely English).'}
-                 ${agent?.greetingMessage ? `If you are the first speaker, you may choose to start the conversation with "${agent.greetingMessage}".` : ''}
-                 ${Array.isArray(agent?.customVocabulary) && agent.customVocabulary.length > 0 ? `Incorporate the following specific terms or phrases naturally where relevant: ${agent.customVocabulary.map(item => item.term).join(', ')}.` : ''}
-                 Speak naturally as if in a real voice call. Be concise and directly address the user's needs or questions based on your instructions.
-             `.trim().replace(/\s+/g, ' '); // Trim whitespace and condense multiple spaces
+            // const systemMessageContent = `
+            //      You are an AI assistant named ${agent?.name || 'Assistant'}.
+            //      ${agent?.prompt ? `Your core instructions and persona details are: ${agent.prompt}` : 'Your purpose is to assist the user.'}
+            //      ${agent?.voiceConfig?.language ? `Maintain conversations in the ${agent.voiceConfig.language} language.` : 'Use the default language of the call (likely English).'}
+            //      ${agent?.greetingMessage ? `If you are the first speaker, you may choose to start the conversation with "${agent.greetingMessage}".` : ''}
+            //      ${Array.isArray(agent?.customVocabulary) && agent.customVocabulary.length > 0 ? `Incorporate the following specific terms or phrases naturally where relevant: ${agent.customVocabulary.map(item => item.term).join(', ')}.` : ''}
+            //      Speak naturally as if in a real voice call. Be concise and directly address the user's needs or questions based on your instructions.
+            //  `.trim().replace(/\s+/g, ' '); // Trim whitespace and condense multiple spaces
 
+let everyContentPrompt = `
+You are an AI assistant named ${agent?.name || 'Assistant'}.
+${agent?.prompt ? `Your core instructions and persona details are: ${agent.prompt}` : 'Your purpose is to assist the user.'}
+${agent?.voiceConfig?.language ? `Maintain conversations in the ${agent.voiceConfig.language} language.` : 'Use the default language of the call (likely English).'}
+${agent?.greetingMessage ? `If you are the first speaker, you may choose to start the conversation with "${agent.greetingMessage}".` : ''}
+${Array.isArray(agent?.customVocabulary) && agent.customVocabulary.length > 0 ? `Incorporate the following specific terms or phrases naturally where relevant: ${agent.customVocabulary.map(item => item.term).join(', ')}.` : ''}
+Speak naturally as if in a real voice call. Be concise and directly address the user's needs or questions based on your instructions.
+`.trim();
+
+// Attach Knowledge Base (if available)
+if (agent.knowledgeBase && agent.knowledgeBase.content) {
+  const kbContent = Array.isArray(agent.knowledgeBase.content)
+    ? agent.knowledgeBase.content.map(item => item.value).join('\n\n')
+    : String(agent.knowledgeBase.content);
+
+  if (kbContent.trim()) {
+    everyContentPrompt += `
+
+--- KNOWLEDGE BASE ---
+You MUST use the information below to answer user questions. This is your primary source of truth.
+
+${kbContent}
+--- END KNOWLEDGE BASE ---`;
+  }
+}
+
+// Cleanup whitespace
+everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
 
              // --- Prepare agent configuration for Vapi ---
@@ -221,7 +250,7 @@ const mapVoiceProviderToVapi = (provider) => {
             // The first message is the system message/prompt
             {
                 role: "system",
-                content: systemMessageContent,
+                content: everyContentPrompt,
                 // You might enhance this system prompt further using other agent fields
                 // For example:
                 // content: `You are roleplaying as a character named ${agent?.name || 'Assistant'}. Your personality is: ${agent?.description || 'helpful and friendly'}. ${agent?.tagline ? `Your tagline is: ${agent?.tagline}.` : ''} ${agent?.greetingMessage ? `If you are the first speaker, start with "${agent?.greetingMessage}".` : ''} Your behavior traits include: ${agent?.behavior && Array.isArray(agent.behavior) && agent.behavior.length > 0 ? agent.behavior.join(', ') : 'friendly'}. Speak naturally as if in a real voice call. Be concise. Maintain this language: ${agent?.voiceConfig?.language || 'en'}. Your core instruction is: ${agent?.prompt || 'Respond to the user.'}`,
