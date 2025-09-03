@@ -1,13 +1,13 @@
-//app/callagents/Integrations/_components/forms/DynamicIntegrationForm.jsx
+// app/callagents/Integrations/_components/forms/DynamicIntegrationForm.jsx
 "use client";
 
 import React, { useState } from 'react';
 import { FiLoader } from 'react-icons/fi';
 import { uiColors } from '../../../_constants/uiConstants';
-import OAuthConnectButton from './OAuthConnectButton'; // Import the new component
+import OAuthConnectButton from './OAuthConnectButton';
 
 export default function DynamicIntegrationForm({ integration, onSuccess, isConnected }) {
-    // This state is now only for key-based auth
+    // This state is only for key-based auth (like ElevenLabs, Twilio)
     const initialFormState = integration.fields.reduce((acc, field) => {
         if (field.type !== 'info' && field.type !== 'oauth') {
             acc[field.id] = '';
@@ -28,17 +28,33 @@ export default function DynamicIntegrationForm({ integration, onSuccess, isConne
         e.preventDefault();
         setError('');
         setIsConnecting(true);
-        
-        setTimeout(() => {
-            const hasEmptyField = integration.fields.some(field => field.type !== 'info' && field.type !== 'oauth' && !formData[field.id].trim());
-            if (hasEmptyField) {
-                setError('All fields are required.');
-                setIsConnecting(false);
-                return;
+
+        // --- THIS IS THE REAL API CALL ---
+        try {
+            // Dynamically call the correct endpoint based on the integration ID
+            const response = await fetch(`/api/integrations/connect/${integration.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData), // Send the form data (e.g., { apiKey: "..." })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Use the error message from the backend if available, otherwise a default one.
+                throw new Error(data.error || 'Failed to connect. Please check your credentials.');
             }
+
+            // On success, call the parent handler to update the UI state.
             onSuccess(integration.id, { accountId: `Connected via ${integration.name}` });
+
+        } catch (err) {
+            // Set the error message to be displayed in the UI.
+            setError(err.message);
+        } finally {
+            // Ensure the loading state is turned off whether it succeeds or fails.
             setIsConnecting(false);
-        }, 1500);
+        }
     };
 
     // Render logic for different field types
@@ -73,6 +89,7 @@ export default function DynamicIntegrationForm({ integration, onSuccess, isConne
         }
     };
 
+    // Check if the form is for an integration that uses API keys/tokens (and not just OAuth/info).
     const hasKeyBasedAuth = integration.fields.some(f => f.type !== 'info' && f.type !== 'oauth');
 
     return (
