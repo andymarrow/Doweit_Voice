@@ -34,6 +34,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.19.4",
+    "dotenv": "^17.2.2",
     "drizzle-orm": "^0.33.0",
     "firebase": "^10.14.1",
     "firebase-admin": "^13.4.0",

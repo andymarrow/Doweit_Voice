@@ -9,8 +9,7 @@ import * as schemaCharacterAI from "@/lib/db/schemaCharacterAI"; // Assuming the
 
 // 2. Get the database URL from environment variables (BEST PRACTICE)
 // Replace the hardcoded URL with reading from process.env
-const databaseUrl =
-	"postgresql://Doweit-Database_owner:wcYSDEX91Bot@ep-spring-rice-a5vzqvbn.us-east-2.aws.neon.tech/Doweit-Database?sslmode=require";
+const databaseUrl = "postgresql://neondb_owner:npg_1qFX3RTnlcho@ep-twilight-fog-adnbqdka-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
 
 if (!databaseUrl) {
 	// Add a check and throw an error if the environment variable is missing
