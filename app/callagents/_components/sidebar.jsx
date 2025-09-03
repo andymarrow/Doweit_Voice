@@ -56,7 +56,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Workflows', icon: FiShare2, href: '/callagents/workflow' },
         { name: 'Contacts', icon: FiUsers, href: '/contacts' },
         { name: 'Phone Numbers', icon: FiPhone, href: '/phone-numbers' },
-        { name: 'Integrations', icon: FiSettings, href: '/integrations' },
+        { name: 'Integrations', icon: FiSettings, href: '/callagents/Integrations' },
         { name: 'Agency', icon: FiBriefcase, href: '/agency' },
         { name: 'Getting Started', icon: FiZapOff, href: '/getting-started', badge: '0%' }, // Item with badge
     ];
