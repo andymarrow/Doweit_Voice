@@ -1,3 +1,5 @@
+// c:/Users/Samson/OneDrive/Desktop/doweitvoice/DoweitV3/app/(auth)/sign-in/[[...sign-in]]/page.jsx
+
 import { SignIn } from '@clerk/nextjs'
 
 export default function Page() {
@@ -6,7 +8,7 @@ export default function Page() {
       <div className="lg:grid lg:min-h-screen lg:grid-cols-12">
         <section className="relative flex h-32 items-end bg-gray-900 lg:col-span-5 lg:h-full xl:col-span-6">
           <img
-            alt=""
+            alt="An abstract visualization of sound waves and AI"
             src="https://images.unsplash.com/photo-1617195737496-bc30194e3a19?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=870&q=80"
             className="absolute inset-0 h-full w-full object-cover opacity-80"
           />
@@ -14,6 +16,7 @@ export default function Page() {
           <div className="hidden lg:relative lg:block lg:p-12">
             <a className="block text-white" href="#">
               <span className="sr-only">Home</span>
+              {/* Your existing SVG logo */}
               <svg
                 className="h-8 sm:h-10"
                 viewBox="0 0 28 24"
@@ -27,14 +30,16 @@ export default function Page() {
               </svg>
             </a>
 
+            {/* --- UPDATED CONTENT --- */}
             <h2 className="mt-6 text-2xl font-bold text-white sm:text-3xl md:text-4xl">
-              Welcome to Doweit Ai 📖
+              Welcome to Doweit Voice 🎙️
             </h2>
 
             <p className="mt-4 leading-relaxed text-white/90">
-            Doweit is an AI-powered web application designed to streamline course creation. It enables users to generate complete courses, including optional YouTube video integrations for each chapter, making it easy to create engaging learning experiences. For coding-related courses, Doweit can also provide sample code snippets to enhance learning. The platform features a Public Library, allowing users to explore and draw inspiration from courses created by others, as well as a Customize Yours section, where users can manage and refine their own course content.
-         
+              Doweit Voice is an AI-powered marketplace for intelligent voice agents. Build, deploy, and manage sophisticated assistants that can handle inbound/outbound calls, book appointments, and act as dynamic characters. Our platform features a public marketplace to discover agents built by the community and a powerful dashboard to create and customize your own, complete with third-party integrations to streamline your workflows.
             </p>
+            {/* --- END UPDATED CONTENT --- */}
+
           </div>
         </section>
 
@@ -48,6 +53,7 @@ export default function Page() {
                 href="#"
               >
                 <span className="sr-only">Home</span>
+                {/* Your existing SVG logo */}
                 <svg
                   className="h-8 sm:h-10"
                   viewBox="0 0 28 24"
@@ -61,15 +67,17 @@ export default function Page() {
                 </svg>
               </a>
 
+              {/* --- UPDATED CONTENT --- */}
               <h1 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl md:text-4xl">
-              Welcome to Doweit Ai 📖
+                Welcome to Doweit Voice 🎙️
               </h1>
 
               <p className="mt-4 leading-relaxed text-gray-500">
-              Doweit is an AI-powered web application designed to streamline course creation. It enables users to generate complete courses, including optional YouTube video integrations for each chapter, making it easy to create engaging learning experiences. For coding-related courses, Doweit can also provide sample code snippets to enhance learning. The platform features a Public Library, allowing users to explore and draw inspiration from courses created by others, as well as a Customize Yours section, where users can manage and refine their own course content.
-         
+                Doweit Voice is an AI-powered marketplace for intelligent voice agents. Build, deploy, and manage sophisticated assistants that can handle inbound/outbound calls, book appointments, and act as dynamic characters. Our platform features a public marketplace to discover agents built by the community and a powerful dashboard to create and customize your own, complete with third-party integrations to streamline your workflows.
               </p>
+              {/* --- END UPDATED CONTENT --- */}
             </div>
+
             <div className='sm:flex sm:justify-center'>
                  <SignIn />
             </div>
@@ -78,5 +86,5 @@ export default function Page() {
         </main>
       </div>
     </section>
-)
+  )
 }
