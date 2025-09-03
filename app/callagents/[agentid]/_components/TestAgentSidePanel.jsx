@@ -7,50 +7,102 @@ import Vapi from '@vapi-ai/web';
 import { uiColors } from '../../_constants/uiConstants';
 import { toast } from 'react-hot-toast';
 
-// --- VAPI SDK Initialization ---
 const VAPI_PUBLIC_API_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
 
-// --- Helper Functions ---
 const getElevenLabsKeyForUser = async () => {
-    // This is a placeholder. In production, this should be a secure backend call.
+    // THIS IS NOT SECURE FOR PRODUCTION. Replace with a backend call.
     return process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY;
 };
 
-// --- Component Definition ---
 const panelWidth = 'w-80';
 
 function TestAgentSidePanel({ isOpen, onClose, agent }) {
     // --- State Management ---
-    const [testMethod, setTestMethod] = useState('web'); // 'web', 'phone', or 'chat'
-    
-    // Form Inputs
+    const [testMethod, setTestMethod] = useState('web');
     const [userName, setUserName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     
-    // Call Status (shared by both Web and Phone)
-    const [isConnecting, setIsConnecting] = useState(false);
-    const [callStatus, setCallStatus] = useState('idle'); // Vapi SDK status for web calls
+    // Call Status for BOTH Web and Phone
+    const [isConnecting, setIsConnecting] = useState(false); // Used for phone call loading state
+    const [callStatus, setCallStatus] = useState('idle');    // Vapi SDK status for web calls
     const [callError, setCallError] = useState(null);
     
-    // Keys
     const [elevenLabsApiKey, setElevenLabsApiKey] = useState(null);
 
     // Refs
     const panelRef = useRef(null);
-    const vapiRef = useRef(null); // Ref for Vapi Web SDK instance
+    const vapiRef = useRef(null);
 
-    // Agent Details
     const agentId = agent?.id;
     const agentName = agent?.name || 'Unnamed Agent';
 
     // --- Effects ---
 
-    // Initialize Vapi Web SDK for the 'Web' tab
+    // Initialize Vapi SDK and event listeners for Web Calls
     useEffect(() => {
         if (!vapiRef.current && VAPI_PUBLIC_API_KEY) {
-            vapiRef.current = new Vapi(VAPI_PUBLIC_API_KEY);
-            vapiRef.current.on('call-status', (status) => setCallStatus(status));
-            vapiRef.current.on('error', (error) => {
+            const vapi = new Vapi(VAPI_PUBLIC_API_KEY);
+            vapiRef.current = vapi;
+            console.log("Vapi SDK initialized for web calls.");
+
+            // --- Friend's Transcript Logic ---
+            let transcriptBuffer = [];
+            let callStartTime = null;
+
+            const saveTranscript = async (customerName) => {
+                if (transcriptBuffer.length === 0) return;
+                
+                const callDetails = {
+                    // For web calls, we don't have a phone number, but can pass the name
+                    customerName: customerName,
+                    direction: 'inbound', // Web calls can be considered inbound tests
+                    status: 'completed',
+                    duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
+                    startTime: callStartTime || new Date().toISOString(),
+                    endTime: new Date().toISOString(),
+                    transcript: JSON.stringify(transcriptBuffer), // Send transcript as a JSON string
+                };
+
+                try {
+                    const response = await fetch(`/api/callagents/${agentId}/calls`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(callDetails),
+                    });
+                    if (!response.ok) throw new Error(await response.text());
+                    console.log("Web call transcript saved successfully.");
+                    toast.success("Test call transcript saved.");
+                } catch (err) {
+                    console.error("Error saving web call transcript:", err);
+                    toast.error("Could not save transcript.");
+                }
+            };
+
+            // Vapi Event Listeners from Friend
+            vapi.on("call-status", (status) => {
+                console.log("Vapi Call Status:", status);
+                setCallStatus(status);
+                if (status === 'connected') {
+                    callStartTime = new Date().toISOString();
+                    transcriptBuffer = []; // Clear buffer for new call
+                }
+                if (status === 'ended') {
+                    toast.success("Web call ended.");
+                    saveTranscript(userName); // Pass the user's name to be saved
+                }
+            });
+
+            vapi.on("message", (message) => {
+                if (message.type === "transcript" && message.transcriptType === "final") {
+                    transcriptBuffer.push({
+                        role: message.role,
+                        text: message.transcript,
+                        timestamp: Date.now(),
+                    });
+                }
+            });
+
+            vapi.on("error", (error) => {
                 console.error("Vapi Web SDK Error:", error);
                 const errorMessage = error?.error?.message?.[0] || error.message || 'An unknown Vapi error occurred.';
                 setCallStatus('error');
@@ -58,12 +110,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                 toast.error(`Web Call Error: ${errorMessage}`);
             });
         }
-        return () => { // Cleanup on unmount
-            if (vapiRef.current) {
-                try { vapiRef.current.stop(); } catch (e) { /* ignore */ }
-            }
-        };
-    }, []);
+    }, [agentId, userName]); // Add agentId and userName as deps to ensure saveTranscript has the latest values
 
     // Reset state and fetch keys when panel opens or agent changes
     useEffect(() => {
@@ -78,7 +125,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                 if (agent?.voiceConfig?.voiceProvider === 'elevenlabs') {
                     const key = await getElevenLabsKeyForUser();
                     if (!key) {
-                        toast.error("ElevenLabs API key not found for your account.");
+                        toast.error("ElevenLabs API key not found.");
                         setCallError("ElevenLabs API key is missing.");
                     }
                     setElevenLabsApiKey(key);
@@ -86,29 +133,25 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             };
             fetchKeys();
         } else {
-            // Ensure any active web call is stopped when panel is closed
             if (vapiRef.current && callStatus !== 'idle') {
-                try { vapiRef.current.stop(); } catch (e) { /* ignore */ }
+                try { vapiRef.current.stop(); } catch (e) {}
             }
         }
     }, [isOpen, agent]);
 
-    // Handle clicks outside the panel to close it
+    // Handle clicks outside panel
     useEffect(() => {
         const handleClickOutside = (event) => {
             const isCallActive = isConnecting || callStatus === 'connecting' || callStatus === 'connected';
-            if (panelRef.current && !panelRef.current.contains(event.target) && isOpen && !isCallActive) {
-                onClose();
-            }
+            if (panelRef.current && !panelRef.current.contains(event.target) && isOpen && !isCallActive) onClose();
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isOpen, onClose, isConnecting, callStatus]);
 
-
     // --- Call Handlers ---
 
-    // Handler for the 'Web' tab (uses client-side VAPI SDK)
+    // Web Call Handler (Client-side)
     const handleStartWebCall = useCallback(async () => {
         if (!vapiRef.current || !agentId || !userName) {
             toast.error("Please enter your name to start a web call.");
@@ -122,8 +165,19 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         setCallError(null);
 
         try {
+            // Friend's detailed prompt logic
+            let everyContentPrompt = `${agent.prompt || "You are a helpful assistant."}`;
+            if (agent.knowledgeBase?.content) {
+                const kbContent = Array.isArray(agent.knowledgeBase.content) ? agent.knowledgeBase.content.map(item => item.value).join('\n\n') : String(agent.knowledgeBase.content);
+                if (kbContent.trim()) everyContentPrompt += `\n\n--- KNOWLEDGE BASE ---\n${kbContent}\n--- END KNOWLEDGE BASE ---`;
+            }
+
             const vapiPayload = {
-                model: { provider: "openai", model: "gpt-3.5-turbo", messages: [{ role: "system", content: agent.prompt || "You are a helpful assistant." }] },
+                model: {
+                    provider: "google",
+                    model: "gemini-1.5-flash",
+                    messages: [{ role: "system", content: everyContentPrompt }],
+                },
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
             };
@@ -131,20 +185,19 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             if (agent.voiceConfig.voiceProvider === 'elevenlabs') {
                 if (!elevenLabsApiKey) throw new Error("ElevenLabs API key is missing.");
                 vapiPayload.voice.provider = '11labs';
-                vapiPayload.voice.elevenLabsApiKey = elevenLabsApiKey; // Correct property for web SDK
+                vapiPayload.voice.elevenLabsApiKey = elevenLabsApiKey;
             } else {
                 vapiPayload.voice.provider = agent.voiceConfig.voiceProvider || 'vapi';
             }
             vapiRef.current.start(vapiPayload);
         } catch (error) {
-            console.error("Error starting Vapi web call:", error);
             setCallStatus('error');
             setCallError(error.message);
             toast.error(`Failed to start call: ${error.message}`);
         }
     }, [agent, userName, callStatus, elevenLabsApiKey]);
 
-    // Handler for the 'Phone' tab (uses our secure backend)
+    // Phone Call Handler (Backend)
     const handleStartPhoneCall = useCallback(async () => {
         if (!agentId || !userName || !phoneNumber) {
             toast.error("Please enter your name and phone number.");
@@ -162,7 +215,6 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             if (!response.ok) throw new Error(data.error || "An unknown error occurred.");
             toast.success("Call initiated! Your phone will ring shortly.");
         } catch (error) {
-            console.error("Error starting phone call:", error);
             setCallError(error.message);
             toast.error(`Error: ${error.message}`);
         } finally {
@@ -174,12 +226,9 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
     if (!isOpen || !agent) return null;
 
-    // Button states for Web tab
     const webCallButtonText = callStatus === 'connected' ? 'End Web Call' : (callStatus === 'connecting' ? 'Connecting...' : 'Start Web Call');
     const isElevenLabsCallButNoKey = (agent?.voiceConfig?.voiceProvider === 'elevenlabs' && !elevenLabsApiKey);
     const isWebCallButtonDisabled = callStatus === 'connecting' || !userName || !VAPI_PUBLIC_API_KEY || isElevenLabsCallButNoKey;
-
-    // Button states for Phone tab
     const isPhoneCallButtonDisabled = isConnecting || !userName || !phoneNumber;
 
     return (
@@ -231,7 +280,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                     {/* PHONE CALL TAB */}
                     {testMethod === 'phone' && (
                         <div className="flex flex-col space-y-4">
-                            <p className={`text-xs ${uiColors.textSecondary}`}>Enter your name and number. Our service will call you to connect you to the agent.</p>
+                            <p className={`text-xs ${uiColors.textSecondary}`}>Our service will call you and connect you to the agent.</p>
                              <div>
                                 <label htmlFor="userNamePhone" className={`block text-sm font-medium mb-1 ${uiColors.textSecondary}`}>Your Name</label>
                                 <div className={`flex items-center border rounded-md ${uiColors.borderPrimary} ${uiColors.bgSecondary}`}>
