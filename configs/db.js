@@ -9,7 +9,7 @@ import * as schemaCharacterAI from "@/lib/db/schemaCharacterAI"; // Assuming the
 
 // 2. Get the database URL from environment variables (BEST PRACTICE)
 // Replace the hardcoded URL with reading from process.env
-const databaseUrl = "postgresql://neondb_owner:npg_1qFX3RTnlcho@ep-twilight-fog-adnbqdka-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
 	// Add a check and throw an error if the environment variable is missing
@@ -34,4 +34,3 @@ export const db = drizzle(sql, {
 
 // Now, the 'db' object is initialized with knowledge of all tables and relations
 // defined in both schema files, enabling the use of db.query... methods.
-
