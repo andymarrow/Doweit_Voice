@@ -13,20 +13,14 @@ import DownloadDeleteTab from './DownloadDeleteTab';
 // Import constants - Adjust path if necessary
 import { uiColors } from '@/app/callagents/_constants/uiConstants';
 
-const detailTabs = [
-    { name: 'Transcript', key: 'transcript' },
-    { name: 'Actions', key: 'actions' },
-    { name: 'Download / Delete', key: 'download' },
-];
-
 const tabContentComponents = {
     transcript: TranscriptTab,
     actions: ActionsDataTab,
     download: DownloadDeleteTab,
 };
 
-// Receive callData, onDeleteCall handler, and isDeleting state
-function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting }) { // *** Added isDeleting ***
+// FIX: Accept agentName as a prop
+function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, agentName }) {
 
     const [activeTab, setActiveTab] = useState('transcript'); // Default active tab
     const modalRef = useRef(null); // Ref for modal content
@@ -42,7 +36,8 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting }
          if (contentArea) {
              contentArea.scrollTop = 0;
          }
-    }, [isOpen, callData, activeTab]); // Re-run when modal opens, different call selected, or tab changes
+    // FIX: Removed `activeTab` from the dependency array to stop the flashing/resetting bug.
+    }, [isOpen, callData]);
 
 
      // Handle clicks outside the modal to close it
@@ -71,7 +66,6 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting }
 
     // Format start time and duration for display in the header
      const formattedStartTime = callData.startTime ? new Date(callData.startTime).toLocaleString() : 'N/A';
-     // You might need a helper to format duration from seconds if not already stored as string
      const formattedDuration = callData.duration !== undefined && callData.duration !== null ? `${callData.duration}s` : callData.duration || 'N/A'; // Assuming duration is in seconds if number
 
     return (
@@ -92,8 +86,10 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting }
 
                 {/* Agent/Caller Info (Optional - display summary here) */}
                  <div className={`px-6 py-3 text-sm ${uiColors.textSecondary} flex items-center justify-between border-b ${uiColors.borderPrimary} flex-shrink-0 flex-wrap gap-2`}> {/* Added flex-wrap and gap */}
-                     <span>Agent: <strong className={`${uiColors.textPrimary}`}>{callData.agent ? callData.agent.name : (callData.agentName || 'N/A')}</strong></span> {/* Use nested agent name if available, fallback to flat agentName */}
-                     <span>Caller: <strong className={`${uiColors.textPrimary}`}>{callData.callerName || callData.phoneNumber || 'Unknown'}</strong></span> {/* Use phoneNumber from DB */}
+                     {/* FIX: Prioritize name from callData, then fallback to prop */}
+                     <span>Agent: <strong className={`${uiColors.textPrimary}`}>{callData.agent?.name || agentName || 'N/A'}</strong></span>
+                     {/* Note: Your console shows customerName is inside rawCallData */}
+                     <span>Caller: <strong className={`${uiColors.textPrimary}`}>{callData.customerName || callData.rawCallData?.customerName || callData.phoneNumber || 'Unknown'}</strong></span>
                       <span>Status: <strong className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${
                           callData.status === 'Completed' ? `${uiColors.statusBadgeSuccessBg} ${uiColors.statusBadgeSuccessText}` :
                           callData.status === 'Failed' ? `${uiColors.statusBadgeDangerBg} ${uiColors.statusBadgeDangerText}` :

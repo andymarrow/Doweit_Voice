@@ -149,7 +149,6 @@ export default function CallsPage() {
                          callerNumber.toLowerCase().includes(lowerSearchTerm) ||
                           status.toLowerCase().includes(lowerSearchTerm) ||
                          // Optional: Search in transcript text if desired (can be large)
-                         // FIX: Changed entry.text to entry.message to match the new Vapi transcript format.
                          call.transcript?.some(entry => (entry.message || '').toLowerCase().includes(lowerSearchTerm)) ||
                           // Optional: Search in action data values (can be large)
                          // call.callActionValues?.some(cav => (String(cav.value) || '').toLowerCase().includes(lowerSearchTerm))
@@ -268,12 +267,14 @@ export default function CallsPage() {
 
             {/* Call Table */}
              <div className="flex-grow overflow-y-auto">
-                {isLoading ? (
+                {/* FIX: Wait for isLoading to be false AND for agent.name to be available */}
+                {isLoading || !agent?.name ? (
                     <div className={`flex flex-col items-center justify-center h-full text-center ${uiColors.textSecondary}`}>
-                         <FiLoader className="animate-spin mx-auto w-8 h-8 mb-4" /> Loading calls...
+                         <FiLoader className="animate-spin mx-auto w-8 h-8 mb-4" /> 
+                         {isLoading ? "Loading calls..." : "Loading agent details..."}
                     </div>
                 ) : (
-                     <CallTable calls={filteredCalls} onViewDetails={handleViewDetails} />
+                     <CallTable calls={filteredCalls} onViewDetails={handleViewDetails} agentName={agent.name} />
                  )}
              </div>
 
@@ -282,9 +283,10 @@ export default function CallsPage() {
              <CallDetailModal
                  isOpen={isDetailModalOpen}
                  onClose={handleCloseModal}
-                 callData={selectedCall} // Pass the selected call data (which now includes nested data)
-                 onDeleteCall={handleDeleteCall} // Pass delete handler down
-                 isDeleting={isDeletingCall} // Pass deleting state to modal
+                 callData={selectedCall}
+                 onDeleteCall={handleDeleteCall}
+                 isDeleting={isDeletingCall}
+                 agentName={agent?.name}
              />
 
         </div>

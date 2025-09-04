@@ -9,7 +9,8 @@ import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Ensure co
 import { itemVariants, sectionVariants } from '@/app/callagents/_constants/uiConstants'; // Assuming variants
 // Removed accentClasses import as it wasn't used directly in the button class
 
-function CallTable({ calls, onViewDetails }) { // Receive calls data and detail handler
+// FIX: Accept agentName as a prop
+function CallTable({ calls, onViewDetails, agentName }) {
 
     if (!calls || calls.length === 0) {
         return (
@@ -70,11 +71,12 @@ function CallTable({ calls, onViewDetails }) { // Receive calls data and detail 
                         >
                             {/* Table Data */}
                             <td className={`px-4 py-4 whitespace-nowrap text-sm font-medium ${uiColors.textPrimary}`}>
-                                {/* Access nested agent name if available, fallback to agentName string */}
-                                {call.agent ? call.agent.name : call.agentName || 'N/A'}
+                                {/* FIX: Prioritize name from the call object, fallback to prop */}
+                                {call.agent?.name || agentName || 'N/A'}
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-sm ${uiColors.textSecondary}`}>
-                                {call.callerName || 'Unknown'} {/* Use callerName from DB */}
+                                {/* Note: Your console shows customerName is inside rawCallData */}
+                                {call.customerName || call.rawCallData?.customerName || 'Unknown'}
                             </td>
                             <td className={`px-4 py-4 whitespace-nowrap text-sm ${uiColors.textSecondary}`}>
                                 {call.phoneNumber || 'N/A'} {/* Use phoneNumber from DB */}
@@ -104,7 +106,7 @@ function CallTable({ calls, onViewDetails }) { // Receive calls data and detail 
                                  <button
                                      onClick={() => onViewDetails(call)} // Call handler with call data
                                      // Adjusted button styling assuming accentPrimary is a color name in uiColors
-                                     className={`text-${uiColors.textAccent} hover:text-${uiColors.textAccentContrast} focus:outline-none focus:underline`} // Simple link-style button or apply your standard button styles
+                                     className={`text-cyan-600 hover:text-cyan-800 dark:text-purple-400 dark:hover:text-purple-300 focus:outline-none focus:underline`}
                                  >
                                      Details
                                  </button>
