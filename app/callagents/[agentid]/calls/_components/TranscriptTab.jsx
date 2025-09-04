@@ -1,19 +1,19 @@
 // voice-agents-CallAgents/[agentid]/calls/_components/TranscriptTab.jsx
 "use client";
 
-import React, { useRef, useEffect } from 'react'; // Added useRef and useEffect for audio
+import React, { useRef, useEffect } from 'react';
 
 // Import constants - Adjust path if necessary
 import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Ensure correct path
 
-function TranscriptTab({ callData }) { // Receive full callData
+function TranscriptTab({ callData }) {
 
-     // Access transcript and audioUrl from callData
+     // Access transcript and recordingUrl from callData
      const transcript = callData?.transcript;
-     const audioUrl = callData?.audioUrl;
+     // FIX: Changed from `audioUrl` to `recordingUrl` to match the data saved from Vapi.
+     const recordingUrl = callData?.recordingUrl;
 
 
-    // Basic audio player state and ref (Placeholder)
     const audioRef = useRef(null);
     // You might need more sophisticated state (isPlaying, currentTime, duration)
     // and handlers (play, pause, seek) for a full audio player UI.
@@ -21,10 +21,11 @@ function TranscriptTab({ callData }) { // Receive full callData
 
     // Optional: Effect to load audio when URL changes or component mounts
      useEffect(() => {
-         if (audioRef.current && audioUrl) {
-             audioRef.current.load(); // Load the new audio source
+         // FIX: Check for `recordingUrl` to load the new audio source.
+         if (audioRef.current && recordingUrl) {
+             audioRef.current.load();
          }
-     }, [audioUrl]);
+     }, [recordingUrl]); // FIX: Dependency updated to `recordingUrl`.
 
 
     if (!transcript || transcript.length === 0) {
@@ -41,28 +42,31 @@ function TranscriptTab({ callData }) { // Receive full callData
             <div className="flex-grow overflow-y-auto space-y-4 text-sm pr-2 -mr-2 hide-scrollbar"> {/* Scrollable area */}
                 {/* Use callData.transcript array */}
                 {transcript.map((entry, index) => (
-                    <div key={index} className={`flex ${entry.type === 'agent' ? 'justify-start' : 'justify-end'}`}>
+                    // FIX: Changed logic from 'entry.type === agent' to 'entry.role === assistant' to match Vapi's roles.
+                    <div key={index} className={`flex ${entry.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
                          <div className={`max-w-[85%] p-3 rounded-lg ${
-                             entry.type === 'agent'
+                             // FIX: Changed condition to use 'entry.role' which will be 'assistant' or 'user'.
+                             entry.role === 'assistant'
                                  ? `${uiColors.chatBubbleAgentBg} ${uiColors.chatBubbleAgentText}`
                                  : `${uiColors.chatBubbleUserBg} ${uiColors.chatBubbleUserText}`
                          }`}>
                             {/* Optional: Timestamp */}
                              {/* <span className={`block text-xs ${uiColors.textPlaceholder} mb-1`}>
-                                {entry.timestamp}
+                                {entry.time} // You can display the time in seconds if you want.
                             </span> */}
-                            {entry.text}
+                            {/* FIX: Changed from `entry.text` to `entry.message` to match the new transcript structure. */}
+                            {entry.message}
                          </div>
                     </div>
                 ))}
             </div>
 
-            {/* Audio Player (Placeholder) */}
+            {/* Audio Player */}
              <div className={`flex-shrink-0 border-t ${uiColors.borderPrimary} pt-4 mt-4`}>
                  <h4 className={`text-sm font-semibold mb-2 ${uiColors.textPrimary}`}>Call Recording</h4>
-                 {/* Use callData.audioUrl */}
-                 {audioUrl ? (
-                     <audio ref={audioRef} controls src={audioUrl} className="w-full">
+                 {/* FIX: Check for and use `recordingUrl`. */}
+                 {recordingUrl ? (
+                     <audio ref={audioRef} controls src={recordingUrl} className="w-full">
                          Your browser does not support the audio element.
                      </audio>
                  ) : (

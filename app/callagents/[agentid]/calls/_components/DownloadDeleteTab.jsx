@@ -21,60 +21,48 @@ const simulateDownload = (filename, content, type) => {
 };
 
 // Receive callData, onDeleteCall handler, and isDeleting state
-function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) { // *** Added isDeleting ***
+function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) {
 
-    // Keep local states for download loading, they are specific to this tab's actions
     const [isDownloadingTranscript, setIsDownloadingTranscript] = useState(false);
     const [isDownloadingAudio, setIsDownloadingAudio] = useState(false);
 
-    // Determine if the delete button itself is disabled (overall deleting state from parent OR local download states)
-     const isDeleteButtonDisabled = isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData;
-
-    // Determine if download buttons are disabled (overall deleting state OR local download states)
-     const isDownloadButtonDisabled = isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData;
+    const isDeleteButtonDisabled = isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData;
+    const isDownloadButtonDisabled = isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData;
 
 
     const handleDownloadTranscript = async () => {
-        // Use callData.transcript received from the modal/page
         if (!callData || !callData.transcript || callData.transcript.length === 0) {
-            alert("No transcript available to download."); // Or use toast
+            alert("No transcript available to download.");
             return;
         }
         setIsDownloadingTranscript(true);
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate processing
-        // API should return transcript as an array of { type, text, timestamp }
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // FIX: Updated to use the correct Vapi transcript format (`role`, `message`, `time`).
         const transcriptText = (callData.transcript || []).map(entry =>
-            `${entry.timestamp ? `[${entry.timestamp}] ` : ''}${(entry.type || '').toUpperCase()}: ${entry.text || ''}` // Safely access properties
+            `[${entry.time.toFixed(2)}s] ${(entry.role || '').toUpperCase()}: ${entry.message || ''}`
         ).join('\n');
+
         simulateDownload(`call_${callData.id}_transcript.txt`, transcriptText, 'text/plain');
         setIsDownloadingTranscript(false);
     };
 
     const handleDownloadAudio = async () => {
-         // Use callData.audioUrl received from the modal/page
-        if (!callData || !callData.audioUrl) {
-             alert("No audio recording available to download."); // Or use toast
+         // FIX: Use `recordingUrl` instead of `audioUrl`.
+        if (!callData || !callData.recordingUrl) {
+             alert("No audio recording available to download.");
              return;
          }
          setIsDownloadingAudio(true);
-         // In a real app, you'd fetch the audio blob/file from callData.audioUrl
-         // and then use simulateDownload (or a better download library)
-         // For simulation, we'll just fake the download success
-         await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate download time
-         alert(`Simulating download of audio from: ${callData.audioUrl}`); // Placeholder
-         // simulateDownload(`call_${callData.id}_audio.wav`, audioBlob, 'audio/wav'); // Use actual blob/type
+         await new Promise(resolve => setTimeout(resolve, 1000));
+         alert(`Simulating download of audio from: ${callData.recordingUrl}`);
+         // Example of a real download link: window.open(callData.recordingUrl, '_blank');
          setIsDownloadingAudio(false);
     };
 
     const handleDeleteCall = () => {
-        // onDeleteCall is the handler passed from the parent page
         if (confirm(`Are you sure you want to delete call ${callData.id}? This action cannot be undone.`)) {
-             // Parent page will handle setting isDeleting=true, calling the API,
-             // updating state, showing toast, and closing the modal.
-             // This component just needs to trigger that process via the prop.
             onDeleteCall(callData.id);
-            // Do NOT set isDeleting(true) locally here, parent controls it.
-            // Do NOT close the modal here, parent controls it after API response.
         }
     };
 
@@ -91,7 +79,7 @@ function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) { // *** Adde
                  <div className="flex flex-wrap gap-4">
                      <button
                          onClick={handleDownloadTranscript}
-                         disabled={isDownloadButtonDisabled || !callData?.transcript || callData.transcript.length === 0} // *** Use isDownloadButtonDisabled ***, check transcript availability
+                         disabled={isDownloadButtonDisabled || !callData?.transcript || callData.transcript.length === 0}
                          className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
                      >
                          {isDownloadingTranscript ? (
@@ -103,7 +91,8 @@ function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) { // *** Adde
                      </button>
                      <button
                          onClick={handleDownloadAudio}
-                          disabled={isDownloadButtonDisabled || !callData?.audioUrl} // *** Use isDownloadButtonDisabled ***, check audioUrl availability
+                          // FIX: Check `recordingUrl` for disabled state.
+                          disabled={isDownloadButtonDisabled || !callData?.recordingUrl}
                           className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
                      >
                          {isDownloadingAudio ? (
@@ -128,11 +117,11 @@ function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) { // *** Adde
                       </div>
                  </div>
                  <button
-                     onClick={handleDeleteCall} // Call the handler
-                     disabled={isDeleteButtonDisabled} // *** Use isDeleteButtonDisabled ***
+                     onClick={handleDeleteCall}
+                     disabled={isDeleteButtonDisabled}
                       className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.alertDangerButtonBg} ${uiColors.alertDangerButtonText} ${uiColors.alertDangerButtonHoverBg} disabled:opacity-50 disabled:cursor-not-allowed`}
                  >
-                     {isDeleting ? ( // *** Use isDeleting state from parent ***
+                     {isDeleting ? (
                          <FiLoader className="mr-2 w-4 h-4 animate-spin" />
                      ) : (
                           <FiTrash2 className="mr-2 w-4 h-4" />

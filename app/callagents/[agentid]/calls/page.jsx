@@ -139,7 +139,7 @@ export default function CallsPage() {
              callsToFilter = callsToFilter.filter(call => {
                  // Safely access properties before checking includes
                  const agentName = call.agent ? call.agent.name : (agent?.name || ''); // Use agent name from fetched call if available, fallback to context agent name
-                 const callerName = call.callerName || '';
+                 const callerName = call.customerName || '';
                  const callerNumber = call.phoneNumber || ''; // Use phoneNumber from DB
                  const status = call.status || '';
 
@@ -149,7 +149,8 @@ export default function CallsPage() {
                          callerNumber.toLowerCase().includes(lowerSearchTerm) ||
                           status.toLowerCase().includes(lowerSearchTerm) ||
                          // Optional: Search in transcript text if desired (can be large)
-                         // call.transcript?.some(entry => (entry.text || '').toLowerCase().includes(lowerSearchTerm))
+                         // FIX: Changed entry.text to entry.message to match the new Vapi transcript format.
+                         call.transcript?.some(entry => (entry.message || '').toLowerCase().includes(lowerSearchTerm)) ||
                           // Optional: Search in action data values (can be large)
                          // call.callActionValues?.some(cav => (String(cav.value) || '').toLowerCase().includes(lowerSearchTerm))
                          false // Fallback if none match

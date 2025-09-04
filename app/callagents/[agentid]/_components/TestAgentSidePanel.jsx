@@ -53,7 +53,8 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             let transcriptBuffer = [];
             let callStartTime = null;
 
-            const saveTranscript = async (customerName) => {
+            // FIX: Updated saveTranscript to handle the full call object from Vapi.
+            const saveTranscript = async (customerName, callData) => {
                 if (transcriptBuffer.length === 0) return;
                 const callDetails = {
                     customerName: customerName,
@@ -62,7 +63,9 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                     duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
                     startTime: callStartTime || new Date().toISOString(),
                     endTime: new Date().toISOString(),
-                    transcript: JSON.stringify(transcriptBuffer),
+                    transcript: transcriptBuffer, // FIX: Sending the array directly, not a JSON string.
+                    callId: callData?.id || null, // FIX: Added callId as per Vapi docs.
+                    recordingUrl: callData?.recordingUrl || null, // FIX: Added recordingUrl as per Vapi docs.
                 };
                 try {
                     const response = await fetch(`/api/callagents/${agentId}/calls`, {
@@ -97,14 +100,16 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                     setCallStatus(message.status);
                     if (message.status === 'ended') {
                         toast.success("Web call ended.");
-                        saveTranscript(userName);
+                        // FIX: Pass the entire `message.call` object to saveTranscript on call end.
+                        saveTranscript(userName, message.call);
                     }
                 }
+                // FIX: This block is updated to match the Vapi transcript object structure.
                 if (message.type === "transcript" && message.transcriptType === "final") {
                     transcriptBuffer.push({
-                        role: message.role,
-                        text: message.transcript,
-                        timestamp: Date.now(),
+                        role: message.role, // 'assistant' or 'user'
+                        message: message.transcript, // FIX: Key changed from 'text' to 'message'
+                        time: message.time,          // FIX: Used Vapi's 'time' instead of Date.now()
                     });
                 }
             });
