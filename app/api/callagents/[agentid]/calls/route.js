@@ -66,19 +66,12 @@ export async function GET(req, { params }) {
 					},
 				},
 			},
-			// Note: Client-side filtering (search, date) will happen in the frontend for now.
-			// If filtering needs to be server-side for performance with large datasets,
-			// add `where` conditions here based on query parameters (e.g., `req.nextUrl.searchParams`).
 		});
 
 		console.log(
 			`[API CALLS GET] Found ${agentCalls.length} calls for agent ${agentId}`,
 		);
-		// console.log('[API CALLS GET] Fetched Calls Sample (first 2):', agentCalls.slice(0, 2)); // Log a sample
 
-		// The data is already structured nicely by Drizzle's `with`
-		// Each call object will have a `callActionValues` array, where each item
-		// has `value` and a nested `agentAction.action` object with global action details.
 		return NextResponse.json(agentCalls, { status: 200 });
 	} catch (error) {
 		console.error(
@@ -105,13 +98,15 @@ export async function POST(req, { params }) {
 
     try {
         const body = await req.json();
-        const callDetails = body; // The body *is* the callDetails object
+        const callDetails = body;
 
         if (!callDetails || !callDetails.transcript) {
             return NextResponse.json({ error: "Transcript data is required" }, { status: 400 });
         }
+        
+        // --- ADD THIS LOG ---
+        console.log(`[API CALLS POST] Received payload with recordingUrl: ${callDetails.recordingUrl}`);
 
-        console.log(`[API CALLS POST] Attempting to save call for agent ${agentId}`);
 
         // Step 1: Verify ownership of the agent
         const agent = await db.query.callAgents.findFirst({
@@ -128,35 +123,32 @@ export async function POST(req, { params }) {
             .insert(calls)
             .values({
                 agentId: agentId,
-                // We don't have a contactId for a web test call, so we leave it null.
-                
-                // --- FIX APPLIED ---
-                // For phoneNumber, we use the value if it exists, otherwise provide a placeholder
-                // since the column is notNull. For web calls, customerName is more relevant.
-                phoneNumber: callDetails.phoneNumber || "Web Call", // Use a placeholder for web calls
-                
-                direction: callDetails.direction || 'inbound', // Use direction from frontend
-                status: "Completed", // Status from frontend
-                
-                // The transcript is already a JSON string from the frontend
+                phoneNumber: callDetails.phoneNumber || "Web Call",
+                direction: callDetails.direction || 'inbound',
+                status: callDetails.status || "Completed", // Use status from frontend
                 transcript: callDetails.transcript, 
-                
                 duration: callDetails.duration || 0,
                 startTime: new Date(callDetails.startTime || Date.now()),
                 endTime: new Date(callDetails.endTime || Date.now()),
 
-                // We can store the customer's name in the rawCallData JSONB field for web calls
+                // --- FIX APPLIED HERE ---
+                // Add the recordingUrl from the payload to the database insert
+                recordingUrl: callDetails.recordingUrl || null,
+
                 rawCallData: {
                     customerName: callDetails.customerName,
+                    // You could also store the Vapi callId here if needed
+                    vapiCallId: callDetails.callId,
                 }
             })
             .returning({ id: calls.id });
 
-        console.log(`[API CALLS POST] Successfully saved call ${newCall.id}`);
+        console.log(`[API CALLS POST] Successfully saved call ${newCall.id} with recording URL.`);
 
         return NextResponse.json({ success: true, callId: newCall.id }, { status: 201 });
 
-    } catch (error) {
+    } catch (error)
+    {
         console.error(`[API CALLS POST] Error saving call for agent ${agentId}:`, error);
         return NextResponse.json({ error: "Internal server error while saving call" }, { status: 500 });
     }
