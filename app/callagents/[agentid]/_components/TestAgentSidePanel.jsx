@@ -1,4 +1,3 @@
-// c:/Users/Samson/OneDrive/Desktop/doweitvoice/DoweitV3/app/callagents/[agentid]/_components/TestAgentSidePanel.jsx
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -53,20 +52,25 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             let transcriptBuffer = [];
             let callStartTime = null;
 
-            // FIX: Updated saveTranscript to handle the full call object from Vapi.
-            const saveTranscript = async (customerName, callData) => {
-                if (transcriptBuffer.length === 0) return;
+            // This function now saves the transcript AND recording URL
+            const saveCallData = async (customerName, callDataFromVapi) => {
+                if (transcriptBuffer.length === 0 && !callDataFromVapi) return;
+
+                console.log("Vapi call data received on end:", callDataFromVapi);
+
                 const callDetails = {
                     customerName: customerName,
                     direction: 'inbound',
-                    status: 'completed',
+                    status: 'Completed', // Using 'Completed' to match table styles
                     duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
                     startTime: callStartTime || new Date().toISOString(),
                     endTime: new Date().toISOString(),
-                    transcript: transcriptBuffer, // FIX: Sending the array directly, not a JSON string.
-                    callId: callData?.id || null, // FIX: Added callId as per Vapi docs.
-                    recordingUrl: callData?.recordingUrl || null, // FIX: Added recordingUrl as per Vapi docs.
+                    transcript: transcriptBuffer,
+                    // *** NEW: Capture callId and recordingUrl from the Vapi call object ***
+                    callId: callDataFromVapi?.id || null, 
+                    recordingUrl: callDataFromVapi?.recordingUrl || null,
                 };
+
                 try {
                     const response = await fetch(`/api/callagents/${agentId}/calls`, {
                         method: "POST",
@@ -74,42 +78,38 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                         body: JSON.stringify(callDetails),
                     });
                     if (!response.ok) throw new Error(await response.text());
-                    console.log("Web call transcript saved successfully.");
+                    console.log("Web call data (transcript & recording) saved successfully.");
                     toast.success("Test call transcript saved.");
                 } catch (err) {
-                    console.error("Error saving web call transcript:", err);
-                    toast.error("Could not save transcript.");
+                    console.error("Error saving web call data:", err);
+                    toast.error("Could not save call data.");
                 }
             };
 
-            // --- CORRECTED EVENT LISTENERS (MERGED) ---
+            // --- Event Listeners ---
             vapi.on("call-status", (status) => {
-                // This gives high-level status like 'connected', 'ended'
-                console.log("High-level Vapi Call Status:", status);
                 if (status === 'connected') {
                     callStartTime = new Date().toISOString();
                     transcriptBuffer = [];
                 }
-                // We use the 'status-update' message for more granular control
             });
 
             vapi.on("message", (message) => {
                 if (message.type === 'status-update') {
-                    // This gives more detailed status updates
                     console.log("Vapi Status Update:", message.status);
                     setCallStatus(message.status);
                     if (message.status === 'ended') {
                         toast.success("Web call ended.");
-                        // FIX: Pass the entire `message.call` object to saveTranscript on call end.
-                        saveTranscript(userName, message.call);
+                        // When the call ends, Vapi provides the full call object.
+                        // Pass this entire object to our save function.
+                        saveCallData(userName, message.call);
                     }
                 }
-                // FIX: This block is updated to match the Vapi transcript object structure.
                 if (message.type === "transcript" && message.transcriptType === "final") {
                     transcriptBuffer.push({
-                        role: message.role, // 'assistant' or 'user'
-                        message: message.transcript, // FIX: Key changed from 'text' to 'message'
-                        time: message.time,          // FIX: Used Vapi's 'time' instead of Date.now()
+                        role: message.role,
+                        message: message.transcript,
+                        time: message.time,
                     });
                 }
             });
@@ -169,7 +169,6 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             toast.error("Please enter your name to start a web call.");
             return;
         }
-        // --- FIX: THIS BUTTON NOW HANDLES BOTH START AND END ---
         if (callStatus === 'in-progress' || callStatus === 'connecting') {
             vapiRef.current.stop();
             return;
@@ -259,10 +258,9 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
     if (!isOpen || !agent) return null;
 
-    // --- FIX: Button text and disabled logic now handles 'in-progress' status ---
     const webCallButtonText = callStatus === 'in-progress' ? 'End Web Call' : (callStatus === 'connecting' ? 'Connecting...' : 'Start Web Call');
     const isElevenLabsCallButNoKey = (agent?.voiceConfig?.voiceProvider === 'elevenlabs' && !elevenLabsApiKey);
-    const isWebCallButtonDisabled = !userName || !VAPI_PUBLIC_API_KEY || isElevenLabsCallButNoKey; // Only disabled if name is missing or keys are missing.
+    const isWebCallButtonDisabled = !userName || !VAPI_PUBLIC_API_KEY || isElevenLabsCallButNoKey;
     
     const isPhoneCallButtonDisabled = isConnecting || !userName || !phoneNumber;
 
