@@ -180,7 +180,7 @@ export default function CharacteraiCreatePage() {
 			// The voice object from /api/voices now has 'voiceId', 'provider', and 'name' extracted from the assistant endpoint
 			voiceId: characterData.selectedVoice.voiceId, // <-- Use the actual Vapi voice ID like "Elliot", "Hana"
 			voiceName: characterData.selectedVoice.name, // <-- Friendly name like "Elliot (vapi)"
-			voiceProvider: characterData.selectedVoice.provider, // <-- Provider like "vapi", "elevenlabs"
+			voiceProvider: characterData.selectedVoice.platform, // <-- Provider like "vapi", "elevenlabs"
 			language: characterData.selectedLanguage, // <-- INCLUDE SELECTED LANGUAGE FROM NEW STATE
 			behavior: characterData.tags,
 			isPublic: characterData.visibility === "public",
