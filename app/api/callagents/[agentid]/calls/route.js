@@ -93,88 +93,73 @@ export async function GET(req, { params }) {
 }
 
 export async function POST(req, { params }) {
-	const { userId } = auth();
-	const agentId = parseInt(params.agentid, 10);
+    const { userId } = auth();
+    const agentId = parseInt(params.agentid, 10);
 
-	if (isNaN(agentId)) {
-		console.warn(
-			`[API CALLS POST] Invalid agentId provided: ${params.agentid}`,
-		);
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
-	}
+    if (isNaN(agentId)) {
+        return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+    }
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-	if (!userId) {
-		console.log(
-			`[API CALLS POST] Unauthorized: No userId for agent ${agentId}`,
-		);
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
+    try {
+        const body = await req.json();
+        const callDetails = body; // The body *is* the callDetails object
 
-	try {
-		const body = await req.json();
-		const { callDetails } = body;
+        if (!callDetails || !callDetails.transcript) {
+            return NextResponse.json({ error: "Transcript data is required" }, { status: 400 });
+        }
 
-		if (!callDetails || !callDetails.transcript) {
-			return NextResponse.json(
-				{ error: "Transcript is required" },
-				{ status: 400 },
-			);
-		}
+        console.log(`[API CALLS POST] Attempting to save call for agent ${agentId}`);
 
-		console.log(
-			`[API CALLS POST] Saving transcript with ${callDetails.length} entries for agent ${agentId} (user ${userId})`,
-		);
+        // Step 1: Verify ownership of the agent
+        const agent = await db.query.callAgents.findFirst({
+            where: and(eq(callAgents.id, agentId), eq(callAgents.creatorId, userId)),
+            columns: { id: true },
+        });
 
-		// Step 1: Verify ownership of agent
-		const agent = await db.query.callAgents.findFirst({
-			where: and(eq(callAgents.id, agentId), eq(callAgents.creatorId, userId)),
-			columns: { id: true, type: true },
-		});
+        if (!agent) {
+            return NextResponse.json({ error: "Agent not found or not authorized" }, { status: 404 });
+        }
 
-		if (!agent) {
-			console.warn(
-				`[API CALLS POST] Agent ${agentId} not found or not owned by user ${userId}`,
-			);
-			return NextResponse.json(
-				{ error: "Agent not found or not authorized" },
-				{ status: 404 },
-			);
-		}
+        // Step 2: Create a new call entry with the correct fields
+        const [newCall] = await db
+            .insert(calls)
+            .values({
+                agentId: agentId,
+                // We don't have a contactId for a web test call, so we leave it null.
+                
+                // --- FIX APPLIED ---
+                // For phoneNumber, we use the value if it exists, otherwise provide a placeholder
+                // since the column is notNull. For web calls, customerName is more relevant.
+                phoneNumber: callDetails.phoneNumber || "Web Call", // Use a placeholder for web calls
+                
+                direction: callDetails.direction || 'inbound', // Use direction from frontend
+                status: "Completed", // Status from frontend
+                
+                // The transcript is already a JSON string from the frontend
+                transcript: callDetails.transcript, 
+                
+                duration: callDetails.duration || 0,
+                startTime: new Date(callDetails.startTime || Date.now()),
+                endTime: new Date(callDetails.endTime || Date.now()),
 
-		// Step 2: Create a new call entry
-		const [newCall] = await db
-			.insert(calls)
-			.values({
-				agentId,
-				userId,
-				direction: agent.type,
-				phoneNumber: callDetails?.phoneNumber || "",
-				status: "ended",
-				transcript: callDetails?.transcript || "",
-				duration: callDetails?.duration || 0,
-				startTime: new Date(callDetails?.startTime || Date.now()),
-				endTime: new Date(callDetails?.endTime || Date.now()),
-			})
-			.returning({ id: calls.id });
+                // We can store the customer's name in the rawCallData JSONB field for web calls
+                rawCallData: {
+                    customerName: callDetails.customerName,
+                }
+            })
+            .returning({ id: calls.id });
 
-		console.log(
-			`[API CALLS POST] Saved call ${newCall.id} with ${callDetails.length} transcript entries`,
-		);
+        console.log(`[API CALLS POST] Successfully saved call ${newCall.id}`);
 
-		return NextResponse.json(
-			{ success: true, callId: newCall.id },
-			{ status: 201 },
-		);
-	} catch (error) {
-		console.error(
-			`[API CALLS POST] Error saving transcript for agent ${agentId} (user ${userId}):`,
-			error,
-		);
-		return NextResponse.json(
-			{ error: "Internal server error" },
-			{ status: 500 },
-		);
-	}
+        return NextResponse.json({ success: true, callId: newCall.id }, { status: 201 });
+
+    } catch (error) {
+        console.error(`[API CALLS POST] Error saving call for agent ${agentId}:`, error);
+        return NextResponse.json({ error: "Internal server error while saving call" }, { status: 500 });
+    }
 }
 // --- DELETE function: Placeholder (Implemented in [callid] route) ---
 // export async function DELETE(...) { ... }
