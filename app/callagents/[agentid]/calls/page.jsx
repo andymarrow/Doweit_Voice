@@ -287,6 +287,7 @@ export default function CallsPage() {
                  onDeleteCall={handleDeleteCall}
                  isDeleting={isDeletingCall}
                  agentName={agent?.name}
+                 agentId={agentId}
              />
 
         </div>

@@ -65,6 +65,15 @@ export async function GET(req, { params }) {
 						},
 					},
 				},
+				agent: {
+                    with: {
+                        agentActions: {
+                            with: {
+                                action: true
+                            }
+                        }
+                    }
+                }
 			},
 		});
 

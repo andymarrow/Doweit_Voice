@@ -1,34 +1,53 @@
-// voice-agents-CallAgents/[agentid]/calls/_components/TranscriptTab.jsx
 "use client";
 
-import React, { useRef, useEffect } from 'react';
+import React, { useState } from 'react'; // Import useState
+import { FiCpu, FiLoader } from 'react-icons/fi'; // Import icons
+import { toast } from 'react-hot-toast'; // For user feedback
 
-// Import constants - Adjust path if necessary
-import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Ensure correct path
+import { uiColors } from '@/app/callagents/_constants/uiConstants';
 
-function TranscriptTab({ callData }) {
+function TranscriptTab({ callData,agentId }) {
+    const transcript = callData?.transcript;
+    const recordingUrl = callData?.recordingUrl;
+    
+    // State to manage the analysis button
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-     // Access transcript and recordingUrl from callData
-     const transcript = callData?.transcript;
-     // FIX: Changed from `audioUrl` to `recordingUrl` to match the data saved from Vapi.
-     const recordingUrl = callData?.recordingUrl;
+    // Check if any action values already exist for this call
+    const hasActionValues = callData?.callActionValues && callData.callActionValues.length > 0;
+    // Check if the call has a transcript to analyze
+    const hasTranscript = transcript && transcript.length > 0;
+
+    const handleAnalyzeClick = async () => {
+        setIsAnalyzing(true);
+        toast.loading('Starting analysis...'); // Inform the user
+
+        try {
+           const response = await fetch(`/api/callagents/${agentId}/calls/${callData.id}/analyze`, {
+                method: 'POST',
+            });
+            
+            const result = await response.json();
+            toast.dismiss(); // Dismiss the loading toast
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to start analysis.');
+            }
+
+            toast.success('Analysis initiated! Results will appear in the "Actions Data" tab shortly.');
+            // You might want to pass a function from the parent to refresh the call data after a delay
+            
+        } catch (error) {
+            toast.dismiss();
+            toast.error(error.message);
+            console.error("Analysis trigger failed:", error);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
 
-    const audioRef = useRef(null);
-    // You might need more sophisticated state (isPlaying, currentTime, duration)
-    // and handlers (play, pause, seek) for a full audio player UI.
-
-
-    // Optional: Effect to load audio when URL changes or component mounts
-     useEffect(() => {
-         // FIX: Check for `recordingUrl` to load the new audio source.
-         if (audioRef.current && recordingUrl) {
-             audioRef.current.load();
-         }
-     }, [recordingUrl]); // FIX: Dependency updated to `recordingUrl`.
-
-
-    if (!transcript || transcript.length === 0) {
+    if (!hasTranscript) {
         return (
             <div className={`text-center py-10 ${uiColors.textSecondary}`}>
                 No transcript available for this call.
@@ -37,24 +56,36 @@ function TranscriptTab({ callData }) {
     }
 
     return (
-        <div className="flex flex-col h-full"> {/* Container to stack transcript and player */}
+        <div className="flex flex-col h-full">
+
+            {/* NEW: Analyze Button Section */}
+            {!hasActionValues && hasTranscript && (
+                <div className={`mb-4 p-3 rounded-md border ${uiColors.borderPrimary} ${uiColors.bgSecondary} flex items-center justify-between`}>
+                    <p className={`text-sm ${uiColors.textSecondary}`}>Extract structured data from this transcript.</p>
+                    <button
+                        onClick={handleAnalyzeClick}
+                        disabled={isAnalyzing}
+                        className={`inline-flex items-center px-3 py-1.5 text-sm font-semibold rounded-md transition-colors text-white ${uiColors.accentPrimaryGradient} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                        {isAnalyzing ? (
+                            <FiLoader className="mr-2 w-4 h-4 animate-spin" />
+                        ) : (
+                            <FiCpu className="mr-2 w-4 h-4" />
+                        )}
+                        Analyze Call
+                    </button>
+                </div>
+            )}
+            
             {/* Transcript Area */}
-            <div className="flex-grow overflow-y-auto space-y-4 text-sm pr-2 -mr-2 hide-scrollbar"> {/* Scrollable area */}
-                {/* Use callData.transcript array */}
+            <div className="flex-grow overflow-y-auto space-y-4 text-sm pr-2 -mr-2 hide-scrollbar">
                 {transcript.map((entry, index) => (
-                    // FIX: Changed logic from 'entry.type === agent' to 'entry.role === assistant' to match Vapi's roles.
                     <div key={index} className={`flex ${entry.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
                          <div className={`max-w-[85%] p-3 rounded-lg ${
-                             // FIX: Changed condition to use 'entry.role' which will be 'assistant' or 'user'.
                              entry.role === 'assistant'
                                  ? `${uiColors.chatBubbleAgentBg} ${uiColors.chatBubbleAgentText}`
                                  : `${uiColors.chatBubbleUserBg} ${uiColors.chatBubbleUserText}`
                          }`}>
-                            {/* Optional: Timestamp */}
-                             {/* <span className={`block text-xs ${uiColors.textPlaceholder} mb-1`}>
-                                {entry.time} // You can display the time in seconds if you want.
-                            </span> */}
-                            {/* FIX: Changed from `entry.text` to `entry.message` to match the new transcript structure. */}
                             {entry.message}
                          </div>
                     </div>
@@ -64,9 +95,8 @@ function TranscriptTab({ callData }) {
             {/* Audio Player */}
              <div className={`flex-shrink-0 border-t ${uiColors.borderPrimary} pt-4 mt-4`}>
                  <h4 className={`text-sm font-semibold mb-2 ${uiColors.textPrimary}`}>Call Recording</h4>
-                 {/* FIX: Check for and use `recordingUrl`. */}
                  {recordingUrl ? (
-                     <audio ref={audioRef} controls src={recordingUrl} className="w-full">
+                     <audio controls src={recordingUrl} className="w-full">
                          Your browser does not support the audio element.
                      </audio>
                  ) : (
