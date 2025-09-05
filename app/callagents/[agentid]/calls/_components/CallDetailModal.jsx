@@ -2,7 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { FiX } from 'react-icons/fi'; // Icons
+import { FiX ,FiLoader} from 'react-icons/fi'; // Icons
+import { toast } from 'react-hot-toast';
 
 // Import tab components
 import CallDetailTabs from './CallDetailTabs';
@@ -25,18 +26,51 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, 
     const [activeTab, setActiveTab] = useState('transcript'); // Default active tab
     const modalRef = useRef(null); // Ref for modal content
 
+     // --- NEW STATE for holding the most up-to-date call data ---
+    const [freshCallData, setFreshCallData] = useState(null);
+    const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+
     // Reset active tab and scroll position when modal opens/callData changes
     useEffect(() => {
         if (isOpen && callData) {
-             setActiveTab('transcript'); // Always start on the Transcript tab
-             // Reset scroll position if needed - often handled by overflow styles
+            setActiveTab('transcript');
+            // Start with the data we already have
+            setFreshCallData(callData);
+
+            // Now, try to fetch the latest version from Vapi to get the recordingUrl
+            const fetchLatestUrl = async () => {
+                const vapiCallId = callData.rawCallData?.vapiCallId;
+                if (!vapiCallId) {
+                    console.log("No vapiCallId found, cannot fetch latest data.");
+                    return;
+                }
+                
+                setIsLoadingUrl(true);
+                try {
+                    const response = await fetch(`/api/vapi/${vapiCallId}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch latest call details.');
+                    }
+                    const vapiData = await response.json();
+                    
+                    // Merge the fresh data with our existing data
+                    // The fresh `recordingUrl` from Vapi will overwrite the potentially null one from our DB.
+                    setFreshCallData(prevData => ({
+                        ...prevData,
+                        recordingUrl: vapiData.recordingUrl || prevData.recordingUrl,
+                        // You can update other fields here too if needed
+                    }));
+
+                } catch (error) {
+                    console.error(error);
+                    toast.error("Could not retrieve call recording.");
+                } finally {
+                    setIsLoadingUrl(false);
+                }
+            };
+
+            fetchLatestUrl();
         }
-         // Reset scroll position of the modal content area on tab change
-         const contentArea = modalRef.current?.querySelector('.flex-grow.overflow-y-auto');
-         if (contentArea) {
-             contentArea.scrollTop = 0;
-         }
-    // FIX: Removed `activeTab` from the dependency array to stop the flashing/resetting bug.
     }, [isOpen, callData]);
 
 
@@ -60,6 +94,8 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, 
 
     // Render nothing if not open or no data
     if (!isOpen || !callData) return null;
+
+     if (!isOpen || !freshCallData) return null; // Use freshCallData for the check
 
     // Get the content component based on the active tab
     const CurrentTabComponent = tabContentComponents[activeTab];
@@ -111,7 +147,7 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, 
                  <div className="flex-grow overflow-y-auto px-6 py-4 hide-scrollbar">
                      {CurrentTabComponent ? (
                          <CurrentTabComponent
-                             callData={callData} // Pass all call data to tabs
+                             callData={freshCallData} // Pass all call data to tabs
                              onDeleteCall={onDeleteCall} // Pass delete handler only to Download/Delete tab
                              isDeleting={isDeleting} // *** Pass deleting state to tabs ***
                             agentId={agentId}

@@ -86,9 +86,9 @@ function CallTable({ calls, onViewDetails, agentName,agentId }) {
                         <th scope="col" className={`px-4 py-3 text-left text-xs font-medium ${uiColors.textSecondary} uppercase tracking-wider`}>
                             Status
                         </th>
-                        <th className={`px-4 py-3 text-left text-xs font-medium ${uiColors.textSecondary} uppercase tracking-wider`}>
+                        {/* <th className={`px-4 py-3 text-left text-xs font-medium ${uiColors.textSecondary} uppercase tracking-wider`}>
                             Recording
-                        </th>
+                        </th> */}
                         <th scope="col" className={`relative px-4 py-3 `}>
                             <span className="sr-only">Details</span>
                         </th>
@@ -133,16 +133,15 @@ function CallTable({ calls, onViewDetails, agentName,agentId }) {
                                      {call.status || 'N/A'}
                                  </span>
                             </td>
-                            <td className={`flex justify-center p-4 whitespace-nowrap text-right text-sm font-medium`}>
-                                 {/* Details Button */}
+                            {/* <td className={`flex justify-center p-4 whitespace-nowrap text-right text-sm font-medium`}>
+                                
                                  <button
-                                     onClick={()=>handlePlayRecording(call)} // Call handler with call data
-                                     // Adjusted button styling assuming accentPrimary is a color name in uiColors
+                                     onClick={()=>handlePlayRecording(call)}
                                      className={`flex justify-center text-cyan-600 hover:text-cyan-800 dark:text-purple-400 dark:hover:text-purple-300 focus:outline-none focus:underline`}
                                  >
                                     <FiPlayCircle className='w-4 h-4'/> 
                                  </button>
-                            </td>
+                            </td> */}
                              <td className={`px-4 py-4 whitespace-nowrap text-right text-sm font-medium`}>
                                  {/* Details Button */}
                                  <button

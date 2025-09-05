@@ -5,6 +5,8 @@ import { FiCpu, FiLoader } from 'react-icons/fi'; // Import icons
 import { toast } from 'react-hot-toast'; // For user feedback
 
 import { uiColors } from '@/app/callagents/_constants/uiConstants';
+import AudioPlayer from './AudioPlayer'; // <-- Import our new player
+
 
 function TranscriptTab({ callData,agentId }) {
     const transcript = callData?.transcript;
@@ -93,12 +95,10 @@ function TranscriptTab({ callData,agentId }) {
             </div>
 
             {/* Audio Player */}
-             <div className={`flex-shrink-0 border-t ${uiColors.borderPrimary} pt-4 mt-4`}>
+              <div className={`flex-shrink-0 border-t ${uiColors.borderPrimary} pt-4 mt-4`}>
                  <h4 className={`text-sm font-semibold mb-2 ${uiColors.textPrimary}`}>Call Recording</h4>
                  {recordingUrl ? (
-                     <audio controls src={recordingUrl} className="w-full">
-                         Your browser does not support the audio element.
-                     </audio>
+                     <AudioPlayer src={recordingUrl} />
                  ) : (
                       <div className={`${uiColors.textSecondary} text-sm`}>No audio recording available.</div>
                  )}
