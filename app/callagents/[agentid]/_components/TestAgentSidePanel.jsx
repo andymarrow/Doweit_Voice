@@ -31,6 +31,8 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     const [callStatus, setCallStatus] = useState('idle');    // Vapi SDK status for web calls
     const [callError, setCallError] = useState(null);
     
+    const [transcriptBuffer, setTranscriptBuffer] = useState([])
+    const [callStartTime, setCallStartTime] = useState([])
     const [elevenLabsApiKey, setElevenLabsApiKey] = useState(null);
 
     // Refs
@@ -44,73 +46,44 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
     // Initialize Vapi SDK and event listeners for Web Calls
     useEffect(() => {
+        console.log("Username log 1", userName)
         if (!vapiRef.current && VAPI_PUBLIC_API_KEY) {
             const vapi = new Vapi(VAPI_PUBLIC_API_KEY);
             vapiRef.current = vapi;
             console.log("Vapi SDK initialized for web calls.");
 
-            let transcriptBuffer = [];
             let callStartTime = null;
 
-            // This function now saves the transcript AND recording URL
-            const saveCallData = async (customerName, callDataFromVapi) => {
-                if (transcriptBuffer.length === 0 && !callDataFromVapi) return;
-
-                console.log("Vapi call data received on end:", callDataFromVapi);
-
-                const callDetails = {
-                    customerName: customerName,
-                    direction: 'inbound',
-                    status: 'Completed', // Using 'Completed' to match table styles
-                    duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
-                    startTime: callStartTime || new Date().toISOString(),
-                    endTime: new Date().toISOString(),
-                    transcript: transcriptBuffer,
-                    // *** NEW: Capture callId and recordingUrl from the Vapi call object ***
-                    callId: callDataFromVapi?.id || null, 
-                    recordingUrl: callDataFromVapi?.recordingUrl || null,
-                };
-
-                try {
-                    const response = await fetch(`/api/callagents/${agentId}/calls`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(callDetails),
-                    });
-                    if (!response.ok) throw new Error(await response.text());
-                    console.log("Web call data (transcript & recording) saved successfully.");
-                    toast.success("Test call transcript saved.");
-                } catch (err) {
-                    console.error("Error saving web call data:", err);
-                    toast.error("Could not save call data.");
-                }
-            };
-
+            
             // --- Event Listeners ---
             vapi.on("call-status", (status) => {
-                if (status === 'connected') {
-                    callStartTime = new Date().toISOString();
-                    transcriptBuffer = [];
-                }
+                console.log("Vapi call status update", status)
             });
 
             vapi.on("message", (message) => {
                 if (message.type === 'status-update') {
                     console.log("Vapi Status Update:", message.status);
                     setCallStatus(message.status);
+
+                    if (message.status === 'in-progress' && callStartTime === null ) {
+                        callStartTime = new Date().toISOString()
+                        setCallStartTime(new Date().toISOString())
+                        setTranscriptBuffer([])
+                    }
+
                     if (message.status === 'ended') {
-                        toast.success("Web call ended.");
-                        // When the call ends, Vapi provides the full call object.
-                        // Pass this entire object to our save function.
-                        saveCallData(userName, message.call);
+                            toast.success("Web call ended.");
+                            // When the call ends, Vapi provides the full call object.
+                            // Pass this entire object to our save function.
+                            // saveCallData(message.call);
                     }
                 }
                 if (message.type === "transcript" && message.transcriptType === "final") {
-                    transcriptBuffer.push({
+                    setTranscriptBuffer(prev => [...prev, {
                         role: message.role,
                         message: message.transcript,
                         time: message.time,
-                    });
+                    }])
                 }
             });
 
@@ -149,7 +122,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                 try { vapiRef.current.stop(); } catch (e) {}
             }
         }
-    }, [isOpen, agent]);
+    }, [isOpen]);
 
     // Handle clicks outside panel
     useEffect(() => {
@@ -161,6 +134,46 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isOpen, onClose, isConnecting, callStatus]);
 
+    useEffect(()=>{
+        if (callStatus === "ended") {
+            saveCallData(null);
+        }
+    },[callStatus])
+    // This function now saves the transcript AND recording URL
+    const saveCallData = async (callDataFromVapi) => {
+        if (transcriptBuffer.length === 0 && !callDataFromVapi) return;
+
+        console.log("Vapi call data received on end:", callDataFromVapi);
+
+        const callDetails = {
+            customerName: userName,
+            direction: 'inbound',
+            status: 'Completed', // Using 'Completed' to match table styles
+            duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
+            startTime: callStartTime || new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            transcript: transcriptBuffer,
+            // *** NEW: Capture callId and recordingUrl from the Vapi call object ***
+            callId: callDataFromVapi?.id || null, 
+            recordingUrl: callDataFromVapi?.recordingUrl || null,
+        };
+
+        try {
+            const response = await fetch(`/api/callagents/${agentId}/calls`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(callDetails),
+            });
+            if (!response.ok) throw new Error(await response.text());
+            console.log("Web call data (transcript & recording) saved successfully.");
+            toast.success("Test call transcript saved.");
+        } catch (err) {
+            console.error("Error saving web call data:", err);
+            toast.error("Could not save call data.");
+        }
+    };
+
+    //
     // --- Call Handlers ---
 
     // Web Call Handler (Client-side)
@@ -300,7 +313,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                                 <label htmlFor="userNameWeb" className={`block text-sm font-medium mb-1 ${uiColors.textSecondary}`}>Your Name</label>
                                 <div className={`flex items-center border rounded-md ${uiColors.borderPrimary} ${uiColors.bgSecondary}`}>
                                     <FiUser className={`w-4 h-4 text-gray-400 ml-3 mr-2`} />
-                                    <input type="text" id="userNameWeb" value={userName} onChange={(e) => setUserName(e.target.value)} disabled={callStatus !== 'idle'} className={`block w-full p-2 text-sm rounded-r-md ${uiColors.bgSecondary} ${uiColors.textPrimary} outline-none disabled:opacity-50`} placeholder="Enter your name" />
+                                    <input type="text" id="userNameWeb" value={userName} onChange={(e) => setUserName(e.target.value)} disabled={callStatus === 'in-progress' || callStatus === 'connecting'} className={`block w-full p-2 text-sm rounded-r-md ${uiColors.bgSecondary} ${uiColors.textPrimary} outline-none disabled:opacity-50`} placeholder="Enter your name" />
                                 </div>
                             </div>
                             <button onClick={handleStartWebCall} disabled={isWebCallButtonDisabled} className={`w-full px-4 py-2 rounded-md font-semibold transition-colors text-sm text-white ${isWebCallButtonDisabled ? 'bg-gray-400 cursor-not-allowed' : (callStatus === 'in-progress' ? 'bg-red-600 hover:bg-red-700' : uiColors.accentPrimaryGradient)}`}>
