@@ -1,13 +1,13 @@
-//app/callagents/Integrations/_components/IntegrationGrid.jsx
+// app/callagents/Integrations/_components/IntegrationGrid.jsx
 "use client";
 
 import React from 'react';
 import IntegrationCard from './IntegrationCard';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { FiLoader } from 'react-icons/fi';
 import { uiColors } from '../../_constants/uiConstants';
 
-export default function IntegrationGrid({ integrations, connections, onCardClick, isLoading }) {
+export default function IntegrationGrid({ integrations, onCardClick, isLoading }) {
     if (isLoading) {
         return (
             <div className={`flex items-center justify-center h-64 ${uiColors.textSecondary}`}>
@@ -25,11 +25,12 @@ export default function IntegrationGrid({ integrations, connections, onCardClick
                 visible: { transition: { staggerChildren: 0.05 } }
             }}
         >
+            {/* The integrations prop now includes the isConnected status */}
             {integrations.map(integration => (
                 <IntegrationCard
                     key={integration.id}
                     integration={integration}
-                    isConnected={connections[integration.id]?.connected || false}
+                    // isConnected is already part of the integration object
                     onCardClick={() => onCardClick(integration)}
                 />
             ))}

@@ -89,16 +89,34 @@ const INTEGRATIONS_CONFIG = [
 ];
 
 export default function IntegrationsPage() {
-    const [connections, setConnections] = useState({});
+    // This state will now store a simple Set of connected provider IDs for fast lookups
+    const [connectedProviders, setConnectedProviders] = useState(new Set());
     const [isLoading, setIsLoading] = useState(true);
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [selectedIntegration, setSelectedIntegration] = useState(null);
 
-    useEffect(() => {
-        setTimeout(() => {
-            setConnections({}); // Start with no connections for a clean demo
+    // Function to fetch and update connection statuses
+    const fetchConnections = async () => {
+        setIsLoading(true);
+        try {
+            // Your real API endpoint for getting connection statuses
+            const response = await fetch('/api/integrations/connections');
+            if (!response.ok) {
+                throw new Error('Failed to fetch connections.');
+            }
+            const providers = await response.json(); // Expects an array like ['elevenlabs', 'twilio']
+            setConnectedProviders(new Set(providers));
+        } catch (error) {
+            toast.error(error.message);
+            console.error("Failed to load connection statuses:", error);
+        } finally {
             setIsLoading(false);
-        }, 1000);
+        }
+    };
+    
+    // Fetch connections on initial component mount
+    useEffect(() => {
+        fetchConnections();
     }, []);
 
     const handleOpenPanel = (integration) => {
@@ -110,14 +128,18 @@ export default function IntegrationsPage() {
         setIsPanelOpen(false);
     };
 
-    const handleIntegrationSuccess = (integrationId, accountDetails) => {
+    const handleIntegrationSuccess = (integrationId) => {
         toast.success(`Successfully connected to ${selectedIntegration.name}!`);
-        setConnections(prev => ({
-            ...prev,
-            [integrationId]: { connected: true, ...accountDetails }
-        }));
+        // After a successful connection, re-fetch the list to update the UI
+        fetchConnections();
         handleClosePanel();
     };
+
+    // We now dynamically calculate the integrations list with their status
+    const integrationsWithStatus = INTEGRATIONS_CONFIG.map(integration => ({
+        ...integration,
+        isConnected: connectedProviders.has(integration.id)
+    }));
 
     return (
         <>
@@ -131,8 +153,7 @@ export default function IntegrationsPage() {
                     <h2 className={`text-2xl font-bold ${uiColors.textPrimary}`}>Third Parties</h2>
                 </div>
                 <IntegrationGrid
-                    integrations={INTEGRATIONS_CONFIG}
-                    connections={connections}
+                    integrations={integrationsWithStatus} // Pass the dynamically calculated list
                     onCardClick={handleOpenPanel}
                     isLoading={isLoading}
                 />
@@ -143,7 +164,8 @@ export default function IntegrationsPage() {
                 onClose={handleClosePanel}
                 integration={selectedIntegration}
                 onSuccess={handleIntegrationSuccess}
-                connectionStatus={connections[selectedIntegration?.id]}
+                // Check connection status directly from our Set
+                isConnected={connectedProviders.has(selectedIntegration?.id)}
             />
         </>
     );
