@@ -1,16 +1,20 @@
 // voice-agents-CallAgents/[agentid]/calls/_components/CallTable.jsx
 "use client";
 
-import React from 'react';
+import React,{useRef, useState} from 'react';
 import { motion } from 'framer-motion';
 
 // Import constants - Adjust path if necessary
 import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Ensure correct path
 import { itemVariants, sectionVariants } from '@/app/callagents/_constants/uiConstants'; // Assuming variants
+import { FiPlayCircle } from 'react-icons/fi';
 // Removed accentClasses import as it wasn't used directly in the button class
 
 // FIX: Accept agentName as a prop
-function CallTable({ calls, onViewDetails, agentName }) {
+function CallTable({ calls, onViewDetails, agentName,agentId }) {
+
+    const [loading, setLoading] = useState(false)
+    const audioRef = useRef(null);
 
     if (!calls || calls.length === 0) {
         return (
@@ -33,8 +37,33 @@ function CallTable({ calls, onViewDetails, agentName }) {
          return `${minutes}m ${seconds}s`;
      };
 
+    const handlePlayRecording = async (call) => {
+        console.log("passed value", call)
+        if (!call.rawCallData?.vapiCallId) return
+
+        setLoading(true)
+        try {
+            const res = await fetch(`/api/callagents/${agentId}/calls/${call.rawCallData?.vapiCallId}`)
+            if (!res.ok) throw new Error("There was error fetching the vapi call details")
+
+            const { call:vapiCall } = await res.json();
+            const recordingUrl = vapiCall?.recordingUrl
+            
+            audioRef.current.src = recordingUrl;
+            audioRef.current.play();
+        } catch (error) {
+            console.error(error.message)
+
+        } finally {
+            setLoading(false)
+        }
+
+    }
+
+
     return (
         <motion.div variants={sectionVariants} initial="hidden" animate="visible" className="overflow-x-auto">
+            <audio ref={audioRef} className='hidden'/>
             <table className={`min-w-full divide-y ${uiColors.borderPrimary}`}>
                 <thead className={`${uiColors.bgSecondary}`}>
                     <tr>
@@ -56,6 +85,9 @@ function CallTable({ calls, onViewDetails, agentName }) {
                         </th>
                         <th scope="col" className={`px-4 py-3 text-left text-xs font-medium ${uiColors.textSecondary} uppercase tracking-wider`}>
                             Status
+                        </th>
+                        <th className={`px-4 py-3 text-left text-xs font-medium ${uiColors.textSecondary} uppercase tracking-wider`}>
+                            Recording
                         </th>
                         <th scope="col" className={`relative px-4 py-3 `}>
                             <span className="sr-only">Details</span>
@@ -100,6 +132,16 @@ function CallTable({ calls, onViewDetails, agentName }) {
                                  }`}>
                                      {call.status || 'N/A'}
                                  </span>
+                            </td>
+                            <td className={`flex justify-center p-4 whitespace-nowrap text-right text-sm font-medium`}>
+                                 {/* Details Button */}
+                                 <button
+                                     onClick={()=>handlePlayRecording(call)} // Call handler with call data
+                                     // Adjusted button styling assuming accentPrimary is a color name in uiColors
+                                     className={`flex justify-center text-cyan-600 hover:text-cyan-800 dark:text-purple-400 dark:hover:text-purple-300 focus:outline-none focus:underline`}
+                                 >
+                                    <FiPlayCircle className='w-4 h-4'/> 
+                                 </button>
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-right text-sm font-medium`}>
                                  {/* Details Button */}

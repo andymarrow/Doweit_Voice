@@ -274,7 +274,7 @@ export default function CallsPage() {
                          {isLoading ? "Loading calls..." : "Loading agent details..."}
                     </div>
                 ) : (
-                     <CallTable calls={filteredCalls} onViewDetails={handleViewDetails} agentName={agent.name} />
+                     <CallTable calls={filteredCalls} onViewDetails={handleViewDetails} agentName={agent.name} agentId={agent.id}/>
                  )}
              </div>
 

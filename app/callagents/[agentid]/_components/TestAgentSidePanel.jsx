@@ -33,6 +33,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     
     const [transcriptBuffer, setTranscriptBuffer] = useState([])
     const [callStartTime, setCallStartTime] = useState([])
+    const [vapiCallData, setVapiCallData] = useState({})
     const [elevenLabsApiKey, setElevenLabsApiKey] = useState(null);
 
     // Refs
@@ -56,11 +57,16 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
             
             // --- Event Listeners ---
-            vapi.on("call-status", (status) => {
-                console.log("Vapi call status update", status)
+            vapi.on("call-start", (status) => {
+                console.log("Vapi call start update", status)
+            });
+
+            vapi.on("call-end", (status) => {
+                console.log("Vapi call end update", status)
             });
 
             vapi.on("message", (message) => {
+                console.log(message)
                 if (message.type === 'status-update') {
                     console.log("Vapi Status Update:", message.status);
                     setCallStatus(message.status);
@@ -140,10 +146,10 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         }
     },[callStatus])
     // This function now saves the transcript AND recording URL
-    const saveCallData = async (callDataFromVapi) => {
-        if (transcriptBuffer.length === 0 && !callDataFromVapi) return;
+    const saveCallData = async () => {
+        if (transcriptBuffer.length === 0 && !vapiCallData) return;
 
-        console.log("Vapi call data received on end:", callDataFromVapi);
+        console.log("Vapi call data received on end:", vapiCallData);
 
         const callDetails = {
             customerName: userName,
@@ -154,8 +160,8 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             endTime: new Date().toISOString(),
             transcript: transcriptBuffer,
             // *** NEW: Capture callId and recordingUrl from the Vapi call object ***
-            callId: callDataFromVapi?.id || null, 
-            recordingUrl: callDataFromVapi?.recordingUrl || null,
+            callId: vapiCallData?.id || null, 
+            recordingUrl: vapiCallData?.recordingUrl || null,
         };
 
         try {
@@ -225,6 +231,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 model: { provider: "google", model: "gemini-1.5-flash", messages: [{ role: "system", content: everyContentPrompt }] },
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
+                recordingEnabled: agent.callConfig?.enableRecordings || false,
             };
 
             if (agent.voiceConfig.voiceProvider === 'elevenlabs') {
@@ -234,7 +241,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             } else {
                 vapiPayload.voice.provider = agent.voiceConfig.voiceProvider || 'vapi';
             }
-            vapiRef.current.start(vapiPayload);
+            vapiRef.current.start(vapiPayload).then(call=> setVapiCallData(call));
         } catch (error) {
             setCallStatus('error');
             setCallError(error.message);
