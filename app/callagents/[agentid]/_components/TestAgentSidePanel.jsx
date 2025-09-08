@@ -237,7 +237,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             if (agent.voiceConfig.voiceProvider === 'elevenlabs') {
                 if (!elevenLabsApiKey) throw new Error("ElevenLabs API key is missing.");
                 vapiPayload.voice.provider = '11labs';
-                vapiPayload.voice.elevenLabsApiKey = elevenLabsApiKey;
+                // vapiPayload.voice.elevenLabsApiKey = elevenLabsApiKey;
             } else {
                 vapiPayload.voice.provider = agent.voiceConfig.voiceProvider || 'vapi';
             }
