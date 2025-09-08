@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/configs/db";
 import { calls } from "@/lib/db/schemaCharacterAI";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // This is the endpoint Vapi will call when a recording is ready.
 export async function POST(req) {
@@ -10,15 +10,19 @@ export async function POST(req) {
 		const body = await req.json();
 
 		// Log the entire incoming webhook payload for debugging
-		console.log("[VAPI WEBHOOK] Received webhook:", JSON.stringify(body, null, 2));
+		console.log(
+			"[VAPI WEBHOOK] Received webhook:",
+			JSON.stringify(body, null, 2),
+		);
 
 		// Check for the specific message type for a ready recording
-		if (body.message?.type === "call-ended-webhook") {
+		if (body.message?.type === "end-of-call-report") {
 			const callData = body.message.call;
 
 			// Vapi will send the full call object, including the recordingUrl
 			const vapiCallId = callData?.id;
-			const recordingUrl = callData?.recordingUrl;
+			// const recordingUrl = callData?.recordingUrl;
+			const recordingUrl = body.message?.recordingUrl;
 
 			if (!vapiCallId) {
 				console.warn("[VAPI WEBHOOK] Webhook received without a Vapi call ID.");
@@ -45,9 +49,9 @@ export async function POST(req) {
 			const result = await db
 				.update(calls)
 				.set({
-					recordingUrl: recordingUrl,
+					audioUrl: recordingUrl
 				})
-				.where(eq(calls.rawCallData.path("vapiCallId"), vapiCallId))
+				.where(sql`${calls.rawCallData}->>'vapiCallId' = ${vapiCallId}`)
 				.returning({ id: calls.id });
 
 			if (result.length > 0) {
@@ -66,6 +70,10 @@ export async function POST(req) {
 	} catch (error) {
 		console.error("[VAPI WEBHOOK] Error processing webhook:", error);
 		// Return a server error, but Vapi might retry
-		return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+		return NextResponse.json(
+			{ error: "Internal Server Error" },
+			{ status: 500 },
+		);
 	}
 }
+

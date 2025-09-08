@@ -232,6 +232,9 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
                 recordingEnabled: agent.callConfig?.enableRecordings || false,
+                server: {
+                    url: process.env.NEXT_PUBLIC_WEBHOOK_URL,
+                }
             };
 
             if (agent.voiceConfig.voiceProvider === 'elevenlabs') {
