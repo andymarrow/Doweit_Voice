@@ -23,7 +23,7 @@ export default function OAuthConnectButton({ field, onSuccess, integrationId }) 
         // In a real app, this would trigger the redirect to your backend OAuth endpoint
         // window.location.href = `/api/integrations/connect/${field.provider}`;
 
-        // We simulate the flow for the demo
+        
         console.log(`Initiating OAuth flow for ${field.provider}...`);
         setTimeout(() => {
             // After redirecting and coming back, the backend would call a webhook
