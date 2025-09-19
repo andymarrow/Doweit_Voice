@@ -1,7 +1,7 @@
 // voice-agents-CallAgents/[agentid]/calls/page.jsx
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 // Remove useParams
 // import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -18,6 +18,7 @@ import CallDetailModal from './_components/CallDetailModal';
 // Import constants - Adjust path if necessary
 import { uiColors } from '../../_constants/uiConstants';
 import { sectionVariants, itemVariants } from '../../_constants/uiConstants';
+import { HiCloudUpload, HiFilter, HiUpload } from 'react-icons/hi';
 
 // Helper function to fetch calls data for an agent
 const fetchAgentCalls = async (agentId) => {
@@ -73,33 +74,38 @@ export default function CallsPage() {
      const [isDeletingCall, setIsDeletingCall] = useState(false); // To disable modal buttons during delete
      const [deleteError, setDeleteError] = useState(null); // State for delete errors
 
+     // --- NEW STATE for bulk export ---
+    const [selectedCallIds, setSelectedCallIds] = useState([]);
+    const [isExporting, setIsExporting] = useState(false);
+
+    // 2. Define loadCalls outside useEffect, wrapped in useCallback
+    const loadCalls = useCallback(async () => {
+        if (!agentId) return; // Guard clause
+
+        setIsLoading(true);
+        setFetchError(null);
+        try {
+            const fetchedCalls = await fetchAgentCalls(agentId);
+            setAllCalls(fetchedCalls);
+        } catch (err) {
+            console.error('[Calls Page] Error loading calls:', err);
+            setFetchError(err.message);
+            setAllCalls([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [agentId]); // Dependency on agentId
 
     // Fetch calls data on component mount or agentId change
     useEffect(() => {
         if (agentId) {
-            const loadCalls = async () => {
-                setIsLoading(true);
-                setFetchError(null); // Clear previous fetch errors
-                try {
-                     // Fetch calls using the new API helper
-                    const fetchedCalls = await fetchAgentCalls(agentId);
-                    setAllCalls(fetchedCalls);
-                } catch (err) {
-                    console.error('[Calls Page] Error loading calls:', err);
-                    setFetchError(err.message);
-                    setAllCalls([]); // Clear calls on error
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-
             loadCalls();
         } else {
              // Handle case where agentId is not yet available (shouldn't happen with layout)
              setIsLoading(true); // Keep loading
              setFetchError('Agent ID not available.'); // Or handle differently
         }
-    }, [agentId]); // Dependency on agentId ensures refetch if agent changes
+    }, [agentId,loadCalls]); // Dependency on agentId ensures refetch if agent changes
 
     // Filtering logic using useMemo
     const filteredCalls = useMemo(() => {
@@ -214,11 +220,67 @@ export default function CallsPage() {
     };
 
 
+    const handleSelectCall = (callId) => {
+        setSelectedCallIds(prev =>
+            prev.includes(callId)
+                ? prev.filter(id => id !== callId)
+                : [...prev, callId]
+        );
+    };
+
+    const handleSelectAll = () => {
+        if (selectedCallIds.length === filteredCalls.length) {
+            setSelectedCallIds([]);
+        } else {
+            setSelectedCallIds(filteredCalls.map(call => call.id));
+        }
+    };
+
+    const handleExport = async () => {
+        setIsExporting(true);
+        toast.loading(`Exporting ${selectedCallIds.length} calls...`);
+        try {
+            const response = await fetch(`/api/callagents/${agentId}/calls/export-to-sheets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callIds: selectedCallIds }),
+            });
+            const result = await response.json();
+            toast.dismiss();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Export failed.");
+            }
+            
+            toast.success(`${result.exportedCount} calls exported successfully!`);
+            // Refresh call data to show the new "isExported" status
+            loadCalls();
+            setSelectedCallIds([]); // Clear selection after export
+
+        } catch (error) {
+            toast.dismiss();
+            toast.error(error.message);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="flex flex-col space-y-6 w-full h-full">
 
             {/* Calls Page Title */}
-            <h1 className={`text-2xl font-bold ${uiColors.textPrimary}`}>Calls</h1>
+            <div className="flex items-center justify-between">
+                 <h1 className={`text-2xl font-bold ${uiColors.textPrimary}`}>Calls</h1>
+                 {/* --- NEW EXPORT BUTTON --- */}
+                 <button
+                    onClick={handleExport}
+                    disabled={selectedCallIds.length === 0 || isExporting}
+                    className="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                 >
+                    {isExporting ? <HiUpload className="animate-spin mr-2" /> : <HiCloudUpload className="mr-2" />}
+                    Export Selected ({selectedCallIds.length})
+                 </button>
+            </div>
 
             {/* Filter Controls */}
             <motion.div
@@ -274,7 +336,15 @@ export default function CallsPage() {
                          {isLoading ? "Loading calls..." : "Loading agent details..."}
                     </div>
                 ) : (
-                     <CallTable calls={filteredCalls} onViewDetails={handleViewDetails} agentName={agent.name} agentId={agent.id}/>
+                     <CallTable 
+                        calls={filteredCalls} 
+                        onViewDetails={handleViewDetails} 
+                        agentName={agent.name} 
+                        agentId={agent.id}
+                        selectedCallIds={selectedCallIds}
+                        onSelectCall={handleSelectCall}
+                        onSelectAll={handleSelectAll}
+                    />
                  )}
              </div>
 
@@ -288,6 +358,8 @@ export default function CallsPage() {
                  isDeleting={isDeletingCall}
                  agentName={agent?.name}
                  agentId={agentId}
+
+                 onAnalysisComplete={loadCalls}
              />
 
         </div>

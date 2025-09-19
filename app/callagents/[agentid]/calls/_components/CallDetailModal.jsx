@@ -21,7 +21,7 @@ const tabContentComponents = {
 };
 
 // FIX: Accept agentName as a prop
-function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, agentName, agentId }) {
+function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, agentName, agentId, onAnalysisComplete  }) {
 
     const [activeTab, setActiveTab] = useState('transcript'); // Default active tab
     const modalRef = useRef(null); // Ref for modal content
@@ -151,6 +151,7 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, 
                              onDeleteCall={onDeleteCall} // Pass delete handler only to Download/Delete tab
                              isDeleting={isDeleting} // *** Pass deleting state to tabs ***
                             agentId={agentId}
+                             onAnalysisComplete={onAnalysisComplete}
                          />
                      ) : (
                          <div className={`text-center ${uiColors.textDanger} py-10`}>

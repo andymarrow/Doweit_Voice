@@ -32,13 +32,21 @@ function TranscriptTab({ callData,agentId }) {
             const result = await response.json();
             toast.dismiss(); // Dismiss the loading toast
 
-            if (!response.ok) {
+           if (!response.ok) {
                 throw new Error(result.error || 'Failed to start analysis.');
             }
 
-            toast.success('Analysis initiated! Results will appear in the "Actions Data" tab shortly.');
+            toast.success('Analysis initiated! Data will be exported automatically and appear in the "Actions Data" tab shortly.');
             // You might want to pass a function from the parent to refresh the call data after a delay
+             // --- NEW: Trigger the refresh function after a delay ---
+            // We give the backend a few seconds to complete the analysis and export
+            setTimeout(() => {
+                if (onAnalysisComplete) {
+                    onAnalysisComplete();
+                }
+            }, 3000); // 3-second delay
             
+
         } catch (error) {
             toast.dismiss();
             toast.error(error.message);
