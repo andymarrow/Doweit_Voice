@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
-import { db } from "@/configs/db";
+import { db } from "@/lib/database";
 import { callAgents, calls } from "@/lib/db/schemaCharacterAI";
 import { getAuthenticatedClient } from "@/lib/google/googleAuth";
 import { prepareCallDataForExport } from "@/lib/exportEngine";
