@@ -4,7 +4,7 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { FiSave, FiAlertCircle } from "react-icons/fi";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
 import ImageUploadSection from "./_components/ImageUploadSection";
@@ -24,7 +24,10 @@ import {
 // Removed supportedLanguages constant
 
 export default function CharacteraiCreatePage() {
-	const { user, isLoading: isUserLoading } = useUser();
+	const {
+		user,
+		isPending: isUserLoading,
+	} = useSession();
 	const router = useRouter();
 
 	// State for form data
@@ -442,4 +445,3 @@ export default function CharacteraiCreatePage() {
 		</div>
 	);
 }
-

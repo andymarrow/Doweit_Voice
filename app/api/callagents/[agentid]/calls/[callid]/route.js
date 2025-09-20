@@ -1,9 +1,10 @@
 // app/api/callagents/[agentid]/calls/[callid]/route.js
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { db } from "@/configs/db";
-import { callAgents, calls } from "@/lib/db/schemaCharacterAI";
-import { eq, and } from "drizzle-orm";
+import { getSession } from "@/lib/auth";
+import { headers } from "next/headers";
+import { db } from "@/lib/database";
+import { calls } from "@/lib/db/schemaCharacterAI";
+import { eq } from "drizzle-orm";
 import { VapiClient } from "@vapi-ai/server-sdk";
 
 const VAPI_SECRET_API_KEY = process.env.VAPI_SECRET_KEY;
@@ -24,7 +25,9 @@ export async function GET(req, { params }) {
 }
 // --- DELETE function: Remove a specific call ---
 export async function DELETE(req, { params }) {
-	const { userId } = auth();
+	// const { userId } = auth();
+	const { user } = await getSession(await headers());
+	const userId = user?.id;
 	const agentId = parseInt(params.agentid, 10);
 	const callId = parseInt(params.callid, 10); // Get the specific call ID
 
@@ -151,4 +154,3 @@ export async function DELETE(req, { params }) {
 		);
 	}
 }
-

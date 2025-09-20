@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "@/lib/auth-client";
 import {
 	FiSettings,
 	FiMoreHorizontal,
@@ -40,7 +40,10 @@ export default function SingleCharacterChatRoom() {
 	const params = useParams();
 	const characterId = params.characterid;
 
-	const { user, isLoading: isUserLoading } = useUser();
+	const {
+		user,
+		isPending: isUserLoading,
+	} = useSession();
 
 	const [character, setCharacter] = useState(null);
 	// Messages will store historical text messages AND final call transcripts for DISPLAY and SAVING
