@@ -1,10 +1,23 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import { getSessionCookie } from "better-auth/cookies";
 
-const isProtectedRoute = createRouteMatcher(["/voice-agents(.*)"]);
+export async function middleware(request) {
+	const sessionCookie = getSessionCookie(request);
+	console.log("sessionCookie", sessionCookie);
+	const { pathname } = request.nextUrl;
 
-export default clerkMiddleware((auth, req) => {
-	if (isProtectedRoute(req)) auth().protect();
-});
+	if (
+		!sessionCookie &&
+		!["/", "/sign-in", "/sign-up"].includes(pathname) &&
+		!pathname.includes("/api/auth")
+	) {
+		console.log("redirecting to signin");
+		return NextResponse.redirect(new URL("/sign-in", request.url));
+	} else if (sessionCookie && ["/sign-in", "/sign-up"].includes(pathname)) {
+		return NextResponse.redirect(new URL("/voice-agents", request.url));
+	}
+	return NextResponse.next();
+}
 
 export const config = {
 	matcher: [
@@ -14,4 +27,3 @@ export const config = {
 		// '/(api|trpc)(.*)',
 	],
 };
-

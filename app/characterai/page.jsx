@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { FiSearch } from "react-icons/fi"; // Only need Search icon here
-import { useUser } from "@clerk/nextjs"; // Import Clerk's useUser hook
+import { useSession } from "@/lib/auth-client";
 
 // Import components
 import CharacterCard from "./_components/CharacterCard";
@@ -15,7 +15,8 @@ import { sectionVariants, itemVariants } from "./_constants/uiConstants";
 import Link from "next/link";
 
 export default function CharacterAiPage() {
-	const { user, isLoading: isUserLoading } = useUser(); // Get user info from Clerk
+	const { data, isPending: isUserLoading } = useSession();
+	const user = data?.user;
 
 	const [searchTerm, setSearchTerm] = useState("");
 	const [characters, setCharacters] = useState([]); // State to hold the fetched characters
@@ -79,7 +80,7 @@ export default function CharacterAiPage() {
 					<h2 className={`text-xl font-bold ${uiColors.textPrimary}`}>
 						{isUserLoading
 							? "Loading user..."
-							: `Welcome back, ${user?.firstName || user?.username || "Guest"}`}
+							: `Welcome back, ${user?.name || user?.username || "Guest"}`}
 					</h2>
 				</div>
 
@@ -215,4 +216,3 @@ export default function CharacterAiPage() {
 		</div>
 	);
 }
-

@@ -13,6 +13,7 @@ import AgentConfigTabs from './_components/AgentConfigTabs';
 import GeneralConfig from './_components/GeneralConfig';
 import VoiceConfig from './_components/VoiceConfig';
 import CallConfig from './_components/CallConfig';
+import IntegrationsConfig from './_components/IntegrationsConfig'; 
 
 // Import constants
 import { uiColors } from '../../_constants/uiConstants';
@@ -42,6 +43,7 @@ const configComponents = {
     'general': GeneralConfig,
     'voice': VoiceConfig,
     'call-configuration': CallConfig,
+    'Integrations': IntegrationsConfig,
 };
 
 // Get the keys for validation

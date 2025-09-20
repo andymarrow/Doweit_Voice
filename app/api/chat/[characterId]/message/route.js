@@ -1,7 +1,8 @@
 // app/api/chat/[characterId]/message/route.js
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { db } from "@/configs/db"; // Your Drizzle DB config
+import { getSession } from "@/lib/auth";
+import { headers } from "next/headers";
+import { db } from "@/lib/database"; // Your Drizzle DB config
 import { characters, chatMessages } from "@/lib/db/schemaCharacterAI"; // Your schema imports (users implicitly joined via relations)
 import { eq, asc } from "drizzle-orm"; // Import eq and asc for Drizzle
 // CORRECT IMPORT: Use the package name in the path
@@ -40,7 +41,7 @@ try {
 		console.log("Firebase Storage bucket accessed.");
 	} else {
 		console.error(
-			"Firebase Admin not initialized. Audio uploads will likely fail."
+			"Firebase Admin not initialized. Audio uploads will likely fail.",
 		);
 	}
 } catch (e) {
@@ -70,7 +71,7 @@ function formatHistoryForGemini(history) {
 			) {
 				console.warn(
 					`Gemini history formatting: Found consecutive messages with the same role ('${role}'). Ensure history alternates 'user' and 'character'. History part:`,
-					msg
+					msg,
 				);
 				// Depending on how often this happens and history source, you might need to filter or adjust.
 			}
@@ -81,7 +82,7 @@ function formatHistoryForGemini(history) {
 			});
 		} else {
 			console.warn(
-				`Skipping message with unknown sender type in history: ${msg.sender}`
+				`Skipping message with unknown sender type in history: ${msg.sender}`,
 			);
 		}
 	}
@@ -91,7 +92,9 @@ function formatHistoryForGemini(history) {
 // POST handler (Send Message to Character)
 export async function POST(req, { params }) {
 	const { characterId } = params;
-	const { userId: currentUserId } = auth(); // Get current user ID from Clerk
+	// const { userId: currentUserId } = auth(); // Get current user ID from Clerk
+	const { user } = await getSession(await headers());
+	const currentUserId = user?.id;
 
 	// 1. Authentication and Authorization Check
 	if (!currentUserId) {
@@ -102,7 +105,7 @@ export async function POST(req, { params }) {
 	if (isNaN(charIdInt)) {
 		return NextResponse.json(
 			{ error: "Invalid Character ID" },
-			{ status: 400 }
+			{ status: 400 },
 		);
 	}
 
@@ -112,13 +115,13 @@ export async function POST(req, { params }) {
 		// history is expected to be an array of message objects [{ id, text, sender, timestamp }]
 		if (!text || typeof text !== "string" || !Array.isArray(history)) {
 			console.error(
-				"Invalid payload: message text (string) or history (array) missing/invalid."
+				"Invalid payload: message text (string) or history (array) missing/invalid.",
 			);
 			return NextResponse.json(
 				{
 					error: "Message text (string) and history (array) are required",
 				},
-				{ status: 400 }
+				{ status: 400 },
 			);
 		}
 		// Optional: Validate history array elements structure
@@ -133,24 +136,20 @@ export async function POST(req, { params }) {
 		if (!character) {
 			return NextResponse.json(
 				{ error: "Character not found" },
-				{ status: 404 }
+				{ status: 404 },
 			);
 		}
 
 		// Ensure character has required voice details and language
-		if (
-			!character.voiceProvider ||
-			!character.voiceId ||
-			!character.language
-		) {
+		if (!character.voiceProvider || !character.voiceId || !character.language) {
 			console.error(
-				`Character ${character.id} is missing voice configuration (provider: ${character.voiceProvider}, id: ${character.voiceId}, language: ${character.language}).`
+				`Character ${character.id} is missing voice configuration (provider: ${character.voiceProvider}, id: ${character.voiceId}, language: ${character.language}).`,
 			);
 			return NextResponse.json(
 				{
 					error: "Character voice configuration is incomplete in the database",
 				},
-				{ status: 500 }
+				{ status: 500 },
 			);
 		}
 
@@ -160,7 +159,7 @@ export async function POST(req, { params }) {
 				{
 					error: "LLM (Gemini) not initialized on server. Check GEMNI_API_KEY.",
 				},
-				{ status: 500 }
+				{ status: 500 },
 			);
 		}
 
@@ -222,7 +221,7 @@ export async function POST(req, { params }) {
 						audioUrl: null,
 					},
 				},
-				{ status: 200 }
+				{ status: 200 },
 			); // Still return 200 for a valid process flow, just an empty/default response
 		}
 
@@ -255,9 +254,7 @@ export async function POST(req, { params }) {
 				!character.voiceId ||
 				!character.language
 			) {
-				console.error(
-					"Character voice details missing from DB for TTS."
-				);
+				console.error("Character voice details missing from DB for TTS.");
 				// Do NOT throw here, just proceed without audio
 			} else {
 				const ttsResponse = await fetch(vapiTtsApiUrl, {
@@ -273,24 +270,24 @@ export async function POST(req, { params }) {
 				if (!ttsResponse.ok) {
 					const errorBody = await ttsResponse.text();
 					console.error(
-						`Vapi TTS API Error. Status: ${ttsResponse.status}, Body: ${errorBody}`
+						`Vapi TTS API Error. Status: ${ttsResponse.status}, Body: ${errorBody}`,
 					);
 					// Log error but proceed without audio
 					audioBuffer = null; // Ensure no buffer to upload
 				} else {
 					console.log(
 						"Received successful response from Vapi TTS. Status:",
-						ttsResponse.status
+						ttsResponse.status,
 					);
 					// Vapi TTS API is documented to return the audio data directly as binary
 					audioBuffer = await ttsResponse.arrayBuffer(); // Get binary data as ArrayBuffer
 					console.log(
-						`Received audio data buffer of size ${audioBuffer?.byteLength} bytes.`
+						`Received audio data buffer of size ${audioBuffer?.byteLength} bytes.`,
 					);
 
 					if (!audioBuffer || audioBuffer.byteLength === 0) {
 						console.warn(
-							"Vapi TTS returned success but audio buffer is empty."
+							"Vapi TTS returned success but audio buffer is empty.",
 						);
 						audioBuffer = null;
 					}
@@ -344,7 +341,7 @@ export async function POST(req, { params }) {
 			} catch (firebaseUploadError) {
 				console.error(
 					"Error uploading audio to Firebase Storage:",
-					firebaseUploadError
+					firebaseUploadError,
 				);
 				audioUrl = null; // Ensure audioUrl is null on failure
 			}
@@ -352,7 +349,7 @@ export async function POST(req, { params }) {
 			console.log("No audio buffer to upload.");
 		} else {
 			console.warn(
-				"Firebase Storage bucket or required info not available or missing IDs for upload."
+				"Firebase Storage bucket or required info not available or missing IDs for upload.",
 			);
 			audioUrl = null;
 		}
@@ -403,10 +400,7 @@ export async function POST(req, { params }) {
 					id: chatMessages.id,
 					timestamp: chatMessages.timestamp,
 				});
-			console.log(
-				"AI message saved to DB. Assigned ID:",
-				savedAiMessage?.id
-			);
+			console.log("AI message saved to DB. Assigned ID:", savedAiMessage?.id);
 
 			console.log("Messages saved to DB.");
 		} catch (dbError) {
@@ -414,7 +408,7 @@ export async function POST(req, { params }) {
 			// Log DB error. Proceed to return AI message if available, but warn.
 			if (savedAiMessage) {
 				console.warn(
-					"Messages generated but failed to save to DB. AI message still returned to frontend."
+					"Messages generated but failed to save to DB. AI message still returned to frontend.",
 				);
 			} else {
 				console.error("Neither messages could be saved to DB.");
@@ -425,15 +419,12 @@ export async function POST(req, { params }) {
 		// Construct the AI message object to return
 		const finalAiMessage = {
 			// Use DB ID and timestamp if transaction succeeded, otherwise fallback
-			id:
-				savedAiMessage?.id?.toString() ||
-				`${charIdInt}-${Date.now()}_temp`,
+			id: savedAiMessage?.id?.toString() || `${charIdInt}-${Date.now()}_temp`,
 			text: generatedText,
 			audioUrl: audioUrl, // This will be null if TTS or upload failed
 			sender: "character",
 			timestamp:
-				savedAiMessage?.timestamp?.toISOString() ||
-				new Date().toISOString(),
+				savedAiMessage?.timestamp?.toISOString() || new Date().toISOString(),
 		};
 
 		console.log("Returning AI message to frontend:", finalAiMessage);
@@ -442,17 +433,17 @@ export async function POST(req, { params }) {
 			{
 				aiMessage: finalAiMessage,
 			},
-			{ status: 200 }
+			{ status: 200 },
 		);
 	} catch (error) {
 		console.error(
 			"API Error /api/chat/[characterId]/message (POST) - Top Level Catch:",
-			error
+			error,
 		);
 		// Catch any errors not handled above and return a generic 500
 		return NextResponse.json(
 			{ error: "Internal server error during chat message processing" },
-			{ status: 500 }
+			{ status: 500 },
 		);
 	}
 }

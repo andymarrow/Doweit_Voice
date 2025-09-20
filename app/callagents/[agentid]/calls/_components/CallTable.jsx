@@ -11,7 +11,7 @@ import { FiPlayCircle } from 'react-icons/fi';
 // Removed accentClasses import as it wasn't used directly in the button class
 
 // FIX: Accept agentName as a prop
-function CallTable({ calls, onViewDetails, agentName,agentId }) {
+function CallTable({ calls, onViewDetails, agentName,agentId, selectedCallIds, onSelectCall, onSelectAll  }) {
 
     const [loading, setLoading] = useState(false)
     const audioRef = useRef(null);
@@ -61,12 +61,23 @@ function CallTable({ calls, onViewDetails, agentName,agentId }) {
     }
 
 
+    const allVisibleSelected = calls.length > 0 && selectedCallIds.length === calls.length;
+
     return (
         <motion.div variants={sectionVariants} initial="hidden" animate="visible" className="overflow-x-auto">
             <audio ref={audioRef} className='hidden'/>
             <table className={`min-w-full divide-y ${uiColors.borderPrimary}`}>
                 <thead className={`${uiColors.bgSecondary}`}>
                     <tr>
+                         {/* --- NEW CHECKBOX HEADER --- */}
+                        <th scope="col" className="p-4">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                checked={allVisibleSelected}
+                                onChange={onSelectAll}
+                            />
+                        </th>
                         {/* Table Headers */}
                         <th scope="col" className={`px-4 py-3 text-left text-xs font-medium ${uiColors.textSecondary} uppercase tracking-wider`}>
                             Agent Name
@@ -101,6 +112,15 @@ function CallTable({ calls, onViewDetails, agentName,agentId }) {
                             variants={itemVariants}
                             className={`${uiColors.hoverBgSubtle}`}
                         >
+                            {/* --- NEW CHECKBOX CELL --- */}
+                            <td className="p-4">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    checked={selectedCallIds.includes(call.id)}
+                                    onChange={() => onSelectCall(call.id)}
+                                />
+                            </td>
                             {/* Table Data */}
                             <td className={`px-4 py-4 whitespace-nowrap text-sm font-medium ${uiColors.textPrimary}`}>
                                 {/* FIX: Prioritize name from the call object, fallback to prop */}
@@ -122,16 +142,21 @@ function CallTable({ calls, onViewDetails, agentName,agentId }) {
                                  {typeof call.duration === 'number' ? formatDuration(call.duration) : call.duration || 'N/A'}
                             </td>
                              <td className={`px-4 py-4 whitespace-nowrap text-sm`}>
-                                {/* Status Badge */}
-                                 <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${
-                                     call.status === 'Completed' ? `${uiColors.statusBadgeSuccessBg} ${uiColors.statusBadgeSuccessText}` :
-                                     call.status === 'Failed' ? `${uiColors.statusBadgeDangerBg} ${uiColors.statusBadgeDangerText}` :
-                                     call.status === 'Busy' ? `${uiColors.statusBadgeWarningBg} ${uiColors.statusBadgeWarningText}` : // Added Busy status
-                                     call.status ? `${uiColors.statusBadgeInfoBg} ${uiColors.statusBadgeInfoText}` : // Default/Other status (use info color)
-                                     '' // No status
-                                 }`}>
-                                     {call.status || 'N/A'}
-                                 </span>
+                                <div className="flex items-center space-x-2">
+                                     <span className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${
+                                         call.status === 'Completed' ? `${uiColors.statusBadgeSuccessBg} ${uiColors.statusBadgeSuccessText}` :
+                                         call.status === 'Failed' ? `${uiColors.statusBadgeDangerBg} ${uiColors.statusBadgeDangerText}` :
+                                         call.status ? `${uiColors.statusBadgeInfoBg} ${uiColors.statusBadgeInfoText}` : ''
+                                     }`}>
+                                         {call.status}
+                                     </span>
+                                     {/* --- NEW EXPORTED BADGE --- */}
+                                     {call.isExported && (
+                                         <span title="Exported to Google Sheets" className="inline-flex items-center p-1 text-xs font-semibold leading-5 rounded-full bg-green-100 text-green-800">
+                                            <FiCheck className="w-3 h-3"/>
+                                         </span>
+                                     )}
+                                </div>
                             </td>
                             {/* <td className={`flex justify-center p-4 whitespace-nowrap text-right text-sm font-medium`}>
                                 

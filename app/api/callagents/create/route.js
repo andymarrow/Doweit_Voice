@@ -1,111 +1,160 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { uploadFileToFirebase } from '@/lib/firebase/upload';
-import { callAgents } from '@/lib/db/schemaCharacterAI';
+import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { headers } from "next/headers";
+import { uploadFileToFirebase } from "@/lib/firebase/upload";
+import { callAgents } from "@/lib/db/schemaCharacterAI";
 import { db } from "@/lib/database";
-import { eq } from 'drizzle-orm';
+import { eq } from "drizzle-orm";
 
 // Add segment config if needed
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 // --- POST function ---
 export async function POST(req) {
-  const { userId } = auth();
+	// const { userId } = auth();
+	const { user } = await getSession(await headers());
+	const userId = user?.id;
 
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+	if (!userId) {
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
 
-  try {
-    const formData = await req.formData();
+	try {
+		const formData = await req.formData();
 
-    const agentName = formData.get('name');
-    const agentType = formData.get('type');
-    const agentImageFile = formData.get('image');
+		const agentName = formData.get("name");
+		const agentType = formData.get("type");
+		const agentImageFile = formData.get("image");
 
-    if (!agentName || typeof agentName !== 'string' || !agentName.trim()) {
-      return NextResponse.json({ error: 'Agent name is required' }, { status: 400 });
-    }
-    if (!agentType || (agentType !== 'inbound' && agentType !== 'outbound')) {
-      return NextResponse.json({ error: 'Valid agent type is required' }, { status: 400 });
-    }
+		if (!agentName || typeof agentName !== "string" || !agentName.trim()) {
+			return NextResponse.json(
+				{ error: "Agent name is required" },
+				{ status: 400 },
+			);
+		}
+		if (!agentType || (agentType !== "inbound" && agentType !== "outbound")) {
+			return NextResponse.json(
+				{ error: "Valid agent type is required" },
+				{ status: 400 },
+			);
+		}
 
-    let avatarUrl = null;
-    if (agentImageFile instanceof File) {
-      try {
-        avatarUrl = await uploadFileToFirebase(agentImageFile, userId, 'agent-avatars');
-        if (!avatarUrl) {
-          console.error(`[API CREATE] Failed to upload agent image for user ${userId}`);
-          return NextResponse.json({ error: 'Failed to upload agent image' }, { status: 500 });
-        }
-        console.log(`[API CREATE] Image uploaded successfully for user ${userId}: ${avatarUrl}`);
-      } catch (uploadError) {
-        console.error(`[API CREATE] Firebase upload error for user ${userId}:`, uploadError);
-        return NextResponse.json({ error: 'Error uploading agent image' }, { status: 500 });
-      }
-    } else {
-      console.log(`[API CREATE] No image file provided for user ${userId}`);
-    }
+		let avatarUrl = null;
+		if (agentImageFile instanceof File) {
+			try {
+				avatarUrl = await uploadFileToFirebase(
+					agentImageFile,
+					userId,
+					"agent-avatars",
+				);
+				if (!avatarUrl) {
+					console.error(
+						`[API CREATE] Failed to upload agent image for user ${userId}`,
+					);
+					return NextResponse.json(
+						{ error: "Failed to upload agent image" },
+						{ status: 500 },
+					);
+				}
+				console.log(
+					`[API CREATE] Image uploaded successfully for user ${userId}: ${avatarUrl}`,
+				);
+			} catch (uploadError) {
+				console.error(
+					`[API CREATE] Firebase upload error for user ${userId}:`,
+					uploadError,
+				);
+				return NextResponse.json(
+					{ error: "Error uploading agent image" },
+					{ status: 500 },
+				);
+			}
+		} else {
+			console.log(`[API CREATE] No image file provided for user ${userId}`);
+		}
 
-    const newAgents = await db.insert(callAgents).values({
-      creatorId: userId,
-      name: agentName.trim(),
-      type: agentType,
-      avatarUrl: avatarUrl,
-      voiceEngine: 'v2',
-      aiModel: 'gpt4o',
-      timezone: 'UTC',
-      customVocabulary: [],
-      useFillerWords: true,
-      prompt: '',
-      greetingMessage: '"Hello..."',
-      voiceConfig: {},
-      callConfig: {},
-      knowledgeBaseId: null,
-      status: 'draft',
-    }).returning();
+		const newAgents = await db
+			.insert(callAgents)
+			.values({
+				creatorId: userId,
+				name: agentName.trim(),
+				type: agentType,
+				avatarUrl: avatarUrl,
+				voiceEngine: "v2",
+				aiModel: "gpt4o",
+				timezone: "UTC",
+				customVocabulary: [],
+				useFillerWords: true,
+				prompt: "",
+				greetingMessage: '"Hello..."',
+				voiceConfig: {},
+				callConfig: {},
+				knowledgeBaseId: null,
+				status: "draft",
+			})
+			.returning();
 
-    if (!newAgents || newAgents.length === 0) {
-      console.error(`[API CREATE] DB Insert failed for user ${userId}. Insert result:`, newAgents);
-      return NextResponse.json({ error: 'Failed to create agent in database' }, { status: 500 });
-    }
+		if (!newAgents || newAgents.length === 0) {
+			console.error(
+				`[API CREATE] DB Insert failed for user ${userId}. Insert result:`,
+				newAgents,
+			);
+			return NextResponse.json(
+				{ error: "Failed to create agent in database" },
+				{ status: 500 },
+			);
+		}
 
-    const newAgent = newAgents[0];
-    console.log(`[API CREATE] Agent created successfully for user ${userId}. ID: ${newAgent.id}`);
+		const newAgent = newAgents[0];
+		console.log(
+			`[API CREATE] Agent created successfully for user ${userId}. ID: ${newAgent.id}`,
+		);
 
-    return NextResponse.json(newAgent, { status: 201 });
-
-  } catch (error) {
-    console.error(`[API CREATE] Unexpected API Error for user ${userId}:`, error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+		return NextResponse.json(newAgent, { status: 201 });
+	} catch (error) {
+		console.error(
+			`[API CREATE] Unexpected API Error for user ${userId}:`,
+			error,
+		);
+		return NextResponse.json(
+			{ error: "Internal server error" },
+			{ status: 500 },
+		);
+	}
 }
 
 // --- GET function ---
 export async function GET() {
-  const { userId } = auth();
+	// const { userId } = auth();
+	const { user } = await getSession(await headers());
+	const userId = user?.id;
+	console.log(
+		`[API GET] Attempting to fetch agents. Current userId from auth: ${userId}`,
+	);
 
-  console.log(`[API GET] Attempting to fetch agents. Current userId from auth: ${userId}`);
+	if (!userId) {
+		console.log("[API GET] Unauthorized: No userId from auth.");
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
 
-  if (!userId) {
-    console.log('[API GET] Unauthorized: No userId from auth.');
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+	try {
+		console.log(`[API GET] Fetching agents for creatorId: ${userId}`);
+		const agents = await db.query.callAgents.findMany({
+			where: eq(callAgents.creatorId, userId),
+			orderBy: (callAgents, { desc }) => [desc(callAgents.createdAt)],
+		});
 
-  try {
-    console.log(`[API GET] Fetching agents for creatorId: ${userId}`);
-    const agents = await db.query.callAgents.findMany({
-      where: eq(callAgents.creatorId, userId),
-      orderBy: (callAgents, { desc }) => [desc(callAgents.createdAt)],
-    });
+		console.log(
+			`[API GET] Drizzle query executed for user ${userId}. Found ${agents.length} agents.`,
+		);
 
-    console.log(`[API GET] Drizzle query executed for user ${userId}. Found ${agents.length} agents.`);
-
-    return NextResponse.json(agents, { status: 200 });
-
-  } catch (error) {
-    console.error(`[API GET] Unexpected API Error for user ${userId}:`, error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+		return NextResponse.json(agents, { status: 200 });
+	} catch (error) {
+		console.error(`[API GET] Unexpected API Error for user ${userId}:`, error);
+		return NextResponse.json(
+			{ error: "Internal server error" },
+			{ status: 500 },
+		);
+	}
 }
