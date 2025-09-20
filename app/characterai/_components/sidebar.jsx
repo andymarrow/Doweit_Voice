@@ -96,10 +96,8 @@ const lowerNavItems = [
 // const recentAgents = [...]; // Removed hardcoded data
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
-	const {
-		user,
-		isPending: isUserLoading,
-	} = useSession();
+	const { data, isPending: isUserLoading } = useSession();
+	const user = data?.user;
 
 	const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 	const [searchTerm, setSearchTerm] = useState(""); // Not used for API search from sidebar directly, but can be kept for local filtering if needed
@@ -534,10 +532,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 						<div
 							className={`flex items-center ${isOpen ? "" : "justify-center w-full"}`}
 						>
-							{user.imageUrl ? (
+							{user.image ? (
 								<Image
-									src={user.imageUrl} // Use Clerk user image URL
-									alt={user.firstName || user.username || "User"}
+									src={user.image} // Use Clerk user image URL
+									alt={user.name || user.username || "User"}
 									width={32}
 									height={32}
 									className="rounded-full mr-2 flex-shrink-0 object-cover"
@@ -547,7 +545,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 								<div
 									className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-2 flex-shrink-0 ${uiColors.accentPrimaryGradient}`}
 								>
-									{user.firstName?.charAt(0).toUpperCase() ||
+									{user.name?.charAt(0).toUpperCase() ||
 										user.username?.charAt(0).toUpperCase() ||
 										"U"}
 								</div>
@@ -562,7 +560,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 										variants={itemVariants}
 										className={`font-semibold whitespace-nowrap flex-grow ${uiColors.textPrimary} overflow-hidden text-ellipsis`}
 									>
-										{user.firstName || user.username || "User"}{" "}
+										{user.name || user.username || "User"}{" "}
 										{/* Display user's name */}
 									</motion.span>
 								)}
@@ -664,4 +662,3 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 };
 
 export default Sidebar;
-

@@ -15,10 +15,8 @@ import { sectionVariants, itemVariants } from "./_constants/uiConstants";
 import Link from "next/link";
 
 export default function CharacterAiPage() {
-	const {
-		user,
-		isPending: isUserLoading,
-	} = useSession();
+	const { data, isPending: isUserLoading } = useSession();
+	const user = data?.user;
 
 	const [searchTerm, setSearchTerm] = useState("");
 	const [characters, setCharacters] = useState([]); // State to hold the fetched characters
@@ -82,7 +80,7 @@ export default function CharacterAiPage() {
 					<h2 className={`text-xl font-bold ${uiColors.textPrimary}`}>
 						{isUserLoading
 							? "Loading user..."
-							: `Welcome back, ${user?.firstName || user?.username || "Guest"}`}
+							: `Welcome back, ${user?.name || user?.username || "Guest"}`}
 					</h2>
 				</div>
 

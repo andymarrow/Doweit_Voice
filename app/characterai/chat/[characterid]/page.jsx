@@ -40,10 +40,9 @@ export default function SingleCharacterChatRoom() {
 	const params = useParams();
 	const characterId = params.characterid;
 
-	const {
-		user,
-		isPending: isUserLoading,
-	} = useSession();
+	const { data, isPending: isUserLoading } = useSession();
+	const user = data?.user;
+
 
 	const [character, setCharacter] = useState(null);
 	// Messages will store historical text messages AND final call transcripts for DISPLAY and SAVING

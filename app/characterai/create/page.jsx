@@ -24,10 +24,8 @@ import {
 // Removed supportedLanguages constant
 
 export default function CharacteraiCreatePage() {
-	const {
-		user,
-		isPending: isUserLoading,
-	} = useSession();
+	const { data, isPending: isUserLoading } = useSession();
+	const user = data?.user;
 	const router = useRouter();
 
 	// State for form data

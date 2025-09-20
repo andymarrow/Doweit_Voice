@@ -60,25 +60,6 @@ export async function POST(req, { params }) {
 				.where(eq(characters.id, charIdInt));
 			message = "Character unliked successfully";
 		} else {
-			// If not liked, add a new like
-			// Add user to DB if they don't exist (re-using logic from POST /api/characters)
-			let userRecord = await db.query.users.findFirst({
-				where: eq(users.id, userId),
-			});
-			if (!userRecord) {
-				const clerkClient = Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
-				const clerkUser = await clerkClient.users.getUser(userId);
-				[userRecord] = await db
-					.insert(users)
-					.values({
-						id: userId,
-						username: clerkUser.username || "User",
-						email: clerkUser.emailAddresses?.[0]?.emailAddress,
-						profileImageUrl: clerkUser.imageUrl,
-					})
-					.returning();
-			}
-
 			await db.insert(characterLikes).values({
 				userId: userId,
 				characterId: charIdInt,

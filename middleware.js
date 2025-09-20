@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
-// const isProtectedRoute = createRouteMatcher(["/voice-agents(.*)"]);
-
-// export default clerkMiddleware((auth, req) => {
-// 	if (isProtectedRoute(req)) auth().protect();
-// });
-
 export async function middleware(request) {
 	const sessionCookie = getSessionCookie(request);
 	console.log("sessionCookie", sessionCookie);

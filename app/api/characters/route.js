@@ -59,39 +59,6 @@ export async function POST(req) {
 				{ status: 400 },
 			);
 		}
-		// Optional: More specific validation (string lengths, valid language code etc.)
-
-		// --- Ensure user exists in our DB (or create if first time) ---
-		let userRecord = await db.query.users.findFirst({
-			where: eq(users.id, userId),
-		});
-
-		if (!userRecord) {
-			const clerkUser = await clerkClient.users.getUser(userId);
-			if (!clerkUser) {
-				console.error("Clerk user not found for ID:", userId);
-				return NextResponse.json(
-					{ error: "Clerk user not found" },
-					{ status: 400 },
-				);
-			}
-			[userRecord] = await db
-				.insert(users)
-				.values({
-					id: userId,
-					username:
-						clerkUser.username ||
-						`${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
-						"New User",
-					email: clerkUser.emailAddresses?.[0]?.emailAddress || null,
-					profileImageUrl: clerkUser.imageUrl || null,
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				})
-				.returning();
-			console.log("Created new user record in DB:", userRecord);
-		}
-
 		// --- Insert new character into the database ---
 		const [newCharacter] = await db
 			.insert(characters)
