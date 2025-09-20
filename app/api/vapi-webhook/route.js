@@ -1,6 +1,6 @@
 // app/api/vapi-webhook/route.js
 import { NextResponse } from "next/server";
-import { db } from "@/configs/db";
+import { db } from "@/lib/database";
 import { calls } from "@/lib/db/schemaCharacterAI";
 import { eq, sql } from "drizzle-orm";
 
@@ -49,7 +49,7 @@ export async function POST(req) {
 			const result = await db
 				.update(calls)
 				.set({
-					audioUrl: recordingUrl
+					audioUrl: recordingUrl,
 				})
 				.where(sql`${calls.rawCallData}->>'vapiCallId' = ${vapiCallId}`)
 				.returning({ id: calls.id });
@@ -76,4 +76,3 @@ export async function POST(req) {
 		);
 	}
 }
-

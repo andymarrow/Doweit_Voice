@@ -1,19 +1,16 @@
 // app/api/callagents/[agentid]/calls/route.js
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { db } from "@/configs/db";
-import {
-	callAgents,
-	calls,
-	callActionValues,
-	agentActions,
-	actions,
-} from "@/lib/db/schemaCharacterAI";
+import { getSession } from "@/lib/auth";
+import { headers } from "next/headers";
+import { db } from "@/lib/database";
+import { callAgents, calls } from "@/lib/db/schemaCharacterAI";
 import { eq, and, desc } from "drizzle-orm";
 
 // --- GET function: Fetch calls for a specific agent ---
 export async function GET(req, { params }) {
-	const { userId } = auth();
+	// const { userId } = auth();
+	const { user } = await getSession(await headers());
+	const userId = user?.id;
 	const agentId = parseInt(params.agentid, 10);
 
 	if (isNaN(agentId)) {
@@ -66,14 +63,14 @@ export async function GET(req, { params }) {
 					},
 				},
 				agent: {
-                    with: {
-                        agentActions: {
-                            with: {
-                                action: true
-                            }
-                        }
-                    }
-                }
+					with: {
+						agentActions: {
+							with: {
+								action: true,
+							},
+						},
+					},
+				},
 			},
 		});
 
@@ -95,73 +92,90 @@ export async function GET(req, { params }) {
 }
 
 export async function POST(req, { params }) {
-    const { userId } = auth();
-    const agentId = parseInt(params.agentid, 10);
+	// const { userId } = auth();
+	const { user } = await getSession(await headers());
+	const userId = user?.id;
+	const agentId = parseInt(params.agentid, 10);
 
-    if (isNaN(agentId)) {
-        return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
-    }
-    if (!userId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+	if (isNaN(agentId)) {
+		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	}
+	if (!userId) {
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
 
-    try {
-        const body = await req.json();
-        const callDetails = body;
+	try {
+		const body = await req.json();
+		const callDetails = body;
 
-        if (!callDetails || !callDetails.transcript) {
-            return NextResponse.json({ error: "Transcript data is required" }, { status: 400 });
-        }
-        
-        // --- ADD THIS LOG ---
-        console.log(`[API CALLS POST] Received payload with recordingUrl: ${callDetails.recordingUrl}`);
+		if (!callDetails || !callDetails.transcript) {
+			return NextResponse.json(
+				{ error: "Transcript data is required" },
+				{ status: 400 },
+			);
+		}
 
+		// --- ADD THIS LOG ---
+		console.log(
+			`[API CALLS POST] Received payload with recordingUrl: ${callDetails.recordingUrl}`,
+		);
 
-        // Step 1: Verify ownership of the agent
-        const agent = await db.query.callAgents.findFirst({
-            where: and(eq(callAgents.id, agentId), eq(callAgents.creatorId, userId)),
-            columns: { id: true },
-        });
+		// Step 1: Verify ownership of the agent
+		const agent = await db.query.callAgents.findFirst({
+			where: and(eq(callAgents.id, agentId), eq(callAgents.creatorId, userId)),
+			columns: { id: true },
+		});
 
-        if (!agent) {
-            return NextResponse.json({ error: "Agent not found or not authorized" }, { status: 404 });
-        }
+		if (!agent) {
+			return NextResponse.json(
+				{ error: "Agent not found or not authorized" },
+				{ status: 404 },
+			);
+		}
 
-        // Step 2: Create a new call entry with the correct fields
-        const [newCall] = await db
-            .insert(calls)
-            .values({
-                agentId: agentId,
-                phoneNumber: callDetails.phoneNumber || "Web Call",
-                direction: callDetails.direction || 'inbound',
-                status: callDetails.status || "Completed", // Use status from frontend
-                transcript: callDetails.transcript, 
-                duration: callDetails.duration || 0,
-                startTime: new Date(callDetails.startTime || Date.now()),
-                endTime: new Date(callDetails.endTime || Date.now()),
+		// Step 2: Create a new call entry with the correct fields
+		const [newCall] = await db
+			.insert(calls)
+			.values({
+				agentId: agentId,
+				phoneNumber: callDetails.phoneNumber || "Web Call",
+				direction: callDetails.direction || "inbound",
+				status: callDetails.status || "Completed", // Use status from frontend
+				transcript: callDetails.transcript,
+				duration: callDetails.duration || 0,
+				startTime: new Date(callDetails.startTime || Date.now()),
+				endTime: new Date(callDetails.endTime || Date.now()),
 
-                // --- FIX APPLIED HERE ---
-                // Add the recordingUrl from the payload to the database insert
-                recordingUrl: callDetails.recordingUrl || null,
+				// --- FIX APPLIED HERE ---
+				// Add the recordingUrl from the payload to the database insert
+				recordingUrl: callDetails.recordingUrl || null,
 
-                rawCallData: {
-                    customerName: callDetails.customerName,
-                    // You could also store the Vapi callId here if needed
-                    vapiCallId: callDetails.callId,
-                }
-            })
-            .returning({ id: calls.id });
+				rawCallData: {
+					customerName: callDetails.customerName,
+					// You could also store the Vapi callId here if needed
+					vapiCallId: callDetails.callId,
+				},
+			})
+			.returning({ id: calls.id });
 
-        console.log(`[API CALLS POST] Successfully saved call ${newCall.id} with recording URL.`);
+		console.log(
+			`[API CALLS POST] Successfully saved call ${newCall.id} with recording URL.`,
+		);
 
-        return NextResponse.json({ success: true, callId: newCall.id }, { status: 201 });
-
-    } catch (error)
-    {
-        console.error(`[API CALLS POST] Error saving call for agent ${agentId}:`, error);
-        return NextResponse.json({ error: "Internal server error while saving call" }, { status: 500 });
-    }
+		return NextResponse.json(
+			{ success: true, callId: newCall.id },
+			{ status: 201 },
+		);
+	} catch (error) {
+		console.error(
+			`[API CALLS POST] Error saving call for agent ${agentId}:`,
+			error,
+		);
+		return NextResponse.json(
+			{ error: "Internal server error while saving call" },
+			{ status: 500 },
+		);
+	}
 }
 // --- DELETE function: Placeholder (Implemented in [callid] route) ---
 // export async function DELETE(...) { ... }
-

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import ThemeToggle from "@/components/Themetoggle"; // Assuming this path is correct
 import { Search, Menu, X } from "lucide-react"; // Import Menu and X icons
-import { UserButton } from "@clerk/nextjs";
+import UserProfile from "@/components/UserProfile";
 
 function Header() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false); // State to manage mobile menu visibility
@@ -79,13 +79,13 @@ function Header() {
 
 					{/* Theme Toggle */}
 					<ThemeToggle />
-					<UserButton />
+					<UserProfile />
 				</div>
 
 				{/* Mobile Menu Toggle & Theme Toggle (Visible on small devices) */}
 				<div className="lg:hidden flex items-center space-x-3">
 					<ThemeToggle /> {/* Keep theme toggle visible on mobile */}
-					<UserButton />
+					<UserProfile />
 					<button
 						onClick={toggleMenu}
 						className="text-gray-700 dark:text-white"
@@ -149,4 +149,3 @@ function Header() {
 }
 
 export default Header;
-
