@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { uploadFileToFirebase } from '@/lib/firebase/upload';
 import { callAgents } from '@/lib/db/schemaCharacterAI';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { eq } from 'drizzle-orm';
 
 // Add segment config if needed

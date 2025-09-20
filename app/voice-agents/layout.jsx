@@ -5,7 +5,7 @@ import Header from './_components/header';
 
 // --- ADD THESE IMPORTS ---
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { users } from '@/lib/db/schemaCharacterAI';
 import { eq } from 'drizzle-orm';
 

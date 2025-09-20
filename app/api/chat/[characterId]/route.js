@@ -1,7 +1,7 @@
 // app/api/chat/[characterId]/route.js - Handles fetching chat history
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db'; // Your Drizzle DB config
+import { db } from "@/lib/database"; // Your Drizzle DB config
 import { chatMessages } from '@/lib/db/schemaCharacterAI'; // Your schema imports
 import { eq, and, asc } from 'drizzle-orm';
 

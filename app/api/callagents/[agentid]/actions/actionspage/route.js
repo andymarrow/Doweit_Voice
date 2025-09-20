@@ -1,7 +1,7 @@
 // app/api/callagents/[agentid]/actionspage/route.js
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { actions } from '@/lib/db/schemaCharacterAI'; // Import the actions schema
 import { eq, or, isNull } from 'drizzle-orm';
 import { sql } from 'drizzle-orm'; // Import sql for more complex conditions if needed

@@ -1,6 +1,6 @@
 // app/api/chat/[characterId]/save-call/route.js
 import { NextResponse } from 'next/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { chatMessages } from '@/lib/db/schemaCharacterAI'; // Adjust the import path if necessary
 import { eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server'; // Import auth to get user ID securely

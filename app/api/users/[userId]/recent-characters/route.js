@@ -1,7 +1,7 @@
 // app/api/users/[userId]/recent-characters/route.js
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { chatMessages, characters, users } from '@/lib/db/schemaCharacterAI';
 import { eq, desc, sql, distinct } from 'drizzle-orm'; // Import necessary helpers
 

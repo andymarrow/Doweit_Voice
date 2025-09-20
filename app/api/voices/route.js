@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { voices } from '@/lib/db/schemaCharacterAI'; 
 import { eq,or, isNull } from 'drizzle-orm';
 

@@ -1,7 +1,7 @@
 // app/api/characters/[characterId]/like/route.js
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { characters, characterLikes } from '@/lib/db/schemaCharacterAI';
 import { eq, and } from 'drizzle-orm';
 

@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { ElevenLabsClient } from 'elevenlabs';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { userConnections, voices } from '@/lib/db/schemaCharacterAI';
 import { encrypt } from '@/lib/utils/crypto';
 import { eq, and } from 'drizzle-orm';

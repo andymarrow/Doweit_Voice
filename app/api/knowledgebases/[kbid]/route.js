@@ -1,7 +1,7 @@
 // app/api/knowledgebases/[kbid]/route.js
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { knowledgeBases, users } from '@/lib/db/schemaCharacterAI'; // Import KB and User schemas
 import { eq, and, or, isNull } from 'drizzle-orm';
 

@@ -1,7 +1,7 @@
 // app/api/integrations/connections/route.js
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/configs/db';
+import { db } from "@/lib/database";
 import { userConnections } from '@/lib/db/schemaCharacterAI';
 import { eq } from 'drizzle-orm';
 
