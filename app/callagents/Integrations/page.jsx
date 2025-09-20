@@ -14,7 +14,7 @@ const INTEGRATIONS_CONFIG = [
         id: 'twilio',
         name: 'Twilio',
         logo: '/integrations/twilio.png',
-        description: 'Connect your Twilio account and use directly your phone numbers with your assistants.',
+        description: 'Connect your Twilio account and use directly your phone numbers with your assistants here on the platform.',
         howItWorks: 'Integrate your Twilio account to purchase and manage phone numbers directly within our platform, enhancing your agents with powerful voice and SMS capabilities.',
         docsUrl: '#',
         websiteUrl: 'https://www.twilio.com',
