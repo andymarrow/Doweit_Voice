@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
 import { google } from "googleapis";
-import { db } from "@/configs/db";
+import { db } from "@/lib/database";
 import {
 	callAgents,
 	calls,
