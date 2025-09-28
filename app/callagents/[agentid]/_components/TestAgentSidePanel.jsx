@@ -31,8 +31,9 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     const [callStatus, setCallStatus] = useState('idle');    // Vapi SDK status for web calls
     const [callError, setCallError] = useState(null);
     
-    const [transcriptBuffer, setTranscriptBuffer] = useState([]);
-    const [callStartTime, setCallStartTime] = useState(null); // Changed initial state to null
+    const [transcriptBuffer, setTranscriptBuffer] = useState([])
+    const [callStartTime, setCallStartTime] = useState([])
+    const [vapiCallData, setVapiCallData] = useState({})
     const [elevenLabsApiKey, setElevenLabsApiKey] = useState(null);
 
     // Refs
@@ -41,83 +42,54 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
     const agentId = agent?.id;
     const agentName = agent?.name || 'Unnamed Agent';
-    
-    // This function now saves the transcript AND recording URL
-    const saveCallData = useCallback(async (finalCallObject) => {
-        if (!finalCallObject || transcriptBuffer.length === 0) {
-            console.log("Save condition not met. Final call object or transcript is missing.");
-            return;
-        }
-
-        console.log("Vapi call data received on end:", finalCallObject);
-
-        const callDetails = {
-            customerName: userName,
-            direction: 'inbound',
-            status: 'Completed', 
-            duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
-            startTime: callStartTime || new Date().toISOString(),
-            endTime: new Date().toISOString(),
-            transcript: transcriptBuffer,
-            // *** NEW: Capture callId and recordingUrl from the final Vapi call object ***
-            callId: finalCallObject?.id || null, 
-            recordingUrl: finalCallObject?.recordingUrl || null,
-            // Optional: Store the entire Vapi object for future reference
-            // rawCallData: { vapiCallId: finalCallObject?.id, ...finalCallObject }
-        };
-
-        try {
-            const response = await fetch(`/api/callagents/${agentId}/calls`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(callDetails),
-            });
-            if (!response.ok) throw new Error(await response.text());
-            console.log("Web call data (transcript & recording) saved successfully.");
-            toast.success("Test call transcript saved.");
-        } catch (err) {
-            console.error("Error saving web call data:", err);
-            toast.error("Could not save call data.");
-        }
-    }, [agentId, userName, callStartTime, transcriptBuffer]); // Dependencies for useCallback
 
     // --- Effects ---
 
     // Initialize Vapi SDK and event listeners for Web Calls
     useEffect(() => {
+        console.log("Username log 1", userName)
         if (!vapiRef.current && VAPI_PUBLIC_API_KEY) {
             const vapi = new Vapi(VAPI_PUBLIC_API_KEY);
             vapiRef.current = vapi;
             console.log("Vapi SDK initialized for web calls.");
 
+            let callStartTime = null;
+
+            
             // --- Event Listeners ---
-            vapi.on("call-start", () => {
-                console.log("Vapi call has started.");
-                setCallStatus('in-progress');
-                setCallStartTime(new Date().toISOString());
-                setTranscriptBuffer([]);
+            vapi.on("call-start", (status) => {
+                console.log("Vapi call start update", status)
             });
 
-            vapi.on("call-end", () => {
-                console.log("Vapi call has ended.");
-                setCallStatus('ended');
-                toast.success("Web call ended.");
+            vapi.on("call-end", (status) => {
+                console.log("Vapi call end update", status)
             });
 
             vapi.on("message", (message) => {
-                console.log("Vapi Message:", message);
-                if (message.type === 'status-update' && message.status === 'ended') {
-                    // *** THIS IS THE KEY CHANGE ***
-                    // When the call ends, Vapi provides the full final call object.
-                    // Pass this entire object to our save function.
-                    saveCallData(message.call); 
+                console.log(message)
+                if (message.type === 'status-update') {
+                    console.log("Vapi Status Update:", message.status);
+                    setCallStatus(message.status);
+
+                    if (message.status === 'in-progress' && callStartTime === null ) {
+                        callStartTime = new Date().toISOString()
+                        setCallStartTime(new Date().toISOString())
+                        setTranscriptBuffer([])
+                    }
+
+                    if (message.status === 'ended') {
+                            toast.success("Web call ended.");
+                            // When the call ends, Vapi provides the full call object.
+                            // Pass this entire object to our save function.
+                            // saveCallData(message.call);
+                    }
                 }
                 if (message.type === "transcript" && message.transcriptType === "final") {
                     setTranscriptBuffer(prev => [...prev, {
                         role: message.role,
                         message: message.transcript,
                         time: message.time,
-                    }]);
+                    }])
                 }
             });
 
@@ -129,13 +101,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                 toast.error(`Web Call Error: ${errorMessage}`);
             });
         }
-        // Cleanup function for listeners if the component unmounts
-        return () => {
-            if (vapiRef.current) {
-                vapiRef.current.removeAllListeners();
-            }
-        };
-    }, [saveCallData]); // Add saveCallData as a dependency
+    }, [agentId, userName]);
 
     // Reset state and fetch keys when panel opens or agent changes
     useEffect(() => {
@@ -158,11 +124,11 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             };
             fetchKeys();
         } else {
-            if (vapiRef.current && callStatus !== 'idle' && callStatus !== 'ended') {
+            if (vapiRef.current && callStatus !== 'idle') {
                 try { vapiRef.current.stop(); } catch (e) {}
             }
         }
-    }, [isOpen, agent]); // Simplified dependencies
+    }, [isOpen]);
 
     // Handle clicks outside panel
     useEffect(() => {
@@ -174,7 +140,49 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isOpen, onClose, isConnecting, callStatus]);
 
+    useEffect(()=>{
+        if (callStatus === "ended") {
+            saveCallData(null);
+        }
+    },[callStatus])
+    // This function now saves the transcript AND recording URL
+    const saveCallData = async () => {
+        if (transcriptBuffer.length === 0 && !vapiCallData) return;
+
+        console.log("Vapi call data received on end:", vapiCallData);
+
+        const callDetails = {
+            customerName: userName,
+            direction: 'inbound',
+            status: 'Completed', // Using 'Completed' to match table styles
+            duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
+            startTime: callStartTime || new Date().toISOString(),
+            endTime: new Date().toISOString(),
+            transcript: transcriptBuffer,
+            // *** NEW: Capture callId and recordingUrl from the Vapi call object ***
+            callId: vapiCallData?.id || null, 
+            recordingUrl: vapiCallData?.recordingUrl || null,
+        };
+
+        try {
+            const response = await fetch(`/api/callagents/${agentId}/calls`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(callDetails),
+            });
+            if (!response.ok) throw new Error(await response.text());
+            console.log("Web call data (transcript & recording) saved successfully.");
+            toast.success("Test call transcript saved.");
+        } catch (err) {
+            console.error("Error saving web call data:", err);
+            toast.error("Could not save call data.");
+        }
+    };
+
+    //
     // --- Call Handlers ---
+
+    // Web Call Handler (Client-side)
     const handleStartWebCall = useCallback(async () => {
         if (!vapiRef.current || !agentId || !userName) {
             toast.error("Please enter your name to start a web call.");
@@ -188,50 +196,63 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         setCallError(null);
 
         try {
-            let everyContentPrompt = `
+            
+let everyContentPrompt = `
 You are an AI assistant named ${agent?.name || 'Assistant'}.
 ${agent?.prompt ? `Your core instructions and persona details are: ${agent.prompt}` : 'Your purpose is to assist the user.'}
 ${agent?.voiceConfig?.language ? `Maintain conversations in the ${agent.voiceConfig.language} language.` : 'Use the default language of the call (likely English).'}
 ${agent?.greetingMessage ? `If you are the first speaker, you may choose to start the conversation with "${agent.greetingMessage}".` : ''}
 ${Array.isArray(agent?.customVocabulary) && agent.customVocabulary.length > 0 ? `Incorporate the following specific terms or phrases naturally where relevant: ${agent.customVocabulary.map(item => item.term).join(', ')}.` : ''}
-Speak naturally as if in a real voice call. Be concise and directly address the user's needs or questions based on your instructions. You must not end the call unless the user explicitly says goodbye.
-`.trim().replace(/\s+/g, ' ');
+Speak naturally as if in a real voice call. Be concise and directly address the user's needs or questions based on your instructions.
+`.trim();
 
-            if (agent.knowledgeBase && agent.knowledgeBase.content) {
-                const kbContent = Array.isArray(agent.knowledgeBase.content)
-                    ? agent.knowledgeBase.content.map(item => item.value).join('\n\n')
-                    : String(agent.knowledgeBase.content);
-                if (kbContent.trim()) {
-                    everyContentPrompt += ` --- KNOWLEDGE BASE --- You MUST use the information below to answer user questions. This is your primary source of truth. ${kbContent} --- END KNOWLEDGE BASE ---`;
-                }
-            }
+// Attach Knowledge Base (if available)
+if (agent.knowledgeBase && agent.knowledgeBase.content) {
+  const kbContent = Array.isArray(agent.knowledgeBase.content)
+    ? agent.knowledgeBase.content.map(item => item.value).join('\n\n')
+    : String(agent.knowledgeBase.content);
+
+  if (kbContent.trim()) {
+    everyContentPrompt += `
+
+--- KNOWLEDGE BASE ---
+You MUST use the information below to answer user questions. This is your primary source of truth.
+
+${kbContent}
+--- END KNOWLEDGE BASE ---`;
+  }
+}
+
+// Cleanup whitespace
+everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
+
 
             const vapiPayload = {
                 model: { provider: "google", model: "gemini-1.5-flash", messages: [{ role: "system", content: everyContentPrompt }] },
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
                 recordingEnabled: agent.callConfig?.enableRecordings || false,
-                // *** SERVER OBJECT REMOVED - THIS IS THE FIX ***
+                server: {
+                    url: process.env.NEXT_PUBLIC_WEBHOOK_URL,
+                }
             };
 
             if (agent.voiceConfig.voiceProvider === 'elevenlabs') {
                 if (!elevenLabsApiKey) throw new Error("ElevenLabs API key is missing.");
                 vapiPayload.voice.provider = '11labs';
+                // vapiPayload.voice.elevenLabsApiKey = elevenLabsApiKey;
             } else {
                 vapiPayload.voice.provider = agent.voiceConfig.voiceProvider || 'vapi';
             }
-            // Start the call. We don't need the returned call object here anymore,
-            // because the 'ended' event listener will provide the final version.
-            vapiRef.current.start(vapiPayload);
+            vapiRef.current.start(vapiPayload).then(call=> setVapiCallData(call));
         } catch (error) {
             setCallStatus('error');
             setCallError(error.message);
             toast.error(`Failed to start call: ${error.message}`);
         }
-    }, [agent, userName, callStatus, elevenLabsApiKey, agentId]);
+    }, [agent, userName, callStatus, elevenLabsApiKey]);
 
-    // ... (The rest of your component remains the same)
-    // Phone Call Handler and JSX Render logic
+    // Phone Call Handler (Backend)
     const handleStartPhoneCall = useCallback(async () => {
         if (!agentId || !userName || !phoneNumber) {
             toast.error("Please enter your name and phone number.");
@@ -257,11 +278,15 @@ Speak naturally as if in a real voice call. Be concise and directly address the 
     }, [agentId, userName, phoneNumber]);
     
     // --- Render Logic ---
+
     if (!isOpen || !agent) return null;
+
     const webCallButtonText = callStatus === 'in-progress' ? 'End Web Call' : (callStatus === 'connecting' ? 'Connecting...' : 'Start Web Call');
     const isElevenLabsCallButNoKey = (agent?.voiceConfig?.voiceProvider === 'elevenlabs' && !elevenLabsApiKey);
     const isWebCallButtonDisabled = !userName || !VAPI_PUBLIC_API_KEY || isElevenLabsCallButNoKey;
+    
     const isPhoneCallButtonDisabled = isConnecting || !userName || !phoneNumber;
+
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
             <div ref={panelRef} className={`flex flex-col h-full ${panelWidth} ${uiColors.bgPrimary} shadow-xl`} onClick={(e) => e.stopPropagation()}>
