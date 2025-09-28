@@ -228,7 +228,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
 
             const vapiPayload = {
-                model: { provider: "google", model: "gemini-1.5-flash", messages: [{ role: "system", content: everyContentPrompt }] },
+                model: { provider: "openai", model: "gpt-3.5-turbo", messages: [{ role: "system", content: everyContentPrompt }] },
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
                 recordingEnabled: agent.callConfig?.enableRecordings || false,
