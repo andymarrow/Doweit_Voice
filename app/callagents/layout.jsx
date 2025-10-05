@@ -71,13 +71,13 @@ export default function CallAgentsLayout({ children }) {
       </div>
 
       {/* Floating Help Button (No changes) */}
-      <button className={`fixed bottom-6 right-6 flex items-center text-white text-sm font-semibold px-4 py-3 rounded-full shadow-lg transition-all z-50
+      {/* <button className={`fixed bottom-6 right-6 flex items-center text-white text-sm font-semibold px-4 py-3 rounded-full shadow-lg transition-all z-50
                           ${uiAccentClasses.helpButtonGradient}
                           ${uiAccentClasses.hoverBgSubtle}
                           `}>
             <FiHelpCircle className="mr-2 text-lg" />
             Help
-      </button>
+      </button> */}
     </>
   );
 }
