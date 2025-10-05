@@ -4,11 +4,11 @@ import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { characters, characterLikes } from "@/lib/db/schemaCharacterAI";
-import { eq, and } from "drizzle-orm";
+// *** THE FIX IS HERE: Added 'sql' to the import list ***
+import { eq, and, sql } from "drizzle-orm";
 
 export async function POST(req, { params }) {
 	const { characterId } = params;
-	// const { userId } = auth(); // Get user ID from Clerk
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
 
@@ -47,52 +47,43 @@ export async function POST(req, { params }) {
 			// If liked, remove the like
 			await db
 				.delete(characterLikes)
-				.where(
-					and(
-						eq(characterLikes.userId, userId),
-						eq(characterLikes.characterId, charIdInt),
-					),
-				);
+				.where(eq(characterLikes.id, existingLike.id)); // Safer to delete by primary key
+
 			// Decrement the likes count on the character
 			await db
 				.update(characters)
-				.set({ likes: sql`${characters.likes} - 1` }) // Use raw SQL to decrement
+				.set({ likes: sql`${characters.likes} - 1` })
 				.where(eq(characters.id, charIdInt));
 			message = "Character unliked successfully";
 		} else {
+			// If not liked, add the like
 			await db.insert(characterLikes).values({
 				userId: userId,
 				characterId: charIdInt,
 			});
+
 			// Increment the likes count on the character
 			await db
 				.update(characters)
-				.set({ likes: sql`${characters.likes} + 1` }) // Use raw SQL to increment
+				.set({ likes: sql`${characters.likes} + 1` })
 				.where(eq(characters.id, charIdInt));
 			message = "Character liked successfully";
 			status = 201; // Created
 		}
 
-		// Optional: Fetch the updated character details including the new like count
+		// Fetch the updated likes count
 		const updatedCharacter = await db.query.characters.findFirst({
 			where: eq(characters.id, charIdInt),
-			with: {
-				// Join to see if the current user now likes it (redundant check, but useful if returning full character)
-				characterLikes: {
-					where: eq(characterLikes.userId, userId),
-					columns: { userId: true },
-					limit: 1,
-				},
+			columns: {
+				likes: true,
 			},
 		});
 
-		// Return the updated character data (or just success message)
 		return NextResponse.json(
 			{
 				message,
-				// Return updated likes count and current user's like status
 				likes: updatedCharacter?.likes ?? 0,
-				isLikedByCurrentUser: !existingLike, // If there was no existing like, it's now liked
+				isLikedByCurrentUser: !existingLike,
 			},
 			{ status },
 		);
@@ -101,12 +92,10 @@ export async function POST(req, { params }) {
 			`API Error /api/characters/${characterId}/like (POST):`,
 			error,
 		);
-		// Handle potential unique constraint violation if user double-clicks quickly without optimistic update
 		if (
-			error.message.includes("duplicate key value violates unique constraint")
+			error.code === '23505' // Standard PostgreSQL unique violation code
 		) {
-			// This might happen if the frontend tries to add a like twice
-			return NextResponse.json({ error: "Already liked" }, { status: 409 });
+			return NextResponse.json({ error: "Conflict: Action already performed." }, { status: 409 });
 		}
 		return NextResponse.json(
 			{ error: "Internal server error toggling like status" },

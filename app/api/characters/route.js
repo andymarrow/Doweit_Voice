@@ -4,11 +4,10 @@ import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { characters, users, characterLikes } from "@/lib/db/schemaCharacterAI";
-import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, like, desc, sql, exists } from "drizzle-orm";
 
-// POST handler (Create Character)
+// POST handler (No changes)
 export async function POST(req) {
-	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
 
@@ -18,9 +17,8 @@ export async function POST(req) {
 
 	try {
 		const characterData = await req.json();
-		console.log("Received character data:", characterData);
+		console.log("Received character data for creation:", characterData);
 
-		// --- Validate incoming data ---
 		const {
 			name,
 			tagline,
@@ -29,13 +27,12 @@ export async function POST(req) {
 			avatarUrl,
 			voiceId,
 			voiceName,
-			voiceProvider, // <-- Already here, good
+			voiceProvider,
 			language,
 			behavior,
 			isPublic,
 		} = characterData;
 
-		// Update validation to include voiceProvider - Already correct
 		if (
 			!name ||
 			!description ||
@@ -59,11 +56,11 @@ export async function POST(req) {
 				{ status: 400 },
 			);
 		}
-		// --- Insert new character into the database ---
+
 		const [newCharacter] = await db
 			.insert(characters)
 			.values({
-				creatorId: userRecord.id,
+				creatorId: userId,
 				name: name.trim(),
 				tagline: tagline?.trim() || null,
 				description: description.trim(),
@@ -71,7 +68,7 @@ export async function POST(req) {
 				avatarUrl: avatarUrl || null,
 				voiceId: voiceId,
 				voiceName: voiceName || null,
-				voiceProvider: voiceProvider, // <-- Already correct
+				voiceProvider: voiceProvider,
 				language: language,
 				behavior: behavior,
 				isPublic: isPublic,
@@ -82,9 +79,8 @@ export async function POST(req) {
 			})
 			.returning();
 
-		console.log("Character created in DB:", newCharacter);
+		console.log("Character created in DB successfully:", newCharacter);
 
-		// Return the newly created character's ID
 		return NextResponse.json(
 			{
 				message: "Character created successfully",
@@ -93,10 +89,8 @@ export async function POST(req) {
 			{ status: 201 },
 		);
 	} catch (error) {
-		console.error("API Error /api/characters (POST):", error);
-		// Return a generic 500 or the specific error message if safe
-		// It's often better not to expose internal error messages directly to the frontend in production
-		// but for development, logging error.message can be helpful server-side.
+		console.error("API Error /api/characters (POST - Character Creation):", error);
+		console.error("Full POST error object:", error);
 		return NextResponse.json(
 			{ error: "Internal server error during character creation" },
 			{ status: 500 },
@@ -104,81 +98,101 @@ export async function POST(req) {
 	}
 }
 
-// GET handler (List Characters)
+// GET handler (List Characters) - FINAL CORRECTED VERSION
 export async function GET(req) {
 	try {
 		const { searchParams } = new URL(req.url);
 		const searchTerm = searchParams.get("search");
 		const category = searchParams.get("category");
 
-		// Build dynamic WHERE clause
-		const whereClause = and(
-			eq(characters.isPublic, true),
-			// Add search term filter
-			searchTerm
-				? or(
-						like(characters.name, `%${searchTerm}%`),
-						like(characters.description, `%${searchTerm}%`),
-						like(characters.tagline, `%${searchTerm}%`),
-						// Searching JSON array example (requires Drizzle `sql`)
-						// Note: This uses raw SQL template literal, adjust syntax if needed for your DB/Drizzle version
-						sql`${characters.behavior} @> ${JSON.stringify([searchTerm])}::jsonb`, // Example: checks if array contains search term
-					)
-				: undefined,
-			// Add category filter (using the same JSONB check)
-			// SYNTAX FIX HERE: Added closing curly brace '}'
-			category
-				? sql`${characters.behavior} @> ${JSON.stringify([category])}::jsonb`
-				: undefined, // <-- FIX APPLIED
-		);
+		const whereConditions = [eq(characters.isPublic, true)];
 
-		// Get current user ID from Clerk (can be null if not logged in)
-		// const { userId: currentUserId } = auth();
-		const { user } = await getSession(await headers());
-		const currentUserId = user?.id;
+		if (searchTerm) {
+			whereConditions.push(
+				or(
+					like(characters.name, `%${searchTerm}%`),
+					like(characters.description, `%${searchTerm}%`),
+					like(characters.tagline, `%${searchTerm}%`),
+					sql`${characters.behavior} @> ${sql.raw(`'${JSON.stringify([searchTerm])}'::jsonb`)}`,
+				),
+			);
+		}
 
-		// Build the Drizzle query with joins
+		if (category) {
+			whereConditions.push(
+				sql`${characters.behavior} @> ${sql.raw(`'${JSON.stringify([category])}'::jsonb`)}`,
+			);
+		}
+
+		let currentUserId = null;
+		try {
+			const { user } = await getSession(await headers());
+			currentUserId = user?.id;
+			console.log("Better-Auth user fetched:", user);
+			console.log("Current User ID from Better-Auth:", currentUserId);
+		} catch (authError) {
+			console.warn("Failed to get session from Better-Auth (user might not be logged in or session is invalid):", authError);
+		}
+
 		const result = await db
 			.select({
-				character: characters,
-				creatorUsername: users.username, // Select creator's username from joined users table
-				// Check if the current user liked this character via a left join
-				liked: characterLikes.userId, // Will be null if not liked by user
+				id: characters.id,
+				creatorId: characters.creatorId,
+				name: characters.name,
+				tagline: characters.tagline,
+				description: characters.description,
+				greeting: characters.greeting,
+				avatarUrl: characters.avatarUrl,
+				voiceId: characters.voiceId,
+				voiceName: characters.voiceName,
+				voiceProvider: characters.voiceProvider,
+				language: characters.language,
+				behavior: characters.behavior,
+				isPublic: characters.isPublic,
+				likes: characters.likes,
+				chats: characters.chats,
+				// *** THE FIX IS HERE ***
+				// Select 'users.name' instead of 'users.username'
+				creatorName: users.name,
+				isLikedByCurrentUser: currentUserId
+					? exists(
+							db
+								.select({ val: 1 })
+								.from(characterLikes)
+								.where(
+									and(
+										eq(characterLikes.characterId, characters.id),
+										eq(characterLikes.userId, currentUserId),
+									),
+								),
+						).as("isLikedByCurrentUser")
+					: sql<boolean>`false`.as("isLikedByCurrentUser"),
 			})
 			.from(characters)
-			// Join to get creator info
 			.leftJoin(users, eq(characters.creatorId, users.id))
-			// Left join with characterLikes table for the current user (only if user is logged in)
-			.leftJoin(
-				characterLikes,
-				and(
-					eq(characters.id, characterLikes.characterId),
-					currentUserId ? eq(characterLikes.userId, currentUserId) : undefined, // Condition only if userId exists
-				),
-			)
-			.where(whereClause) // Apply public/search/category filters
-			.orderBy(desc(characters.createdAt)); // Order results
+			.where(and(...whereConditions))
+			.orderBy(desc(characters.createdAt));
 
-		// Format the result to match the frontend CharacterCard props
+		// The mapping now correctly uses the 'creatorName' alias from the query
 		const formattedCharacters = result.map((row) => ({
-			id: row.character.id,
-			name: row.character.name,
-			tagline: row.character.tagline,
-			description: row.character.description,
-			greeting: row.character.greeting,
-			avatarUrl: row.character.avatarUrl,
-			voiceId: row.character.voiceId,
-			voiceName: row.character.voiceName,
-			voiceProvider: row.character.voiceProvider, // <-- Ensure this is included when fetching
-			language: row.character.language,
-			behavior: row.character.behavior,
-			isPublic: row.character.isPublic,
-			likes: row.character.likes || 0, // Ensure number
-			chats: row.character.chats || 0, // Ensure number
-			shares: 0, // Placeholder
-			creatorId: row.character.creatorId,
-			creatorName: row.creatorUsername || "Unknown Creator", // Use fetched creator username
-			isLikedByCurrentUser: !!row.liked, // True if liked.userId is not null
+			id: row.id,
+			name: row.name,
+			tagline: row.tagline,
+			description: row.description,
+			greeting: row.greeting,
+			avatarUrl: row.avatarUrl,
+			voiceId: row.voiceId,
+			voiceName: row.voiceName,
+			voiceProvider: row.voiceProvider,
+			language: row.language,
+			behavior: row.behavior,
+			isPublic: row.isPublic,
+			likes: row.likes || 0,
+			chats: row.chats || 0,
+			shares: 0,
+			creatorId: row.creatorId,
+			creatorName: row.creatorName || "Unknown Creator", // Use the alias directly
+			isLikedByCurrentUser: row.isLikedByCurrentUser,
 		}));
 
 		return NextResponse.json(
@@ -186,7 +200,8 @@ export async function GET(req) {
 			{ status: 200 },
 		);
 	} catch (error) {
-		console.error("API Error /api/characters (GET):", error);
+		console.error("API Error /api/characters (GET - Fetching Characters):", error);
+		console.error("Full GET error object:", error);
 		return NextResponse.json(
 			{ error: "Internal server error fetching characters" },
 			{ status: 500 },

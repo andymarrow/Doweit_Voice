@@ -4,11 +4,10 @@ import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { characters, characterLikes, users } from "@/lib/db/schemaCharacterAI";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, exists } from "drizzle-orm"; // Ensure sql and exists are imported
 
 export async function GET(req, { params }) {
-	const { characterId } = params; // Get character ID from the URL params
-	// const { userId: currentUserId } = auth(); // Get current user ID from Clerk (can be null)
+	const { characterId } = params;
 	const { user } = await getSession(await headers());
 	const currentUserId = user?.id;
 
@@ -20,30 +19,50 @@ export async function GET(req, { params }) {
 	}
 
 	try {
-		// Fetch the character details, including creator's username
+		// Use the more robust subquery method to prevent Drizzle errors
 		const characterResult = await db
 			.select({
-				character: characters,
-				creatorUsername: users.username, // Select creator's username
-				// Also check if the current user likes this character
-				liked: characterLikes.userId, // Will be null if not liked by user
+				// Explicitly select all fields from the 'characters' table
+				id: characters.id,
+				creatorId: characters.creatorId,
+				name: characters.name,
+				tagline: characters.tagline,
+				description: characters.description,
+				greeting: characters.greeting,
+				avatarUrl: characters.avatarUrl,
+				voiceId: characters.voiceId,
+				voiceName: characters.voiceName,
+				voiceProvider: characters.voiceProvider,
+				language: characters.language,
+				behavior: characters.behavior,
+				isPublic: characters.isPublic,
+				likes: characters.likes,
+				chats: characters.chats,
+				// *** THE FIX IS HERE: Select 'users.name' instead of 'users.username' ***
+				creatorName: users.name,
+				// Use the subquery for the liked status
+				isLikedByCurrentUser: currentUserId
+					? exists(
+							db
+								.select({ val: 1 })
+								.from(characterLikes)
+								.where(
+									and(
+										eq(characterLikes.characterId, characters.id),
+										eq(characterLikes.userId, currentUserId),
+									),
+								),
+						).as("isLikedByCurrentUser")
+					: sql<boolean>`false`.as("isLikedByCurrentUser"),
 			})
 			.from(characters)
 			.leftJoin(users, eq(characters.creatorId, users.id)) // Join to get creator info
-			// Left join with characterLikes table for the current user
-			.leftJoin(
-				characterLikes,
-				and(
-					eq(characters.id, characterLikes.characterId),
-					currentUserId ? eq(characterLikes.userId, currentUserId) : undefined, // Join only if userId exists
-				),
-			)
-			.where(eq(characters.id, parseInt(characterId))) // Filter by character ID (parse as integer)
-			.limit(1); // Expect only one result
+			.where(eq(characters.id, parseInt(characterId))) // Filter by character ID
+			.limit(1);
 
-		const characterRow = characterResult[0];
+		const character = characterResult[0];
 
-		if (!characterRow) {
+		if (!character) {
 			return NextResponse.json(
 				{ error: "Character not found" },
 				{ status: 404 },
@@ -51,30 +70,17 @@ export async function GET(req, { params }) {
 		}
 
 		// If the character is private, ensure the current user is the creator
-		if (
-			!characterRow.character.isPublic &&
-			characterRow.character.creatorId !== currentUserId
-		) {
+		if (!character.isPublic && character.creatorId !== currentUserId) {
 			return NextResponse.json(
 				{ error: "Unauthorized access to private character" },
 				{ status: 403 },
 			);
 		}
 
-		// Format the result
-		const character = {
-			...characterRow.character,
-			creatorName: characterRow.creatorUsername || "Unknown Creator", // Use fetched username
-			// Ensure engagement metrics are numbers
-			likes: characterRow.character.likes || 0,
-			chats: characterRow.character.chats || 0,
-			// Note: shares is a placeholder on frontend
-			shares: 0, // Provide a default or fetch if tracked differently
-			// Indicate if the current user likes this character
-			isLikedByCurrentUser: !!characterRow.liked, // True if liked.userId is not null
-		};
+        // The query result is already in the correct flat format, so we can return it directly.
+        // We add the 'shares' placeholder as before.
+		return NextResponse.json({ ...character, shares: 0 }, { status: 200 });
 
-		return NextResponse.json(character, { status: 200 });
 	} catch (error) {
 		console.error(`API Error /api/characters/${characterId} (GET):`, error);
 		return NextResponse.json(
