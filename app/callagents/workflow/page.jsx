@@ -855,7 +855,7 @@ export default function WorkflowPage() {
 
     // --- Render ---
     return (
-        <div className="flex flex-col space-y-6 w-full h-full">
+        <div className="flex flex-col space-y-6 w-full ">
 
             {/* Header Area */}
              <motion.div
@@ -919,7 +919,7 @@ export default function WorkflowPage() {
             {/* Workflow Canvas Area */}
               {/* flex-grow helps fill parent, but parent must have height */}
              {/* Add an explicit min-height or height if h-full isn't working */}
-             <div className="flex-grow overflow-hidden h-full min-h-[500px]"> {/* Added min-h for safety */}
+             <div style={{ height: 'calc(100vh - 220px)' }}> {/* Added min-h for safety */}
                  {showLoading ? (
                      <div className={`flex flex-col items-center justify-center h-full text-center ${uiColors.textSecondary}`}> /* ...Loading message... */ <FiLoader className="animate-spin mx-auto w-8 h-8 mb-4" /> Loading Agent Workflow... </div>
                  ) : !selectedAgentId && !showError ? (
@@ -936,7 +936,7 @@ export default function WorkflowPage() {
                                nodeTypes={nodeTypes} // Pass definition from this component
                                fitView // Automatically zoom to fit content
                                attributionPosition="bottom-left"
-                               className={`${uiColors.bgSecondary} rounded-lg border ${uiColors.borderPrimary} ${isCanvasInteractive ? '' : 'pointer-events-none opacity-75'}`}
+                               className={`h-full w-full ${uiColors.bgSecondary} rounded-lg border ${uiColors.borderPrimary} ${isCanvasInteractive ? '' : 'pointer-events-none opacity-75'}`}
                                onNodeDragStop={onNodeDragStop} // Pass handler from this component
                                // Add other React Flow props as needed
                                nodesDraggable={!isSavingWorkflow}
