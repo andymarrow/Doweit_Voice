@@ -6,8 +6,9 @@ import { FiCheck, FiChevronRight, FiLoader, FiTrash2, FiX } from 'react-icons/fi
 
 // Import constants
 import { uiColors } from '@/app/callagents/_constants/uiConstants';  // Correct import path
-
+import { useRouter } from 'next/navigation';
 import SelectKnowledgeBaseModal from './SelectKnowledgeBaseModal'; // Adjust path
+import { user } from 'elevenlabs/api';
 
 
 // Receive config data and the change handler from the parent page
@@ -18,12 +19,15 @@ function GeneralConfig({ config, onConfigChange, agentId }) {
      const [isSelectKbModalOpen, setIsSelectKbModalOpen] = useState(false);
      // No need for state to store the selected KB ID locally, it's in `config.knowledgeBaseId`
 
+const [isDeleting, setIsDeleting] = useState(false); // State to handle deletion loading
 
     // No longer need individual useState for each form field like agentName, voiceEngine, etc.
     // Their values come from the 'config' prop.
     // Only need state for temporary input like 'newVocabTerm'.
      const [newVocabTerm, setNewVocabTerm] = useState('');
-
+    
+     const router=useRouter();
+     
     // Placeholder function for image handling (more complex in reality)
     // This would ideally trigger an API call to remove/update the avatarUrl
     const handleRemoveImage = () => {
@@ -51,16 +55,31 @@ function GeneralConfig({ config, onConfigChange, agentId }) {
         // Pass the new array to the parent handler
         onConfigChange('customVocabulary', updatedVocabulary);
     };
+    
 
     // Placeholder function for deleting agent
-    const handleDeleteAgent = () => {
-        if (confirm('Are you sure you want to delete this agent? This action cannot be undone.')) {
-            console.log(`[GeneralConfig] Deleting agent ${agentId}`);
-            // Implement actual deletion logic (API call, redirect)
-            // This would be a separate API call (DELETE /api/callagents/[agentid])
-            alert(`Agent ${agentId} deleted (simulated)`);
-            // After successful deletion, you'd redirect the user, likely to the main /callagents page
-            // router.push('/callagents');
+     const handleDeleteAgent = async () => {
+        if (confirm('Are you sure you want to delete this agent? This will permanently erase all associated data, including call logs. This action cannot be undone.')) {
+            setIsDeleting(true);
+            try {
+                const response = await fetch(`/api/callagents/${agentId}`, {
+                    method: 'DELETE',
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to delete the agent.');
+                }
+
+                 // Redirect to the main agents page after successful deletion
+                router.push('/callagents');
+                router.refresh(); // Force a refresh to update the agent list
+
+            } catch (error) {
+                console.error('[GeneralConfig] Error deleting agent:', error);
+            } finally {
+                setIsDeleting(false);
+            }
         }
     };
 
@@ -444,17 +463,26 @@ function GeneralConfig({ config, onConfigChange, agentId }) {
             {/* This button doesn't update config state, it performs a separate action */}
             <div className={`p-4 rounded-md border ${uiColors.alertDangerBorder} ${uiColors.alertDangerBg} w-full sm:max-w-md`}>
                 <label className={`block text-lg font-medium ${uiColors.textSecondary}`}>
-                     Delete Agent
+                    Delete Agent
                 </label>
                 <p className={`text-xs mb-4 ${uiColors.textPlaceholder}`}>
                     Deleting agents will mean erasing personalized data, voice profiles, and integrations.
                 </p>
-                 <button
-                     onClick={handleDeleteAgent} // Use the delete handler
-                      className={`px-4 py-2 text-lg font-semibold rounded-md transition-colors ${uiColors.alertDangerButtonBg} ${uiColors.alertDangerButtonText} ${uiColors.alertDangerButtonHoverBg}`}
-                 >
-                     Delete Agent
-                 </button>
+                <button
+                    onClick={handleDeleteAgent}
+                    disabled={isDeleting} // Disable button while deleting
+                    className={`inline-flex items-center px-4 py-2 text-lg font-semibold rounded-md transition-colors text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed`}
+                >
+                    {isDeleting ? (
+                        <>
+                            <FiLoader className="animate-spin mr-2" /> Deleting...
+                        </>
+                    ) : (
+                        <>
+                           <FiTrash2 className="mr-2" /> Delete Agent
+                        </>
+                    )}
+                </button>
             </div>
 
             {/* *** Render the Select KB Modal *** */}
