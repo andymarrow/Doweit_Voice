@@ -438,7 +438,7 @@ export default function SingleCharacterChatRoom() {
 		const assistantConfig = {
 			model: {
 				provider: "google",
-				model: "gemini-1.5-flash",
+				model: "gemini-2.5-flash",
 				temperature: 0.7,
 				// Include recent non-system messages from the component's state as context for Vapi
 				// Filter out system messages and map sender to Vapi role ('character' becomes 'assistant')
