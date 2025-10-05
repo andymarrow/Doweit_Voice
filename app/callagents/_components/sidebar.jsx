@@ -1,56 +1,42 @@
-// voice-agents-dashboard/_components/sidebar.jsx
 "use client";
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-import ThemeToggle from '@/components/Themetoggle'; // Import your ThemeToggle component
+import ThemeToggle from '@/components/Themetoggle';
 import { FiBookOpen, FiBriefcase, FiChevronDown, FiChevronLeft, FiChevronRight, FiChevronUp, FiExternalLink, FiPhone, FiSettings, FiShare2, FiUsers, FiZap, FiZapOff } from 'react-icons/fi';
 
 // --- Reusable Accent Color Classes ---
-// (Ideally, these would be in a shared constants file)
 const accentClasses = {
-    // Used for active link background (subtle)
     bgSubtle: 'bg-purple-100 dark:bg-purple-800',
-    // Used for active link text/icon color
     textBold: 'text-purple-700 dark:text-white',
-    // Used for hover background (subtle)
     hoverBg: 'hover:bg-gray-100 dark:hover:bg-gray-800',
-    // Used for hover text color
     hoverText: 'hover:text-gray-900 dark:hover:text-white',
-    // Used for secondary text (e.g., section titles)
     textSubtle: 'text-gray-500 dark:text-gray-500',
-    // Used for accent text/icon (e.g., Academy link, Badge)
     textAccent: 'text-purple-600 dark:text-purple-400',
-    // Used for badge background
-    badgeBg: 'bg-purple-500/20 dark:bg-purple-500/30', // Use opacity variants
-    // Used for Upgrade button gradient
+    badgeBg: 'bg-purple-500/20 dark:bg-purple-500/30',
     buttonGradient: 'bg-gradient-to-r from-cyan-400 to-cyan-600 hover:from-cyan-500 hover:to-cyan-700 dark:from-purple-600 dark:to-purple-800 dark:hover:from-purple-700 dark:hover:to-purple-900 transition-all'
 };
 
-
-// Animation variants for sidebar elements (keep existing)
+// --- Animation variants ---
 const itemVariants = {
     collapsed: { opacity: 0, x: -20 },
     open: { opacity: 1, x: 0 },
 };
-
-// Animation variants for dropdown items (keep existing for profile)
 const dropdownVariants = {
     collapsed: { opacity: 0, height: 0, transition: { duration: 0.3, ease: "easeOut" } },
     open: { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: "easeOut" } },
 };
 
-
 const Sidebar = ({ isOpen, toggleSidebar }) => {
+    const pathname = usePathname();
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
-    // Define the FLAT list of navigation items based on the image
     const sidebarNavItems = [
-        { name: 'Agents', icon: FiBriefcase, href: '/callagents', active: true }, // Active item based on image
+        { name: 'Agents', icon: FiBriefcase, href: '/callagents' },
         { name: 'Knowledge Base', icon: FiBookOpen, href: '/callagents/knowledgebase' },
         { name: 'Actions', icon: FiZap, href: '/callagents/actions' },
         { name: 'Workflows', icon: FiShare2, href: '/callagents/workflow' },
@@ -58,19 +44,25 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Phone Numbers', icon: FiPhone, href: '/phone-numbers' },
         { name: 'Integrations', icon: FiSettings, href: '/callagents/Integrations' },
         { name: 'Agency', icon: FiBriefcase, href: '/agency' },
-        { name: 'Getting Started', icon: FiZapOff, href: '/getting-started', badge: '0%' }, // Item with badge
+        { name: 'Getting Started', icon: FiZapOff, href: '/getting-started', badge: '0%' },
     ];
 
-    // Removed old nav item definitions (mainNavItems, agentToolItems, advancedOptionItems, socialLinks)
-
+    // --- KEY CHANGE: Define the sub-routes that are NOT the main "Agents" page ---
+    const agentChildRoutes = [
+        '/callagents/knowledgebase',
+        '/callagents/actions',
+        '/callagents/workflow',
+        '/callagents/Integrations'
+    ];
 
     return (
-        // Apply base background/text colors from the scheme
         <div className={`h-full flex flex-col p-4 transition-width duration-300 hide-scrollbar overflow-y-auto
                         bg-white text-gray-800
                         dark:bg-gray-950 dark:text-gray-200
                         ${isOpen ? 'w-64' : 'w-16'}`}>
 
+            {/* Logo, Toggle, and Profile sections remain unchanged */}
+            {/* ... your existing JSX for these sections ... */}
             {/* === Start: KEEP THIS EXACT BLOCK AS REQUESTED === */}
             {/* Logo/Brand Area */}
             <div className="flex items-center mb-6 p-2 space-x-3">
@@ -188,52 +180,62 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
 
             {/* Main Navigation */}
-            <nav className="mb-6 flex-grow overflow-y-auto hide-scrollbar"> {/* Added flex-grow and overflow for scrollable nav */}
-                {sidebarNavItems.map(item => (
-                    <Link key={item.name} href={item.href} legacyBehavior>
-                        {/* motion.a handles the overall row, hover, active state, and layout */}
-                        <motion.a
-                            // Removed animation variants from motion.a itself
-                             className={`flex items-center p-2 rounded-md transition-colors mb-1 // Added margin-bottom
-                                       ${accentClasses.hoverBg}
-                                       ${item.active
-                                        ? `${accentClasses.bgSubtle} ${accentClasses.textBold}` // Active style
-                                        : `text-gray-700 ${accentClasses.hoverText} dark:text-gray-300` // Default + Hover style
-                                       }
-                                       ${isOpen ? '' : 'justify-center'}`}> {/* Apply theme colors and hover */}
+            <nav className="mb-6 flex-grow overflow-y-auto hide-scrollbar">
+                {sidebarNavItems.map(item => {
+                    // --- REFINED ACTIVE STATE LOGIC ---
+                    let isActive = false;
+                    if (item.href === '/callagents') {
+                        // The "Agents" link is active if the path starts with /callagents...
+                        const isAgentRoute = pathname.startsWith('/callagents');
+                        // ...but is NOT one of the more specific child routes.
+                        const isOtherAgentSubPage = agentChildRoutes.some(route => pathname.startsWith(route));
+                        isActive = isAgentRoute && !isOtherAgentSubPage;
+                    } else {
+                        // For all other links, the simple "startsWith" check is correct.
+                        isActive = pathname.startsWith(item.href);
+                    }
 
-                            {/* Icon - Always rendered */}
-                            {/* Apply size class directly. The image shows slightly larger icons when collapsed. */}
-                             <item.icon className={`${isOpen ? 'text-xl' : 'text-2xl'} flex-shrink-0`} /> {/* Adjusted size, added shrink */}
-
-                            {/* Item Name and Badge - Animated in/out */}
-                            <AnimatePresence initial={false}> {/* initial={false} prevents initial animation on mount */}
-                               {isOpen && ( // Only render these children when sidebar is open
-                                    <motion.div
-                                        key={`${item.name}-content`} // Unique key for the animated div
-                                        initial="collapsed"
-                                        animate="open"
-                                        exit="collapsed"
-                                        variants={itemVariants} // Apply the fade/slide animation here
-                                        className="flex items-center flex-grow min-w-0" // Use flex to contain text and badge, allow text to shrink if needed, min-w-0 prevents overflow issues in flex
-                                    >
-                                         <span className="pl-2 whitespace-nowrap flex-grow overflow-hidden text-ellipsis"> {/* Added overflow/ellipsis for long names */}
-                                             {item.name}
-                                         </span>
-
-                                         {item.badge && (
-                                              <span className={`ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${accentClasses.badgeBg} ${accentClasses.textAccent} whitespace-nowrap`}>
-                                                  {item.badge}
-                                              </span>
-                                          )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </motion.a>
-                    </Link>
-                ))}
+                    return (
+                        <Link key={item.name} href={item.href} legacyBehavior>
+                            <motion.a
+                                className={`flex items-center p-2 rounded-md transition-colors mb-1
+                                        ${accentClasses.hoverBg}
+                                        ${isActive
+                                            ? `${accentClasses.bgSubtle} ${accentClasses.textBold}`
+                                            : `text-gray-700 ${accentClasses.hoverText} dark:text-gray-300`
+                                        }
+                                        ${isOpen ? '' : 'justify-center'}`}
+                            >
+                                <item.icon className={`${isOpen ? 'text-xl' : 'text-2xl'} flex-shrink-0`} />
+                                <AnimatePresence initial={false}>
+                                    {isOpen && (
+                                        <motion.div
+                                            key={`${item.name}-content`}
+                                            initial="collapsed"
+                                            animate="open"
+                                            exit="collapsed"
+                                            variants={itemVariants}
+                                            className="flex items-center flex-grow min-w-0"
+                                        >
+                                            <span className="pl-2 whitespace-nowrap flex-grow overflow-hidden text-ellipsis">
+                                                {item.name}
+                                            </span>
+                                            {item.badge && (
+                                                <span className={`ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${accentClasses.badgeBg} ${accentClasses.textAccent} whitespace-nowrap`}>
+                                                    {item.badge}
+                                                </span>
+                                            )}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </motion.a>
+                        </Link>
+                    );
+                })}
             </nav>
 
+            {/* Academy, Usage, and Upgrade sections remain unchanged */}
+            {/* ... your existing JSX for these sections ... */}
             {/* Academy Card */}
             <AnimatePresence>
                 {isOpen && (
@@ -259,7 +261,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                          <Link href="/join" legacyBehavior>
                                 <a className={`block text-center text-sm font-semibold px-4 py-2.5 rounded-md transition-all shadow
                                                ${accentClasses.buttonGradient}`}> {/* Full width, center text, applied gradient */}
-                                    Join 
+                                    Join
                                 </a>
                            </Link>
                      </motion.div>

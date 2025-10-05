@@ -63,7 +63,7 @@ export default function CallAgentsLayout({ children }) {
             {/* --- SCROLLABLE MAIN CONTENT AREA --- */}
             {/* `flex-1` makes this area take up all remaining vertical space.
                 `overflow-y-auto` makes only this section scrollable, leaving the mobile header fixed at the top. */}
-            <main className="flex-1 overflow-y-auto px-1 sm:px-2 lg:px-3 py-3">
+            <main className="flex-1 overflow-y-auto px-2 sm:px-3 lg:px-4 py-5">
                 {children}
             </main>
         </div>
