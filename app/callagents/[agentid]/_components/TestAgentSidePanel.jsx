@@ -21,16 +21,16 @@ const panelWidth = 'w-80';
 function TestAgentSidePanel({ isOpen, onClose, agent }) {
     // --- State Management ---
     const [testMethod, setTestMethod] = useState('web');
-
+    
     // Form Inputs
     const [userName, setUserName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
-
+    
     // Call Status (shared by both Web and Phone)
     const [isConnecting, setIsConnecting] = useState(false); // Used for phone call loading state
     const [callStatus, setCallStatus] = useState('idle');    // Vapi SDK status for web calls
     const [callError, setCallError] = useState(null);
-
+    
     const [transcriptBuffer, setTranscriptBuffer] = useState([])
     const [callStartTime, setCallStartTime] = useState([])
     const [vapiCallData, setVapiCallData] = useState({})
@@ -55,7 +55,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
             let callStartTime = null;
 
-
+            
             // --- Event Listeners ---
             vapi.on("call-start", (status) => {
                 console.log("Vapi call start update", status)
@@ -160,7 +160,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             endTime: new Date().toISOString(),
             transcript: transcriptBuffer,
             // *** NEW: Capture callId and recordingUrl from the Vapi call object ***
-            callId: vapiCallData?.id || null,
+            callId: vapiCallData?.id || null, 
             recordingUrl: vapiCallData?.recordingUrl || null,
         };
 
@@ -196,7 +196,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         setCallError(null);
 
         try {
-
+            
 let everyContentPrompt = `
 You are an AI assistant named ${agent?.name || 'Assistant'}.
 ${agent?.prompt ? `Your core instructions and persona details are: ${agent.prompt}` : 'Your purpose is to assist the user.'}
@@ -204,7 +204,6 @@ ${agent?.voiceConfig?.language ? `Maintain conversations in the ${agent.voiceCon
 ${agent?.greetingMessage ? `If you are the first speaker, you may choose to start the conversation with "${agent.greetingMessage}".` : ''}
 ${Array.isArray(agent?.customVocabulary) && agent.customVocabulary.length > 0 ? `Incorporate the following specific terms or phrases naturally where relevant: ${agent.customVocabulary.map(item => item.term).join(', ')}.` : ''}
 Speak naturally as if in a real voice call. Be concise and directly address the user's needs or questions based on your instructions.
-When the conversation is over and all tasks are complete, you must use the endCall function to terminate the call.
 `.trim();
 
 // Attach Knowledge Base (if available)
@@ -229,23 +228,10 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
 
             const vapiPayload = {
-                model: {
+                model: { 
                     provider: "google",
-				    model: "gemini-2.5-flash",
-                    messages: [{ role: "system", content: everyContentPrompt }],
-                    tools: [{
-                      type: 'function',
-                      function: {
-                        name: 'endCall',
-                        description: 'Ends the phone call when the conversation is complete.',
-                        parameters: {
-                          type: 'object',
-                          properties: {},
-                          required: []
-                        }
-                      }
-                    }]
-                },
+				    model: "gemini-2.5-flash", 
+                    messages: [{ role: "system", content: everyContentPrompt }] },
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
                 recordingEnabled: agent.callConfig?.enableRecordings || false,
@@ -293,7 +279,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             setIsConnecting(false);
         }
     }, [agentId, userName, phoneNumber]);
-
+    
     // --- Render Logic ---
 
     if (!isOpen || !agent) return null;
@@ -301,7 +287,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     const webCallButtonText = callStatus === 'in-progress' ? 'End Web Call' : (callStatus === 'connecting' ? 'Connecting...' : 'Start Web Call');
     const isElevenLabsCallButNoKey = (agent?.voiceConfig?.voiceProvider === 'elevenlabs' && !elevenLabsApiKey);
     const isWebCallButtonDisabled = !userName || !VAPI_PUBLIC_API_KEY || isElevenLabsCallButNoKey;
-
+    
     const isPhoneCallButtonDisabled = isConnecting || !userName || !phoneNumber;
 
     return (
