@@ -13,6 +13,7 @@
 	},
 	"dependencies": {
 		"@codesandbox/sandpack-react": "^2.20.0",
+		"@elevenlabs/elevenlabs-js": "^2.17.0",
 		"@google/genai": "^1.7.0",
 		"@google/generative-ai": "^0.17.1",
 		"@neondatabase/serverless": "^0.9.5",
@@ -39,7 +40,6 @@
 		"convex": "^1.19.4",
 		"dotenv": "^17.2.2",
 		"drizzle-orm": "^0.33.0",
-		"elevenlabs": "^1.59.0",
 		"firebase": "^10.14.1",
 		"firebase-admin": "^13.4.0",
 		"framer-motion": "^12.18.1",

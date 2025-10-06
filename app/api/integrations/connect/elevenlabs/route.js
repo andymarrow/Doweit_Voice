@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
-import { ElevenLabsClient } from "elevenlabs";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { db } from "@/lib/database";
 import { userConnections, voices } from "@/lib/db/schemaCharacterAI";
 import { encrypt } from "@/lib/utils/crypto";
