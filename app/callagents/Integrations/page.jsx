@@ -142,18 +142,21 @@ export default function IntegrationsPage() {
     }));
 
     return (
-        <>
+         <>
+            {/* The root div is now simpler as the layout handles the main structure */}
             <motion.div
-                className="flex flex-col space-y-6 w-full h-full"
+                className="flex flex-col space-y-6 w-full"
                 variants={sectionVariants}
                 initial="hidden"
                 animate="visible"
             >
                 <div>
+                    {/* Page-specific title */}
                     <h2 className={`text-2xl font-bold ${uiColors.textPrimary}`}>Third Parties</h2>
+                    <p className={`${uiColors.textSecondary} mt-1`}>Connect your favorite tools to extend your agent's capabilities.</p>
                 </div>
                 <IntegrationGrid
-                    integrations={integrationsWithStatus} // Pass the dynamically calculated list
+                    integrations={integrationsWithStatus}
                     onCardClick={handleOpenPanel}
                     isLoading={isLoading}
                 />
@@ -164,7 +167,6 @@ export default function IntegrationsPage() {
                 onClose={handleClosePanel}
                 integration={selectedIntegration}
                 onSuccess={handleIntegrationSuccess}
-                // Check connection status directly from our Set
                 isConnected={connectedProviders.has(selectedIntegration?.id)}
             />
         </>
