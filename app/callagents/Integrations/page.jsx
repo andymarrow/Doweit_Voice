@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
+import { useSearchParams, useRouter } from 'next/navigation'; // Import new hooks
 import { sectionVariants, uiColors } from '../_constants/uiConstants';
 import IntegrationGrid from './_components/IntegrationGrid';
 import IntegrationSidePanel from './_components/IntegrationSidePanel';
@@ -51,7 +52,7 @@ const INTEGRATIONS_CONFIG = [
         ]
     },
     {
-        id: 'google-sheets',
+        id: 'google',
         name: 'Google Sheets',
         logo: '/integrations/googlesheets.jpg',
         description: 'Send call data and action values directly to a Google Sheet after each call.',
@@ -95,6 +96,11 @@ export default function IntegrationsPage() {
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [selectedIntegration, setSelectedIntegration] = useState(null);
 
+
+     const searchParams = useSearchParams();
+    const router = useRouter();
+
+
     // Function to fetch and update connection statuses
     const fetchConnections = async () => {
         setIsLoading(true);
@@ -115,9 +121,26 @@ export default function IntegrationsPage() {
     };
     
     // Fetch connections on initial component mount
+    // Check for success/error parameters in the URL on mount
     useEffect(() => {
+        const status = searchParams.get('status');
+        const error = searchParams.get('error');
+
+        if (status === 'success') {
+            toast.success("Successfully connected to Google!");
+            // Clean the URL
+            router.replace('/callagents/Integrations');
+        } else if (error) {
+            toast.error("Failed to connect to Google. Please try again.");
+            console.error("Google OAuth Error Code:", error);
+            // Clean the URL
+            router.replace('/callagents/Integrations');
+        }
+
+        // Fetch connections regardless to get the latest status
         fetchConnections();
-    }, []);
+    }, [searchParams, router]); // Re-run if searchParams change
+
 
     const handleOpenPanel = (integration) => {
         setSelectedIntegration(integration);

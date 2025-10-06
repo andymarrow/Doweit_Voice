@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react'; // Keep useEffect if initial
 import Image from 'next/image';
 import { FiCheck, FiChevronRight, FiLoader, FiTrash2, FiX } from 'react-icons/fi'; // Include FiX for vocab remove
 
+import { toast } from 'react-hot-toast';
+
 // Import constants
 import { uiColors } from '@/app/callagents/_constants/uiConstants';  // Correct import path
 import { useRouter } from 'next/navigation';
@@ -14,6 +16,8 @@ import { user } from 'elevenlabs/api';
 // Receive config data and the change handler from the parent page
 // The agentId prop is still useful for the Delete Agent action
 function GeneralConfig({ config, onConfigChange, agentId }) {
+
+    const [isSettingUpSheet, setIsSettingUpSheet] = useState(false);
 
     // State for the Select KB Modal visibility
      const [isSelectKbModalOpen, setIsSelectKbModalOpen] = useState(false);
@@ -34,6 +38,40 @@ const [isDeleting, setIsDeleting] = useState(false); // State to handle deletion
         // In a real app, you'd call an API here, then update the state via onConfigChange
         console.log(`[GeneralConfig] Removing image for agent ${agentId} (simulated)`);
         onConfigChange('avatarUrl', null); // Update parent state to null
+    };
+
+     const handleSetupSheet = async () => {
+        setIsSettingUpSheet(true);
+        toast.loading("Setting up Google Sheet...");
+
+        try {
+            const response = await fetch(`/api/callagents/${agentId}/integrations/google-sheets/setup`, {
+                method: 'POST',
+            });
+
+            const result = await response.json();
+            toast.dismiss();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Failed to set up Google Sheet.");
+            }
+
+            // The API returns the new sheet data { spreadsheetId, spreadsheetUrl }
+            // We need to update the parent component's state to reflect this change immediately.
+            onConfigChange('integrationConfig', {
+                ...config.integrationConfig,
+                googleSheets: result,
+            });
+
+            toast.success("Google Sheet configured successfully!");
+
+        } catch (error) {
+            toast.dismiss();
+            toast.error(error.message);
+            console.error("Error setting up Google Sheet:", error);
+        } finally {
+            setIsSettingUpSheet(false);
+        }
     };
 
     // Handler for adding vocabulary
@@ -458,6 +496,50 @@ const [isDeleting, setIsDeleting] = useState(false); // State to handle deletion
                  </select>
             </div>
 
+
+{/* --- NEW SECTION: Google Sheets Integration --- */}
+            <div>
+                <label className={`block text-lg font-medium ${uiColors.textSecondary}`}>
+                    Google Sheets Export
+                </label>
+                <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
+                    Automatically create and link a Google Sheet to this agent for call data exports.
+                </p>
+                {config.integrationConfig?.googleSheets?.spreadsheetUrl ? (
+                    // State 1: Already configured
+                    <div className={`p-3 rounded-md border ${uiColors.borderPrimary} w-full sm:max-w-md flex items-center justify-between ${uiColors.bgSecondary}`}>
+                        <div className="flex items-center text-sm">
+                            <FiCheck className={`w-5 h-5 mr-2 text-green-500`} />
+                            <span className={`${uiColors.textPrimary}`}>Export is configured.</span>
+                        </div>
+                        <a 
+                            href={config.integrationConfig.googleSheets.spreadsheetUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors text-white ${uiColors.accentPrimaryGradient}`}
+                        >
+                            View Sheet <FiExternalLink className="ml-1.5 w-3 h-3" />
+                        </a>
+                    </div>
+                ) : (
+                    // State 2: Not configured, show setup button
+                    <button
+                        onClick={handleSetupSheet}
+                        disabled={isSettingUpSheet}
+                        className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors text-white ${uiColors.accentPrimaryGradient} disabled:opacity-50`}
+                    >
+                        {isSettingUpSheet ? (
+                            <FiLoader className="animate-spin mr-2" />
+                        ) : (
+                            <FiCheck className="mr-2" />
+                        )}
+                        {isSettingUpSheet ? 'Setting Up...' : 'Setup Google Sheets Export'}
+                    </button>
+                )}
+                 <p className={`text-xs mt-2 ${uiColors.textPlaceholder}`}>
+                    Note: You must have your Google account connected in the main Integrations tab first.
+                 </p>
+            </div>
 
             {/* Delete Agent */}
             {/* This button doesn't update config state, it performs a separate action */}

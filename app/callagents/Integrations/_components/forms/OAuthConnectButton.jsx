@@ -20,17 +20,10 @@ export default function OAuthConnectButton({ field, onSuccess, integrationId }) 
 
     const handleConnect = () => {
         setIsConnecting(true);
-        // In a real app, this would trigger the redirect to your backend OAuth endpoint
-        // window.location.href = `/api/integrations/connect/${field.provider}`;
-
-        
-        console.log(`Initiating OAuth flow for ${field.provider}...`);
-        setTimeout(() => {
-            // After redirecting and coming back, the backend would call a webhook
-            // or the frontend would receive a success status. We simulate that here.
-            onSuccess(integrationId, { accountId: `user@${field.provider}.com` });
-            setIsConnecting(false);
-        }, 2000);
+        // --- THIS IS THE KEY CHANGE ---
+        // Instead of a timeout, redirect to your backend API route.
+        // The browser will handle the rest of the redirection flow.
+        window.location.href = `/api/integrations/connect/${field.provider}`;
     };
 
     return (
