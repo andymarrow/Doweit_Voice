@@ -9,6 +9,8 @@ import { sectionVariants, uiColors } from '../_constants/uiConstants';
 import IntegrationGrid from './_components/IntegrationGrid';
 import IntegrationSidePanel from './_components/IntegrationSidePanel';
 
+export const dynamic = 'force-dynamic';
+
 // Expanded configuration with new integrations and OAuth connection type
 const INTEGRATIONS_CONFIG = [
     {
