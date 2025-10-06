@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast';
 import { uiColors } from '@/app/callagents/_constants/uiConstants';  // Correct import path
 import { useRouter } from 'next/navigation';
 import SelectKnowledgeBaseModal from './SelectKnowledgeBaseModal'; // Adjust path
-import { user } from 'elevenlabs/api';
+
 
 
 // Receive config data and the change handler from the parent page
