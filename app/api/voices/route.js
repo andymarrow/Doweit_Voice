@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 const vapiSecretKey = process.env.VAPI_SECRET_KEY;
 const vapiAssistantsApiUrl = "https://api.vapi.ai/assistant";
 
+export const dynamic = 'force-dynamic'; 
 // --- Function to fetch default voices from VAPI ---
 async function fetchVapiVoices() {
 	if (!vapiSecretKey) {
