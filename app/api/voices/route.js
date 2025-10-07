@@ -17,7 +17,7 @@ async function fetchVapiVoices() {
 		console.error(
 			"VAPI_SECRET_KEY is not set. Cannot fetch default VAPI voices.",
 		);
-		return []; // Return empty array if not configured
+		return []; // Return eempty array if not configured
 	}
 	try {
 		const response = await fetch(vapiAssistantsApiUrl, {
