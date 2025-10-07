@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fi'; // Import necessary icons, including FiLoader
 import { toast } from 'react-hot-toast'; // Assuming you use react-hot-toast or similar
 
+import { useRouter } from "next/navigation";
 // Import context hook
 import { useCallAgent } from '../_context/CallAgentContext';
 
@@ -41,6 +42,7 @@ const updateAgentConfig = async (agentId, configData) => {
 export default function PromptPage() {
     // Get initial agent data from context provided by the layout
     const initialAgent = useCallAgent();
+	const router = useRouter();
 
     // State for editable prompt content - Initialize with values from initialAgent in useEffect
     const [greetingMessage, setGreetingMessage] = useState('');
@@ -135,6 +137,7 @@ export default function PromptPage() {
 
             const updatedAgent = await updateAgentConfig(agentId, dataToSave);
 
+			router.refresh();
             // Success: Mark as clean, show toast
             setIsDirty(false);
             toast.success('Prompt saved successfully!');

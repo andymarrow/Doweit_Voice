@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { FiPlusCircle, FiCheck, FiLoader, FiTrash2, FiEye } from 'react-icons/fi'; // Added FiEye icon
 import { toast } from 'react-hot-toast'; // Assuming toast is available
 
+import { useRouter } from "next/navigation";
 // Import context hook
 import { useCallAgent } from '../_context/CallAgentContext';
 
@@ -75,6 +76,7 @@ const deleteAgentAction = async (agentId, agentActionId) => {
 export default function ActionsPage() {
     // Get agent data from context
     const agent = useCallAgent();
+	const router = useRouter();
     const agentId = agent?.id; // Use agent ID from context
 
     // State for the active tab
@@ -183,6 +185,8 @@ export default function ActionsPage() {
                     [timing]: updatedTabActions
                 };
             });
+
+			router.refresh();
 
             toast.success(`${newlyAddedAgentActions.length} action(s) added successfully!`);
             console.log("[Actions Page] Actions added:", newlyAddedAgentActions);
