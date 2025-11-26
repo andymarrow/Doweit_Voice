@@ -31,6 +31,27 @@ const getGoogleKey = async () => {
     }
 };
 
+// --- AUDIO HELPERS FOR GEMINI INPUT ---
+const floatTo16BitPCM = (float32Array) => {
+    const buffer = new ArrayBuffer(float32Array.length * 2);
+    const view = new DataView(buffer);
+    for (let i = 0; i < float32Array.length; i++) {
+        let s = Math.max(-1, Math.min(1, float32Array[i]));
+        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    return buffer;
+};
+
+const arrayBufferToBase64 = (buffer) => {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+};
+
 // --- Component Definition ---
 const panelWidth = 'w-96'; // Slightly wider for chat/gemini controls
 
@@ -64,6 +85,11 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     const vapiRef = useRef(null);
     const geminiSessionRef = useRef(null); // Ref for Gemini Session
     const currentGeminiTurnAudioRef = useRef([]); // Audio for current turn playback
+    
+    // Audio Input Refs (Microphone)
+    const audioContextRef = useRef(null);
+    const mediaStreamRef = useRef(null);
+    const processorRef = useRef(null);
 
     const agentId = agent?.id;
     const agentName = agent?.name || 'Unnamed Agent';
@@ -76,7 +102,6 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     // Initialize Vapi SDK and event listeners for Web Calls
     useEffect(() => {
         // Only init Vapi if NOT using Google Native (or keep it for fallback)
-        // We keep this exactly as is for your Vapi agents.
         if (!vapiRef.current && VAPI_PUBLIC_API_KEY && !isGoogleNative) {
             const vapi = new Vapi(VAPI_PUBLIC_API_KEY);
             vapiRef.current = vapi;
@@ -107,7 +132,6 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
                     if (message.status === 'ended') {
                             toast.success("Web call ended.");
-                            // saveCallData logic triggers via effect on callStatus change
                     }
                 }
                 if (message.type === "transcript" && message.transcriptType === "final") {
@@ -162,13 +186,12 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
             };
             fetchKeys();
         } else {
+            // Stop Vapi
             if (vapiRef.current && callStatus !== 'idle') {
                 try { vapiRef.current.stop(); } catch (e) {}
             }
-            if (geminiSessionRef.current) {
-                try { geminiSessionRef.current.close(); } catch(e) {}
-                geminiSessionRef.current = null;
-            }
+            // Stop Gemini & Mic
+            stopGeminiSession(); 
         }
     }, [isOpen, agentId, isGoogleNative]);
 
@@ -190,7 +213,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     },[callStatus, isGoogleNative])
 
     // ------------------------------------------------------------------
-    // EXISTING VAPI CALL LOGIC (UNTOUCHED LOGIC)
+    // EXISTING VAPI CALL LOGIC (RESTORED EXACTLY AS REQUESTED)
     // ------------------------------------------------------------------
     const saveCallData = async () => {
         if (transcriptBuffer.length === 0 && !vapiCallData) return;
@@ -227,8 +250,8 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
     // Web Call Handler (Client-side) - VAPI ONLY
     const handleStartWebCall = useCallback(async () => {
+        // If google native, delegate to new function
         if (isGoogleNative) {
-            // If google native, delegate to new function
             handleStartGeminiSession();
             return;
         }
@@ -275,7 +298,7 @@ ${kbContent}
 // Cleanup whitespace
 everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
-            // --- VAPI PAYLOAD (PRESERVED AS REQUESTED) ---
+            // --- VAPI PAYLOAD (YOUR EXACT VERSION) ---
             const vapiPayload = {
                 model: { 
                     provider: "google",
@@ -302,7 +325,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             setCallError(error.message);
             toast.error(`Failed to start call: ${error.message}`);
         }
-    }, [agent, userName, callStatus, elevenLabsApiKey, isGoogleNative]); // Added isGoogleNative dependency
+    }, [agent, userName, callStatus, elevenLabsApiKey, isGoogleNative]);
 
     // Phone Call Handler (Backend) - VAPI ONLY
     const handleStartPhoneCall = useCallback(async () => {
@@ -330,21 +353,76 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     }, [agentId, userName, phoneNumber]);
 
     // ------------------------------------------------------------------
-    // NEW: GEMINI NATIVE LOGIC
+    // 3. GEMINI NATIVE LOGIC (UPDATED WITH AUDIO INPUT CAPTURE)
     // ------------------------------------------------------------------
 
+    // A. START MICROPHONE
+    const startAudioInput = async () => {
+        try {
+            // Request Mic
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000 } });
+            mediaStreamRef.current = stream;
+
+            // Create Context
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            audioContextRef.current = audioContext;
+
+            const source = audioContext.createMediaStreamSource(stream);
+            
+            // Use ScriptProcessor (Buffer 4096) to capture raw audio
+            const processor = audioContext.createScriptProcessor(4096, 1, 1);
+            processorRef.current = processor;
+
+            processor.onaudioprocess = (e) => {
+                if (!geminiSessionRef.current) return; // Don't send if session closed
+
+                const inputData = e.inputBuffer.getChannelData(0); // Float32
+                const pcm16 = floatTo16BitPCM(inputData); // Convert to Int16
+                const base64Audio = arrayBufferToBase64(pcm16); // Convert to Base64
+
+                // Send to Gemini
+                geminiSessionRef.current.sendRealtimeInput([{
+                    mimeType: "audio/pcm;rate=16000",
+                    data: base64Audio
+                }]);
+            };
+
+            source.connect(processor);
+            processor.connect(audioContext.destination); // Activate processor
+
+        } catch (e) {
+            console.error("Failed to capture audio:", e);
+            setCallError("Microphone access failed: " + e.message);
+            stopGeminiSession();
+        }
+    };
+
+    // B. STOP MICROPHONE
+    const stopAudioInput = () => {
+        if (processorRef.current) {
+            processorRef.current.disconnect();
+            processorRef.current = null;
+        }
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
+        }
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current = null;
+        }
+    };
+
+    // C. PROMPT BUILDER
     const buildGeminiSystemPrompt = () => {
-        // Reconstruct prompt specifically for Gemini Native systemInstruction
         let prompt = `You are an AI assistant named ${agentName}.`;
         if (agent.prompt) prompt += `\nInstructions: ${agent.prompt}`;
         
-        // Language Enforcement
         if (agent.voiceConfig?.language) {
             prompt += `\nIMPORTANT: You must speak ONLY in ${agent.voiceConfig.language}. Do not switch languages unless explicitly asked.`;
         }
         if (agent.greetingMessage) prompt += `\nStart conversation with: "${agent.greetingMessage}"`;
 
-        // Knowledge Base
         if (agent.knowledgeBase && agent.knowledgeBase.content) {
              const kbContent = Array.isArray(agent.knowledgeBase.content)
                 ? agent.knowledgeBase.content.map(i => i.value).join('\n')
@@ -356,6 +434,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         return prompt;
     };
 
+    // D. START SESSION
     const handleStartGeminiSession = async () => {
         if (!geminiApiKey || !userName) return toast.error("Enter name.");
         if (isConnecting || callStatus === 'in-progress') return;
@@ -363,7 +442,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         setIsConnecting(true);
         setCallStatus('connecting');
         setGeminiTranscript([]);
-        setGeminiAudioChunks([]); // Reset recording buffer
+        setGeminiAudioChunks([]); 
         
         const ai = new GoogleGenAI({ apiKey: geminiApiKey });
         const systemInstruction = buildGeminiSystemPrompt();
@@ -383,17 +462,19 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                         setIsConnecting(false);
                         setCallStatus('in-progress');
                         toast.success("Connected to Gemini Live.");
+                        startAudioInput(); // <--- THIS STARTS THE MIC
                     },
                     onmessage: (msg) => handleGeminiMessage(msg),
                     onclose: () => {
                         setCallStatus('ended');
-                        saveGeminiCallData(); // Save on close
+                        saveGeminiCallData(); 
                     },
                     onerror: (e) => {
                         console.error(e);
                         setCallStatus('error');
                         setCallError(e.message);
                         setIsConnecting(false);
+                        stopAudioInput();
                     }
                 }
             });
@@ -405,13 +486,13 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
+    // E. HANDLE INCOMING MESSAGES
     const handleGeminiMessage = (message) => {
-        // 1. Text (Transcript)
+        // 1. Text
         const part = message.serverContent?.modelTurn?.parts?.[0];
         if (part?.text) {
             setGeminiTranscript(prev => {
                 const last = prev[prev.length - 1];
-                // If last message was model, append text, else new message
                 if (last && last.role === 'model') {
                     return [...prev.slice(0, -1), { ...last, text: last.text + part.text }];
                 }
@@ -419,7 +500,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             });
         }
 
-        // 2. Audio (Playback & Recording)
+        // 2. Audio
         if (part?.inlineData) {
             const chunk = part.inlineData.data;
             currentGeminiTurnAudioRef.current.push(chunk);
@@ -433,6 +514,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
+    // F. PLAY AUDIO
     const playGeminiAudioQueue = async (chunks) => {
         if (!chunks.length) return;
         try {
@@ -443,70 +525,62 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         } catch(e) { console.error("Playback error", e); }
     };
 
+    // G. SEND TEXT (CHAT)
     const handleSendGeminiText = () => {
         if (!geminiSessionRef.current) return;
         const text = textInput.trim();
         if (!text) return;
 
-        // Optimistic update UI
         setGeminiTranscript(prev => [...prev, { role: 'user', text, time: Date.now() }]);
-        
         geminiSessionRef.current.sendClientContent({
             turns: [{ role: 'user', parts: [{ text }] }]
         });
         setTextInput('');
     };
 
+    // H. STOP SESSION
     const stopGeminiSession = () => {
+        stopAudioInput(); // Kill Mic
         if (geminiSessionRef.current) {
             geminiSessionRef.current.close();
             geminiSessionRef.current = null;
         }
-        // Saving handled in onclose callback
     };
 
+    // I. SAVE DATA
     const saveGeminiCallData = async () => {
         if (geminiAudioChunks.length === 0 && geminiTranscript.length === 0) return;
 
         let recordingUrl = null;
         
-        // 1. Stitch Audio and Upload
         if (geminiAudioChunks.length > 0) {
             const uploadToast = toast.loading("Saving call recording...");
             try {
                 const wavBuffer = convertToWav(geminiAudioChunks, "audio/pcm;rate=24000");
                 const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-                // We need a file object for the upload function
                 const file = new File([blob], `gemini-${Date.now()}.wav`, { type: 'audio/wav' });
-                
-                // Reuse existing Firebase upload logic (assuming client-side auth context is handled)
-                // Pass a dummy user ID if needed or fetch from context if available. 
-                // Assuming 'calls' folder.
                 recordingUrl = await uploadFileToFirebase(file, `user-${agent?.creatorId || 'anon'}`, 'calls');
                 toast.success("Recording saved.");
             } catch (e) {
                 console.error("Upload failed", e);
-                toast.error("Failed to save recording audio.");
+                toast.error("Failed to save recording.");
             } finally {
                 toast.dismiss(uploadToast);
             }
         }
 
-        // 2. Save to DB
         const payload = {
             customerName: userName,
             direction: 'inbound',
             status: 'Completed',
-            duration: 0, // Could calculate from start time
+            duration: 0, 
             startTime: new Date().toISOString(),
             endTime: new Date().toISOString(),
-            // Map Gemini transcript structure to DB schema
             transcript: geminiTranscript.map(t => ({ role: t.role, message: t.text })),
             callId: `gemini-${Date.now()}`,
             recordingUrl: recordingUrl
         };
 
-        // Use shared fetch
         try {
             const res = await fetch(`/api/callagents/${agentId}/calls`, {
                 method: "POST",
@@ -514,9 +588,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 body: JSON.stringify(payload),
             });
             if (res.ok) toast.success("Call log saved.");
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     };
     
     // ------------------------------------------------------------------
@@ -526,40 +598,38 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     if (!isOpen || !agent) return null;
 
     const webCallButtonText = callStatus === 'in-progress' ? 'End Web Call' : (callStatus === 'connecting' ? 'Connecting...' : 'Start Web Call');
-    // Vapi button disable logic
     const isElevenLabsCallButNoKey = (agent?.voiceConfig?.voiceProvider === 'elevenlabs' && !elevenLabsApiKey);
     const isWebCallButtonDisabled = !userName || (!VAPI_PUBLIC_API_KEY && !isGoogleNative) || (isElevenLabsCallButNoKey && !isGoogleNative);
-    
     const isPhoneCallButtonDisabled = isConnecting || !userName || !phoneNumber;
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
-            <div ref={panelRef} className={`flex flex-col h-full ${panelWidth} ${uiColors.bgPrimary} shadow-xl`} onClick={(e) => e.stopPropagation()}>
+            <div className="absolute inset-0 bg-black/20" onClick={onClose} />
+            <div ref={panelRef} className={`relative flex flex-col h-full ${panelWidth} ${uiColors.bgPrimary} shadow-xl`} onClick={(e) => e.stopPropagation()}>
+                
                 {/* Header */}
                 <div className={`flex items-center justify-between p-4 border-b ${uiColors.borderPrimary}`}>
                     <h3 className={`text-lg font-semibold ${uiColors.textPrimary}`}>
                         {isGoogleNative ? <span className="flex items-center gap-2"><FiGlobe className="text-blue-500"/> Gemini Native</span> : `Test: ${agentName}`}
                     </h3>
-                    {callStatus !== 'idle' && testMethod === 'web' && (
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${callStatus === 'in-progress' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                            {callStatus.charAt(0).toUpperCase() + callStatus.slice(1)}
-                            {callStatus === 'connecting' && <FiLoader className="inline-block ml-1 w-3 h-3 animate-spin" />}
-                        </span>
-                    )}
-                    <button onClick={onClose} className={`p-1 rounded-md ${uiColors.hoverBgSubtle}`} title="Close" disabled={isConnecting || callStatus === 'connecting' || callStatus === 'in-progress'}>
-                        <FiX className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                         {callStatus !== 'idle' && (
+                            <span className={`text-xs px-2 py-1 rounded-full ${callStatus === 'in-progress' ? 'bg-green-100 text-green-800' : 'bg-yellow-100'}`}>
+                                {callStatus}
+                            </span>
+                        )}
+                        <button onClick={onClose} className={`p-1 rounded-md ${uiColors.hoverBgSubtle}`}>
+                            <FiX />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Method Selection Tabs */}
                 <div className={`flex border-b ${uiColors.borderPrimary}`}>
                     <button onClick={() => setTestMethod('web')} className={`flex-1 flex items-center justify-center gap-2 text-center py-3 text-sm font-medium transition-colors ${testMethod === 'web' ? `border-b-2 ${uiColors.accentPrimary} border-cyan-500 dark:border-purple-500` : `${uiColors.textSecondary} ${uiColors.hoverBgSubtle}`}`}><FiGlobe /> Web</button>
-                    
-                    {/* Hide Phone tab if Google Native (not supported yet per your request) */}
                     {!isGoogleNative && (
                         <button onClick={() => setTestMethod('phone')} className={`flex-1 flex items-center justify-center gap-2 text-center py-3 text-sm font-medium transition-colors ${testMethod === 'phone' ? `border-b-2 ${uiColors.accentPrimary} border-cyan-500 dark:border-purple-500` : `${uiColors.textSecondary} ${uiColors.hoverBgSubtle}`}`}><FiPhone /> Phone</button>
                     )}
-                    
                     <button onClick={() => setTestMethod('chat')} className={`flex-1 flex items-center justify-center gap-2 text-center py-3 text-sm font-medium transition-colors ${testMethod === 'chat' ? `border-b-2 ${uiColors.accentPrimary} border-cyan-500 dark:border-purple-500` : `${uiColors.textSecondary} ${uiColors.hoverBgSubtle}`}`}><FiMessageCircle /> Chat</button>
                 </div>
 
@@ -580,19 +650,19 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                             </div>
                             
                             {isGoogleNative ? (
-                                // --- GEMINI NATIVE BUTTONS ---
+                                // GEMINI BUTTONS
                                 callStatus === 'in-progress' ? (
                                     <button onClick={stopGeminiSession} className="w-full px-4 py-2 rounded-md font-semibold transition-colors text-sm text-white bg-red-600 hover:bg-red-700 flex justify-center items-center gap-2">
                                         <FiSquare fill="currentColor" /> Stop Session
                                     </button>
                                 ) : (
-                                    <button onClick={handleStartWebCall} disabled={isWebCallButtonDisabled} className={`w-full px-4 py-2 rounded-md font-semibold transition-colors text-sm text-white ${isWebCallButtonDisabled ? 'bg-gray-400 cursor-not-allowed' : uiColors.accentPrimaryGradient}`}>
+                                    <button onClick={handleStartGeminiSession} disabled={isWebCallButtonDisabled} className={`w-full px-4 py-2 rounded-md font-semibold transition-colors text-sm text-white ${isWebCallButtonDisabled ? 'bg-gray-400 cursor-not-allowed' : uiColors.accentPrimaryGradient}`}>
                                         {callStatus === 'connecting' ? <FiLoader className="inline-block mr-2 w-4 h-4 animate-spin" /> : <FiMic className="inline-block mr-2" />}
                                         Start Gemini Live
                                     </button>
                                 )
                             ) : (
-                                // --- EXISTING VAPI BUTTON (Untouched Logic) ---
+                                // VAPI BUTTONS
                                 <button onClick={handleStartWebCall} disabled={isWebCallButtonDisabled} className={`w-full px-4 py-2 rounded-md font-semibold transition-colors text-sm text-white ${isWebCallButtonDisabled ? 'bg-gray-400 cursor-not-allowed' : (callStatus === 'in-progress' ? 'bg-red-600 hover:bg-red-700' : uiColors.accentPrimaryGradient)}`}>
                                     {callStatus === 'connecting' && <FiLoader className="inline-block mr-2 w-4 h-4 animate-spin" />}
                                     {webCallButtonText}
@@ -601,7 +671,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                         </div>
                     )}
 
-                    {/* PHONE CALL TAB (VAPI ONLY) */}
+                    {/* PHONE CALL TAB */}
                     {testMethod === 'phone' && !isGoogleNative && (
                         <div className="flex flex-col space-y-4">
                             <p className={`text-xs ${uiColors.textSecondary}`}>Our service will call you and connect you to the agent.</p>
@@ -628,7 +698,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                     {/* CHAT TAB */}
                     {testMethod === 'chat' && (
                         isGoogleNative ? (
-                            // --- GEMINI NATIVE CHAT UI ---
                             <div className="h-full flex flex-col h-[400px]">
                                 <div className="flex-grow border rounded p-2 mb-2 bg-gray-50 overflow-y-auto text-sm space-y-2">
                                     {geminiTranscript.length === 0 && <span className="text-gray-400 flex justify-center mt-10">Start session to chat...</span>}
@@ -654,7 +723,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                                 </div>
                             </div>
                         ) : (
-                            // --- EXISTING VAPI PLACEHOLDER ---
                             <div className="text-center text-sm text-gray-500 pt-8">Chat simulation will be available soon.</div>
                         )
                     )}
