@@ -12,6 +12,17 @@ const vapiAssistantsApiUrl = "https://api.vapi.ai/assistant";
 
 export const dynamic = 'force-dynamic'; 
 // --- Function to fetch default voices from VAPI ---
+
+// --- Hardcoded Gemini Voices ---
+const GEMINI_VOICES = [
+    'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus',
+    'Aoede', 'Callirrhoe', 'Autonoe', 'Enceladus', 'Lapetus', 'Umbriel',
+    'Algieba', 'Despina', 'Erinome', 'Algenib', 'Rasalgethi', 'Laemedeia',
+    'Achernar', 'Alnilam', 'Schedar', 'Gacrux', 'Pulcherrima', 'Achird',
+    'Zubenelgenubi', 'Vindemiatrix', 'Sadchibia', 'Sadaltager', 'Sulafat'
+];
+
+
 async function fetchVapiVoices() {
 	if (!vapiSecretKey) {
 		console.error(
@@ -21,12 +32,9 @@ async function fetchVapiVoices() {
 	}
 	try {
 		const response = await fetch(vapiAssistantsApiUrl, {
-			method: "GET",
-			headers: {
-				Authorization: `Bearer ${vapiSecretKey}`,
-				"Content-Type": "application/json",
-			},
-		});
+            method: "GET",
+            headers: { Authorization: `Bearer ${vapiSecretKey}`, "Content-Type": "application/json" },
+        });
 
 		if (!response.ok) {
 			const errorBody = await response.text();
@@ -40,20 +48,21 @@ async function fetchVapiVoices() {
 		const vapiVoices = {}; // Use a map to handle duplicates from VAPI
 
 		assistants.forEach((assistant) => {
-			if (assistant.voice?.provider && assistant.voice?.voiceId) {
-				const voiceKey = `${assistant.voice.provider}-${assistant.voice.voiceId}`;
-				if (!vapiVoices[voiceKey]) {
-					vapiVoices[voiceKey] = {
-						id: voiceKey,
-						voiceId: assistant.voice.voiceId,
-						name: assistant.name || assistant.voice.voiceId, // Prefer assistant name
-						description: `VAPI Default (${assistant.voice.provider})`,
-						sampleAudioUrl: null, // VAPI assistant endpoint does not provide this
-						platform: "vapi", // Standardize the platform key
-					};
-				}
-			}
-		});
+            if (assistant.voice?.provider && assistant.voice?.voiceId) {
+                const voiceKey = `${assistant.voice.provider}-${assistant.voice.voiceId}`;
+                if (!vapiVoices[voiceKey]) {
+                    vapiVoices[voiceKey] = {
+                        id: voiceKey,
+                        voiceId: assistant.voice.voiceId,
+                        name: assistant.name || assistant.voice.voiceId,
+                        description: `VAPI Default (${assistant.voice.provider})`,
+                        sampleAudioUrl: null,
+                        platform: "vapi", // Map to general provider
+                        provider: assistant.voice.provider // Specific provider
+                    };
+                }
+            }
+        });
 		return Object.values(vapiVoices);
 	} catch (error) {
 		console.error("Error fetching Vapi voices:", error);
@@ -79,12 +88,27 @@ async function fetchUserCustomVoices(userId) {
 			description: v.description || `Custom (${v.provider})`,
 			sampleAudioUrl: v.sampleAudioUrl,
 			platform: v.provider,
+            provider: v.provider
 		}));
 	} catch (error) {
 		console.error(`Error fetching custom voices for user ${userId}:`, error);
 		return [];
 	}
 }
+
+// --- Helper to format Gemini Voices ---
+function getGeminiVoices() {
+    return GEMINI_VOICES.map(voiceName => ({
+        id: `google-${voiceName}`,
+        voiceId: voiceName,
+        name: `${voiceName}`,
+        description: "Custom voices",
+        sampleAudioUrl: null, // Google doesn't provide public sample URLs easily yet
+        platform: "google",
+        provider: "google"
+    }));
+}
+
 
 // --- MAIN GET HANDLER ---
 export async function GET(request) {
@@ -99,10 +123,15 @@ export async function GET(request) {
 			fetchUserCustomVoices(userId), // Pass the userId to get their specific voices
 		]);
 
+
+		const geminiVoices = getGeminiVoices();
 		// --- 2. Merge the lists ---
 		// We can use a Map to ensure that if a user's custom voice happens
 		// to have the same ID as a VAPI default, the custom one takes precedence.
 		const combinedVoicesMap = new Map();
+
+		// 1. Add Gemini Voices
+        geminiVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
 
 		// Add VAPI defaults first
 		vapiVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
