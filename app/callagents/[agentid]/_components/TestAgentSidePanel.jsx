@@ -83,13 +83,16 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     // Refs
     const panelRef = useRef(null);
     const vapiRef = useRef(null);
-    const geminiSessionRef = useRef(null); // Ref for Gemini Session
-    const currentGeminiTurnAudioRef = useRef([]); // Audio for current turn playback
     
-    // Audio Input Refs (Microphone)
-    const audioContextRef = useRef(null);
+    // --- UPDATED GEMINI REFS ---
+    const geminiSessionRef = useRef(null); 
+    // We separate the input context (Microphone) from output context (Speaker)
+    // to avoid feedback loops and allow streaming playback.
+    const audioInputContextRef = useRef(null); 
+    const audioOutputContextRef = useRef(null); 
     const mediaStreamRef = useRef(null);
     const processorRef = useRef(null);
+    const nextPlayTimeRef = useRef(0); // Tracks when the next chunk should play
 
     const agentId = agent?.id;
     const agentName = agent?.name || 'Unnamed Agent';
@@ -353,30 +356,44 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     }, [agentId, userName, phoneNumber]);
 
     // ------------------------------------------------------------------
-    // 3. GEMINI NATIVE LOGIC (UPDATED WITH AUDIO INPUT CAPTURE)
+    // 3. GEMINI NATIVE LOGIC (COMPLETELY UPDATED)
     // ------------------------------------------------------------------
 
-    // A. START MICROPHONE
+    // A. START MICROPHONE (Fixed: Resumes context, handles float->16bit)
     const startAudioInput = async () => {
         try {
-            // Request Mic
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000 } });
-            mediaStreamRef.current = stream;
-
-            // Create Context
+            // 1. Create Audio Context (Force 16kHz for Gemini)
             const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-            audioContextRef.current = audioContext;
+            audioInputContextRef.current = audioContext;
+
+            // 2. CRITICAL: Resume context if suspended (Browser policy)
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+
+            // 3. Get Stream
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { 
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    autoGainControl: true,
+                    noiseSuppression: true
+                } 
+            });
+            mediaStreamRef.current = stream;
 
             const source = audioContext.createMediaStreamSource(stream);
             
-            // Use ScriptProcessor (Buffer 4096) to capture raw audio
+            // 4. Use ScriptProcessor to capture raw audio
+            // Buffer size 4096 gives a good balance between latency and performance
             const processor = audioContext.createScriptProcessor(4096, 1, 1);
             processorRef.current = processor;
 
             processor.onaudioprocess = (e) => {
-                if (!geminiSessionRef.current) return; // Don't send if session closed
+                if (!geminiSessionRef.current) return; 
 
-                const inputData = e.inputBuffer.getChannelData(0); // Float32
+                const inputData = e.inputBuffer.getChannelData(0); // Float32 from Mic
                 const pcm16 = floatTo16BitPCM(inputData); // Convert to Int16
                 const base64Audio = arrayBufferToBase64(pcm16); // Convert to Base64
 
@@ -397,23 +414,77 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
-    // B. STOP MICROPHONE
+    // B. STOP MICROPHONE & PLAYBACK
     const stopAudioInput = () => {
+        // Stop Input (Mic)
         if (processorRef.current) {
             processorRef.current.disconnect();
             processorRef.current = null;
         }
-        if (audioContextRef.current) {
-            audioContextRef.current.close();
-            audioContextRef.current = null;
+        if (audioInputContextRef.current) {
+            audioInputContextRef.current.close();
+            audioInputContextRef.current = null;
         }
         if (mediaStreamRef.current) {
             mediaStreamRef.current.getTracks().forEach(track => track.stop());
             mediaStreamRef.current = null;
         }
+        // Stop Output (Speaker)
+        if (audioOutputContextRef.current) {
+            audioOutputContextRef.current.close();
+            audioOutputContextRef.current = null;
+        }
+        nextPlayTimeRef.current = 0;
     };
 
-    // C. PROMPT BUILDER
+    // C. PLAY STREAMED AUDIO (Fixed: Plays chunks immediately, no waiting)
+    const playStreamedAudio = (base64Data) => {
+        try {
+            // Initialize Output Context if missing (Gemini usually sends 24kHz)
+            if (!audioOutputContextRef.current) {
+                audioOutputContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            }
+            const ctx = audioOutputContextRef.current;
+
+            // Base64 -> Float32
+            const binaryString = window.atob(base64Data);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            const int16Data = new Int16Array(bytes.buffer);
+            const float32Data = new Float32Array(int16Data.length);
+            for (let i = 0; i < int16Data.length; i++) {
+                float32Data[i] = int16Data[i] / 32768.0;
+            }
+
+            // Create Buffer
+            const buffer = ctx.createBuffer(1, float32Data.length, 24000);
+            buffer.copyToChannel(float32Data, 0);
+
+            // Schedule Playback (Seamless Streaming)
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(ctx.destination);
+
+            // Calculate start time:
+            // If nextPlayTime is in the past (we fell behind or it's the start), play NOW.
+            // Otherwise, play at the scheduled future time.
+            const currentTime = ctx.currentTime;
+            const startTime = nextPlayTimeRef.current < currentTime ? currentTime : nextPlayTimeRef.current;
+            
+            source.start(startTime);
+            
+            // Advance the pointer
+            nextPlayTimeRef.current = startTime + buffer.duration;
+
+        } catch (e) {
+            console.error("Playback error", e);
+        }
+    };
+
+    // D. PROMPT BUILDER
     const buildGeminiSystemPrompt = () => {
         let prompt = `You are an AI assistant named ${agentName}.`;
         if (agent.prompt) prompt += `\nInstructions: ${agent.prompt}`;
@@ -434,7 +505,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         return prompt;
     };
 
-    // D. START SESSION
+    // E. START SESSION
     const handleStartGeminiSession = async () => {
         if (!geminiApiKey || !userName) return toast.error("Enter name.");
         if (isConnecting || callStatus === 'in-progress') return;
@@ -443,6 +514,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         setCallStatus('connecting');
         setGeminiTranscript([]);
         setGeminiAudioChunks([]); 
+        nextPlayTimeRef.current = 0;
         
         const ai = new GoogleGenAI({ apiKey: geminiApiKey });
         const systemInstruction = buildGeminiSystemPrompt();
@@ -462,7 +534,8 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                         setIsConnecting(false);
                         setCallStatus('in-progress');
                         toast.success("Connected to Doweit Live.");
-                        startAudioInput(); // <--- THIS STARTS THE MIC
+                        // Start the microphone immediately upon connection
+                        startAudioInput(); 
                     },
                     onmessage: (msg) => handleGeminiMessage(msg),
                     onclose: () => {
@@ -486,9 +559,9 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
-    // E. HANDLE INCOMING MESSAGES
+    // F. HANDLE INCOMING MESSAGES
     const handleGeminiMessage = (message) => {
-        // 1. Text
+        // 1. Text (for UI)
         const part = message.serverContent?.modelTurn?.parts?.[0];
         if (part?.text) {
             setGeminiTranscript(prev => {
@@ -500,29 +573,17 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             });
         }
 
-        // 2. Audio
+        // 2. Audio - STREAMING (Fixed Latency)
         if (part?.inlineData) {
             const chunk = part.inlineData.data;
-            currentGeminiTurnAudioRef.current.push(chunk);
+            // Save raw Base64 for recording later
             setGeminiAudioChunks(prev => [...prev, chunk]);
+            
+            // Play immediately!
+            playStreamedAudio(chunk);
         }
 
-        // 3. Turn Complete -> Play Audio
-        if (message.serverContent?.turnComplete) {
-            playGeminiAudioQueue(currentGeminiTurnAudioRef.current);
-            currentGeminiTurnAudioRef.current = [];
-        }
-    };
-
-    // F. PLAY AUDIO
-    const playGeminiAudioQueue = async (chunks) => {
-        if (!chunks.length) return;
-        try {
-            const wavBuffer = convertToWav(chunks, "audio/pcm;rate=24000");
-            const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-            const audio = new Audio(URL.createObjectURL(blob));
-            audio.play();
-        } catch(e) { console.error("Playback error", e); }
+        // We do NOT wait for turnComplete to play audio anymore.
     };
 
     // G. SEND TEXT (CHAT)
@@ -540,7 +601,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
     // H. STOP SESSION
     const stopGeminiSession = () => {
-        stopAudioInput(); // Kill Mic
+        stopAudioInput(); // Kills Mic & Speaker contexts
         if (geminiSessionRef.current) {
             geminiSessionRef.current.close();
             geminiSessionRef.current = null;
@@ -556,6 +617,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         if (geminiAudioChunks.length > 0) {
             const uploadToast = toast.loading("Saving call recording...");
             try {
+                // Stitch all chunks
                 const wavBuffer = convertToWav(geminiAudioChunks, "audio/pcm;rate=24000");
                 const blob = new Blob([wavBuffer], { type: 'audio/wav' });
                 const file = new File([blob], `gemini-${Date.now()}.wav`, { type: 'audio/wav' });
