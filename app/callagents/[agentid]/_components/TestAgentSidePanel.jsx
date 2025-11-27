@@ -32,6 +32,8 @@ const getGoogleKey = async () => {
 };
 
 // --- AUDIO HELPERS FOR GEMINI INPUT ---
+
+// 1. Helper to Convert Float32 (Web Audio) to Int16 (Gemini)
 const floatTo16BitPCM = (float32Array) => {
     const buffer = new ArrayBuffer(float32Array.length * 2);
     const view = new DataView(buffer);
@@ -42,6 +44,7 @@ const floatTo16BitPCM = (float32Array) => {
     return buffer;
 };
 
+// 2. Helper to Convert Buffer to Base64
 const arrayBufferToBase64 = (buffer) => {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -50,6 +53,25 @@ const arrayBufferToBase64 = (buffer) => {
         binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
+};
+
+// 3. NEW HELPER: Downsample Audio (Fixes the "Slow Motion" voice issue)
+const downsampleTo16k = (buffer, sampleRate) => {
+    if (sampleRate === 16000) return buffer;
+    
+    const ratio = sampleRate / 16000;
+    const newLength = Math.round(buffer.length / ratio);
+    const result = new Float32Array(newLength);
+    
+    for (let i = 0; i < newLength; i++) {
+        const index = i * ratio;
+        const floorIndex = Math.floor(index);
+        const ceilIndex = Math.min(buffer.length - 1, Math.ceil(index));
+        const t = index - floorIndex;
+        
+        result[i] = buffer[floorIndex] * (1 - t) + buffer[ceilIndex] * t;
+    }
+    return result;
 };
 
 // --- Component Definition ---
@@ -352,11 +374,18 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     // 3. GEMINI NATIVE LOGIC (UPDATED WITH FIXES)
     // ------------------------------------------------------------------
 
-    // A. START MICROPHONE
+    // A. START MICROPHONE (UPDATED - HYBRID SOLUTION)
     const startAudioInput = async () => {
         try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            
+            // 1. Attempt to request 16k directly (Google's Method)
+            const audioContext = new AudioContextClass({ sampleRate: 16000 });
             audioInputContextRef.current = audioContext;
+
+            // 2. CHECK: Did the browser actually give us 16kHz?
+            const actualSampleRate = audioContext.sampleRate;
+            console.log(`Microphone started. Actual Rate: ${actualSampleRate}Hz`);
 
             if (audioContext.state === 'suspended') {
                 await audioContext.resume();
@@ -364,7 +393,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: { 
-                    sampleRate: 16000,
                     channelCount: 1,
                     echoCancellation: true,
                     autoGainControl: true,
@@ -375,15 +403,21 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
             const source = audioContext.createMediaStreamSource(stream);
             
+            // Use 4096 buffer size for stability across devices
             const processor = audioContext.createScriptProcessor(4096, 1, 1);
             processorRef.current = processor;
 
             processor.onaudioprocess = (e) => {
                 if (!geminiSessionRef.current) return; 
 
-                const inputData = e.inputBuffer.getChannelData(0); // Float32 from Mic
-                const pcm16 = floatTo16BitPCM(inputData); // Convert to Int16
-                const base64Audio = arrayBufferToBase64(pcm16); // Convert to Base64
+                const inputData = e.inputBuffer.getChannelData(0); 
+                
+                // 3. LOGIC: Downsample if actual rate != 16000
+                const effectiveData = downsampleTo16k(inputData, actualSampleRate);
+
+                // Convert to PCM Int16
+                const pcm16 = floatTo16BitPCM(effectiveData); 
+                const base64Audio = arrayBufferToBase64(pcm16);
 
                 geminiSessionRef.current.sendRealtimeInput([{
                     mimeType: "audio/pcm;rate=16000",
