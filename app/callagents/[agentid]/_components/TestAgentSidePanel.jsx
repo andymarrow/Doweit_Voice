@@ -461,7 +461,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                     onopen: () => {
                         setIsConnecting(false);
                         setCallStatus('in-progress');
-                        toast.success("Connected to Gemini Live.");
+                        toast.success("Connected to Doweit Live.");
                         startAudioInput(); // <--- THIS STARTS THE MIC
                     },
                     onmessage: (msg) => handleGeminiMessage(msg),
@@ -610,7 +610,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 {/* Header */}
                 <div className={`flex items-center justify-between p-4 border-b ${uiColors.borderPrimary}`}>
                     <h3 className={`text-lg font-semibold ${uiColors.textPrimary}`}>
-                        {isGoogleNative ? <span className="flex items-center gap-2"><FiGlobe className="text-blue-500"/> Gemini Native</span> : `Test: ${agentName}`}
+                        {isGoogleNative ? <span className="flex items-center gap-2"><FiGlobe className="text-blue-500"/>Doweit Native</span> : `Test: ${agentName}`}
                     </h3>
                     <div className="flex items-center gap-2">
                          {callStatus !== 'idle' && (
@@ -658,7 +658,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                                 ) : (
                                     <button onClick={handleStartGeminiSession} disabled={isWebCallButtonDisabled} className={`w-full px-4 py-2 rounded-md font-semibold transition-colors text-sm text-white ${isWebCallButtonDisabled ? 'bg-gray-400 cursor-not-allowed' : uiColors.accentPrimaryGradient}`}>
                                         {callStatus === 'connecting' ? <FiLoader className="inline-block mr-2 w-4 h-4 animate-spin" /> : <FiMic className="inline-block mr-2" />}
-                                        Start Gemini Live
+                                        Start Doweit Live
                                     </button>
                                 )
                             ) : (
@@ -714,7 +714,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                                         onChange={e => setTextInput(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleSendGeminiText()}
                                         className="flex-grow p-2 border rounded text-sm"
-                                        placeholder={callStatus === 'in-progress' ? "Type to Gemini..." : "Connect first..."}
+                                        placeholder={callStatus === 'in-progress' ? "Type to Doweit..." : "Connect first..."}
                                         disabled={callStatus !== 'in-progress'}
                                     />
                                     <button onClick={handleSendGeminiText} disabled={callStatus !== 'in-progress'} className="p-2 bg-blue-600 text-white rounded disabled:bg-gray-300">
