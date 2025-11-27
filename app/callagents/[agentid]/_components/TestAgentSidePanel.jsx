@@ -84,10 +84,8 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     const panelRef = useRef(null);
     const vapiRef = useRef(null);
     
-    // --- UPDATED GEMINI REFS ---
+    // --- GEMINI REFS ---
     const geminiSessionRef = useRef(null); 
-    // We separate the input context (Microphone) from output context (Speaker)
-    // to avoid feedback loops and allow streaming playback.
     const audioInputContextRef = useRef(null); 
     const audioOutputContextRef = useRef(null); 
     const mediaStreamRef = useRef(null);
@@ -173,7 +171,6 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
                     const key = await getGoogleKey();
                     if (!key) setCallError("Google API Key missing on server.");
                     setGeminiApiKey(key);
-                    // Google Native doesn't support phone/PSTN yet in this context
                     if (testMethod === 'phone') setTestMethod('web'); 
                 } else {
                     // Existing Logic for Vapi/11Labs
@@ -216,7 +213,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     },[callStatus, isGoogleNative])
 
     // ------------------------------------------------------------------
-    // EXISTING VAPI CALL LOGIC (RESTORED EXACTLY AS REQUESTED)
+    // EXISTING VAPI CALL LOGIC
     // ------------------------------------------------------------------
     const saveCallData = async () => {
         if (transcriptBuffer.length === 0 && !vapiCallData) return;
@@ -226,12 +223,11 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         const callDetails = {
             customerName: userName,
             direction: 'inbound',
-            status: 'Completed', // Using 'Completed' to match table styles
+            status: 'Completed', 
             duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
             startTime: callStartTime || new Date().toISOString(),
             endTime: new Date().toISOString(),
             transcript: transcriptBuffer,
-            // *** NEW: Capture callId and recordingUrl from the Vapi call object ***
             callId: vapiCallData?.id || null, 
             recordingUrl: vapiCallData?.recordingUrl || null,
         };
@@ -253,7 +249,6 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
 
     // Web Call Handler (Client-side) - VAPI ONLY
     const handleStartWebCall = useCallback(async () => {
-        // If google native, delegate to new function
         if (isGoogleNative) {
             handleStartGeminiSession();
             return;
@@ -301,7 +296,6 @@ ${kbContent}
 // Cleanup whitespace
 everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
-            // --- VAPI PAYLOAD (YOUR EXACT VERSION) ---
             const vapiPayload = {
                 model: { 
                     provider: "google",
@@ -318,7 +312,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             if (agent.voiceConfig.voiceProvider === 'elevenlabs') {
                 if (!elevenLabsApiKey) throw new Error("ElevenLabs API key is missing.");
                 vapiPayload.voice.provider = '11labs';
-                // vapiPayload.voice.elevenLabsApiKey = elevenLabsApiKey;
             } else {
                 vapiPayload.voice.provider = agent.voiceConfig.voiceProvider || 'vapi';
             }
@@ -356,22 +349,19 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     }, [agentId, userName, phoneNumber]);
 
     // ------------------------------------------------------------------
-    // 3. GEMINI NATIVE LOGIC (COMPLETELY UPDATED)
+    // 3. GEMINI NATIVE LOGIC (UPDATED WITH FIXES)
     // ------------------------------------------------------------------
 
-    // A. START MICROPHONE (Fixed: Resumes context, handles float->16bit)
+    // A. START MICROPHONE
     const startAudioInput = async () => {
         try {
-            // 1. Create Audio Context (Force 16kHz for Gemini)
             const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
             audioInputContextRef.current = audioContext;
 
-            // 2. CRITICAL: Resume context if suspended (Browser policy)
             if (audioContext.state === 'suspended') {
                 await audioContext.resume();
             }
 
-            // 3. Get Stream
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 audio: { 
                     sampleRate: 16000,
@@ -385,8 +375,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
             const source = audioContext.createMediaStreamSource(stream);
             
-            // 4. Use ScriptProcessor to capture raw audio
-            // Buffer size 4096 gives a good balance between latency and performance
             const processor = audioContext.createScriptProcessor(4096, 1, 1);
             processorRef.current = processor;
 
@@ -397,7 +385,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 const pcm16 = floatTo16BitPCM(inputData); // Convert to Int16
                 const base64Audio = arrayBufferToBase64(pcm16); // Convert to Base64
 
-                // Send to Gemini
                 geminiSessionRef.current.sendRealtimeInput([{
                     mimeType: "audio/pcm;rate=16000",
                     data: base64Audio
@@ -405,7 +392,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             };
 
             source.connect(processor);
-            processor.connect(audioContext.destination); // Activate processor
+            processor.connect(audioContext.destination); 
 
         } catch (e) {
             console.error("Failed to capture audio:", e);
@@ -416,7 +403,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
     // B. STOP MICROPHONE & PLAYBACK
     const stopAudioInput = () => {
-        // Stop Input (Mic)
         if (processorRef.current) {
             processorRef.current.disconnect();
             processorRef.current = null;
@@ -429,7 +415,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             mediaStreamRef.current.getTracks().forEach(track => track.stop());
             mediaStreamRef.current = null;
         }
-        // Stop Output (Speaker)
         if (audioOutputContextRef.current) {
             audioOutputContextRef.current.close();
             audioOutputContextRef.current = null;
@@ -437,46 +422,40 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         nextPlayTimeRef.current = 0;
     };
 
-    // C. PLAY STREAMED AUDIO (Fixed: Plays chunks immediately, no waiting)
+    // C. PLAY STREAMED AUDIO (FIXED BYTE ALIGNMENT)
     const playStreamedAudio = (base64Data) => {
         try {
-            // Initialize Output Context if missing (Gemini usually sends 24kHz)
             if (!audioOutputContextRef.current) {
                 audioOutputContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
             }
             const ctx = audioOutputContextRef.current;
 
-            // Base64 -> Float32
             const binaryString = window.atob(base64Data);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
             for (let i = 0; i < len; i++) {
                 bytes[i] = binaryString.charCodeAt(i);
             }
-            const int16Data = new Int16Array(bytes.buffer);
+
+            // CRITICAL FIX: Use slice to ensure proper byte alignment for Int16Array
+            const int16Data = new Int16Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+            
             const float32Data = new Float32Array(int16Data.length);
             for (let i = 0; i < int16Data.length; i++) {
                 float32Data[i] = int16Data[i] / 32768.0;
             }
 
-            // Create Buffer
             const buffer = ctx.createBuffer(1, float32Data.length, 24000);
             buffer.copyToChannel(float32Data, 0);
 
-            // Schedule Playback (Seamless Streaming)
             const source = ctx.createBufferSource();
             source.buffer = buffer;
             source.connect(ctx.destination);
 
-            // Calculate start time:
-            // If nextPlayTime is in the past (we fell behind or it's the start), play NOW.
-            // Otherwise, play at the scheduled future time.
             const currentTime = ctx.currentTime;
             const startTime = nextPlayTimeRef.current < currentTime ? currentTime : nextPlayTimeRef.current;
             
             source.start(startTime);
-            
-            // Advance the pointer
             nextPlayTimeRef.current = startTime + buffer.duration;
 
         } catch (e) {
@@ -505,7 +484,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         return prompt;
     };
 
-    // E. START SESSION
+    // E. START SESSION (UPDATED CONFIG)
     const handleStartGeminiSession = async () => {
         if (!geminiApiKey || !userName) return toast.error("Enter name.");
         if (isConnecting || callStatus === 'in-progress') return;
@@ -517,16 +496,20 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         nextPlayTimeRef.current = 0;
         
         const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-        const systemInstruction = buildGeminiSystemPrompt();
+        const systemInstructionText = buildGeminiSystemPrompt().replace(/\n/g, " ");
 
         try {
             const session = await ai.live.connect({
-                model: 'models/gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 config: {
+                    // Set both Audio response AND Transcriptions enabled
                     responseModalities: [Modality.AUDIO], 
-                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                    outputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
+                    inputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
+                    
+                    systemInstruction: { parts: [{ text: systemInstructionText }] },
                     speechConfig: {
-                        voiceConfig: { prebuiltVoiceConfig: { voiceName: agent.voiceConfig.voiceId } }
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: agent.voiceConfig.voiceId || "Kore" } }
                     }
                 },
                 callbacks: {
@@ -534,7 +517,6 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                         setIsConnecting(false);
                         setCallStatus('in-progress');
                         toast.success("Connected to Doweit Live.");
-                        // Start the microphone immediately upon connection
                         startAudioInput(); 
                     },
                     onmessage: (msg) => handleGeminiMessage(msg),
@@ -559,31 +541,49 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
-    // F. HANDLE INCOMING MESSAGES
+    // F. HANDLE INCOMING MESSAGES (UPDATED PARSING)
     const handleGeminiMessage = (message) => {
-        // 1. Text (for UI)
-        const part = message.serverContent?.modelTurn?.parts?.[0];
-        if (part?.text) {
+        const serverContent = message.serverContent;
+
+        // 1. Handle Interruption (VAD)
+        if (serverContent?.interrupted) {
+            console.log("Bot interrupted by user");
+            // We can't clear the buffer of a running context easily, but we can reset the pointer logic
+            if (audioOutputContextRef.current) {
+                 nextPlayTimeRef.current = audioOutputContextRef.current.currentTime;
+            }
+            return; 
+        }
+
+        // 2. Audio Chunks
+        const modelTurn = serverContent?.modelTurn;
+        if (modelTurn?.parts) {
+            for (const part of modelTurn.parts) {
+                if (part.inlineData) {
+                    const chunk = part.inlineData.data;
+                    setGeminiAudioChunks(prev => [...prev, chunk]);
+                    playStreamedAudio(chunk);
+                }
+            }
+        }
+
+        // 3. Model Text Transcription (Correct Location)
+        if (serverContent?.outputTranscription?.text) {
+            const text = serverContent.outputTranscription.text;
             setGeminiTranscript(prev => {
                 const last = prev[prev.length - 1];
                 if (last && last.role === 'model') {
-                    return [...prev.slice(0, -1), { ...last, text: last.text + part.text }];
+                    return [...prev.slice(0, -1), { ...last, text: last.text + text }];
                 }
-                return [...prev, { role: 'model', text: part.text, time: Date.now() }];
+                return [...prev, { role: 'model', text: text, time: Date.now() }];
             });
         }
 
-        // 2. Audio - STREAMING (Fixed Latency)
-        if (part?.inlineData) {
-            const chunk = part.inlineData.data;
-            // Save raw Base64 for recording later
-            setGeminiAudioChunks(prev => [...prev, chunk]);
-            
-            // Play immediately!
-            playStreamedAudio(chunk);
+        // 4. User Input Transcription (Correct Location)
+        if (serverContent?.inputTranscription?.text) {
+            const text = serverContent.inputTranscription.text;
+            setGeminiTranscript(prev => [...prev, { role: 'user', text: text, time: Date.now() }]);
         }
-
-        // We do NOT wait for turnComplete to play audio anymore.
     };
 
     // G. SEND TEXT (CHAT)
