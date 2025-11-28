@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 export async function middleware(request) {
-	const cookie = request.cookies.get("better-auth.session_token");
+	const cookieName =
+		process.env.NODE_ENV === "production"
+			? "__Secure-better-auth.session_token"
+			: "better-auth.session_token";
+	const cookie = request.cookies.get(cookieName);
 	const validCookie = cookie && cookie.value;
 	const { pathname } = request.nextUrl;
 
