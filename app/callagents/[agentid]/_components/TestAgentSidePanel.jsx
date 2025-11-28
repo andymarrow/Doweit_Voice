@@ -603,7 +603,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
     // H. STOP SESSION
     const stopGeminiSession = () => {
-        stopAudioInput(); // Kills Mic & Speaker contexts
+        stopAudioInput(); // Kills Mic & Speaker contextss
         if (geminiSessionRef.current) {
             geminiSessionRef.current.close();
             geminiSessionRef.current = null;
