@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FiX, FiPhone, FiMessageCircle, FiUser, FiSend, FiVolume2, FiLoader, FiAlertTriangle, FiGlobe, FiMic, FiSquare } from 'react-icons/fi';
+import { FiX, FiPhone, FiMessageCircle, FiUser, FiSend, FiLoader, FiAlertTriangle, FiGlobe, FiMic, FiSquare } from 'react-icons/fi';
 import Vapi from '@vapi-ai/web';
 import { GoogleGenAI, Modality } from '@google/genai'; // Import Gemini SDK
 import { uiColors } from '../../_constants/uiConstants';
@@ -355,7 +355,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     // A. START MICROPHONE
     const startAudioInput = async () => {
         try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const audioContext = new window.AudioContext({ sampleRate: 16000 });
             audioInputContextRef.current = audioContext;
 
             if (audioContext.state === 'suspended') {
@@ -385,10 +385,12 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 const pcm16 = floatTo16BitPCM(inputData); // Convert to Int16
                 const base64Audio = arrayBufferToBase64(pcm16); // Convert to Base64
 
-                geminiSessionRef.current.sendRealtimeInput([{
-                    mimeType: "audio/pcm;rate=16000",
-                    data: base64Audio
-                }]);
+                geminiSessionRef.current.sendRealtimeInput({
+                    audio: {
+                        mimeType: "audio/pcm;rate=16000",
+                        data: base64Audio
+                    }
+                });
             };
 
             source.connect(processor);
@@ -426,7 +428,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     const playStreamedAudio = (base64Data) => {
         try {
             if (!audioOutputContextRef.current) {
-                audioOutputContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+                audioOutputContextRef.current = new window.AudioContext({ sampleRate: 24000 });
             }
             const ctx = audioOutputContextRef.current;
 
