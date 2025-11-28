@@ -1,19 +1,18 @@
 import { NextResponse } from "next/server";
-import { getSessionCookie } from "better-auth/cookies";
 
 export async function middleware(request) {
-	const sessionCookie = getSessionCookie(request);
-	console.log("sessionCookie", sessionCookie);
+	const cookie = request.cookies.get("better-auth.session_token");
+	const validCookie = cookie && cookie.value;
 	const { pathname } = request.nextUrl;
 
 	if (
-		!sessionCookie &&
+		!validCookie &&
 		!["/", "/sign-in", "/sign-up"].includes(pathname) &&
 		!pathname.includes("/api/auth")
 	) {
 		console.log("redirecting to signin");
 		return NextResponse.redirect(new URL("/sign-in", request.url));
-	} else if (sessionCookie && ["/sign-in", "/sign-up"].includes(pathname)) {
+	} else if (validCookie && ["/sign-in", "/sign-up"].includes(pathname)) {
 		return NextResponse.redirect(new URL("/voice-agents", request.url));
 	}
 	return NextResponse.next();
