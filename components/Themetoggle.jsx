@@ -1,3 +1,4 @@
+// /components/Themetoggle.jsx
 "use client";
 import { useTheme } from 'next-themes'; // This hook helps toggle themes
 import { useEffect, useState } from 'react';

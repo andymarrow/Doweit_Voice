@@ -1,3 +1,4 @@
+// /app/callagents/Integrations/page.jsx
 import React, { Suspense } from 'react';
 import { FiLoader } from 'react-icons/fi';
 import IntegrationsClientPage from './IntegrationsClientPage'; // Import the component you just renamed

@@ -59,6 +59,7 @@
 		"react-router-dom": "^6.26.1",
 		"react-youtube": "^10.1.0",
 		"reactflow": "^11.11.4",
+		"recharts": "^3.5.1",
 		"shadcn": "^2.4.0-canary.12",
 		"sidebar": "^1.0.2",
 		"tailwind-merge": "^2.5.2",
