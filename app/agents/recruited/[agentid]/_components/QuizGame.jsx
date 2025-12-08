@@ -35,12 +35,21 @@ export default function QuizGame({ agentId, onExit }) {
 
     // --- LOGIC ---
 
-    const startGame = () => {
+    // Replace the old startGame logic with this:
+    const startGame = async () => {
         setGameState('loading');
-        // Simulate API call to Gemini with the requested count
-        setTimeout(() => {
-            const newQuestions = GENERATE_MOCK_QUESTIONS(questionCount);
-            setQuestions(newQuestions);
+        
+        try {
+            const res = await fetch('/api/trainee/quiz/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ agentId: parseInt(agentId), count: questionCount })
+            });
+
+            if (!res.ok) throw new Error("Failed to generate quiz");
+            const data = await res.json();
+            
+            setQuestions(data.questions);
             
             // Reset Game State
             setCurrentIndex(0);
@@ -50,7 +59,11 @@ export default function QuizGame({ agentId, onExit }) {
             setFeedback(null);
             
             setGameState('playing');
-        }, 1500);
+        } catch (error) {
+            console.error(error);
+            // Handle error state or toast here
+            setGameState('setup'); // Go back on error
+        }
     };
 
     const handleAnswer = (userChoice) => {

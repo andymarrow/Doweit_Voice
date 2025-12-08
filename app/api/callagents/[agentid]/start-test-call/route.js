@@ -42,7 +42,7 @@ export async function POST(req, { params }) {
 			name: `Test Agent ${agent.id}-${Date.now()}`.slice(0, 40),
 			model: {
 				provider: "google",
-				model: "gemini-1.5-flash",
+				model: "gemini-2.5-flash",
 				messages: [
 					{
 						role: "system",

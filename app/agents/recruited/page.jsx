@@ -1,24 +1,41 @@
 // app/agents/recruited/page.jsx
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { FiPlay, FiBarChart2 } from 'react-icons/fi';
+import { FiPlay, FiLoader, FiAlertCircle } from 'react-icons/fi';
 import { uiColors, sectionVariants } from '@/app/callagents/_constants/uiConstants';
 
-const MY_AGENTS = [
-    { id: 1, title: "Google System Design", xp: 1200, level: 5, lastPlayed: "2 days ago" },
-    { id: 2, title: "Behavioral Interview", xp: 450, level: 2, lastPlayed: "Yesterday" },
-];
-
 export default function MyGymPage() {
+    const [agents, setAgents] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchAgents = async () => {
+            try {
+                const res = await fetch('/api/trainee/agents');
+                if (res.ok) {
+                    const data = await res.json();
+                    setAgents(data);
+                }
+            } catch (error) {
+                console.error("Failed to load training agents", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchAgents();
+    }, []);
+
+    if (isLoading) return <div className="flex h-full items-center justify-center"><FiLoader className="w-10 h-10 animate-spin text-cyan-600" /></div>;
+
     return (
         <div className="p-6 space-y-8">
             <h1 className={`text-3xl font-bold ${uiColors.textPrimary}`}>My Training Gym</h1>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Create New Card */}
+                {/* Create/Buy New Card */}
                 <Link href="/agents/marketplace" legacyBehavior>
                     <a className={`flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed ${uiColors.borderPrimary} hover:border-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/10 transition-all cursor-pointer h-64 group`}>
                         <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -29,7 +46,7 @@ export default function MyGymPage() {
                 </Link>
 
                 {/* Agent Cards */}
-                {MY_AGENTS.map((agent) => (
+                {agents.map((agent) => (
                     <Link key={agent.id} href={`/agents/recruited/${agent.id}`} legacyBehavior>
                         <motion.a 
                             variants={sectionVariants} initial="hidden" animate="visible"

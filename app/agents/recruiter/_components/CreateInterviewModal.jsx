@@ -1,3 +1,4 @@
+// app/agents/recruiter/_components/CreateInterviewModal.jsx
 "use client";
 
 import React, { useState } from 'react';
@@ -8,6 +9,7 @@ import {
 } from 'react-icons/fi';
 import Image from 'next/image';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 // Constants & Components
 import { uiColors, uiAccentClasses } from '../../../callagents/_constants/uiConstants';
@@ -20,64 +22,177 @@ const stepVariants = {
     exit: { opacity: 0, x: -20 },
 };
 
-// Mock AI Generation Helper
-const simulateAiGeneration = async (jobTitle, jobDescription) => {
-    await new Promise(r => setTimeout(r, 2000));
-    return `You are an expert interviewer for the position of ${jobTitle}. 
-Your goal is to assess the candidate's technical skills and cultural fit based on the following requirements:
-${jobDescription.substring(0, 100)}...
-
-1. Start by introducing yourself and asking the candidate to introduce themselves.
-2. Ask probing questions about their experience.
-3. Keep the tone professional but encouraging.`;
-};
-
 export default function CreateInterviewModal({ isOpen, onClose, mode = 'recruiter' }) {
+    const router = useRouter();
+
     // --- STATE ---
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(1); // 1: Brain, 2: Behavior, 3: Persona
     const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
     const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
     
     // Form Data
     const [formData, setFormData] = useState({
         jobTitle: '',
-        inputType: 'pdf', 
+        inputType: 'pdf', // 'pdf' | 'text'
         fileName: null,
+        pdfFile: null, // Store actual file object
         textDescription: '',
         systemPrompt: '',
-        duration: 15, 
-        difficulty: 'Medium',
+        duration: 15, // minutes
+        difficulty: 'Medium', // Casual, Medium, Strict
         selectedVoice: null,
         avatarFile: null,
         avatarPreview: null
     });
 
     // --- HANDLERS ---
+
     const handleNext = async () => {
+        // STEP 1: CONTEXT -> AI GENERATION
         if (step === 1) {
+            // Validation
             if (!formData.jobTitle) return toast.error("Please enter a Job Title");
             if (formData.inputType === 'text' && !formData.textDescription) return toast.error("Please paste the Job Description");
             if (formData.inputType === 'pdf' && !formData.fileName) return toast.error("Please upload a PDF");
 
             setIsGeneratingPrompt(true);
-            const generatedPrompt = await simulateAiGeneration(formData.jobTitle, formData.textDescription || "PDF Content...");
-            setFormData(prev => ({ ...prev, systemPrompt: generatedPrompt }));
-            setIsGeneratingPrompt(false);
-            setStep(2);
-        } else if (step === 2) {
+
+            try {
+                // Call the Ingestion API
+                let response;
+                
+                if (formData.inputType === 'pdf') {
+                    const uploadData = new FormData();
+                    uploadData.append('file', formData.pdfFile);
+                    uploadData.append('jobTitle', formData.jobTitle);
+
+                    response = await fetch('/api/callagents/ingest', {
+                        method: 'POST',
+                        body: uploadData,
+                    });
+                } else {
+                    response = await fetch('/api/callagents/ingest', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jobTitle: formData.jobTitle,
+                            textDescription: formData.textDescription
+                        })
+                    });
+                }
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || "AI Generation failed");
+                }
+
+                const data = await response.json();
+                
+                // Update State with AI Prompt
+                setFormData(prev => ({ 
+                    ...prev, 
+                    systemPrompt: data.systemPrompt,
+                    // Note: 'data.rubric' is also returned here if you want to store it for later
+                }));
+                
+                toast.success("AI Analysis Complete!");
+                setStep(2);
+
+            } catch (error) {
+                console.error(error);
+                toast.error(error.message || "Failed to analyze Job Description");
+            } finally {
+                setIsGeneratingPrompt(false);
+            }
+        } 
+        
+        // STEP 2: BEHAVIOR -> PERSONA
+        else if (step === 2) {
             setStep(3);
-        } else if (step === 3) {
-            if (!formData.selectedVoice) return toast.error("Please select a voice");
-            toast.success(mode === 'trainee' ? "Training Agent Created!" : "Interview Agent Created!");
-            onClose();
+        } 
+        
+        // STEP 3: PERSONA -> SUBMIT
+        else if (step === 3) {
+            handleSubmit();
         }
     };
 
     const handleBack = () => setStep(prev => prev - 1);
 
+    const handleSubmit = async () => {
+        if (!formData.selectedVoice) return toast.error("Please select a voice");
+        
+        setIsGeneratingPrompt(true); // Re-use loading state
+
+        try {
+            // Construct the final payload for the Creation API
+            const payload = {
+                name: formData.jobTitle,
+                type: mode === 'trainee' ? 'trainee_clone' : 'recruiter',
+                
+                // Map wizard data to schema JSONB fields
+                recruitmentConfig: {
+                    jobDescription: formData.inputType === 'text' ? formData.textDescription : "PDF Uploaded",
+                    systemPrompt: formData.systemPrompt,
+                    difficulty: formData.difficulty,
+                    duration: formData.duration
+                },
+                
+                systemPrompt: formData.systemPrompt, // Also save to top-level prompt field
+
+                // Voice Data
+                voiceConfig: {
+                    voiceId: formData.selectedVoice.voiceId,
+                    voiceName: formData.selectedVoice.name,
+                    voiceProvider: formData.selectedVoice.provider || formData.selectedVoice.platform,
+                    language: formData.selectedVoice.language || 'en'
+                },
+
+                // Note: Avatar upload should ideally happen here to Firebase, getting a URL.
+                // For this implementation, we are passing the URL if available, or null.
+                // (Client-side file upload logic omitted for brevity, usually handled by a separate utility)
+            };
+
+            const response = await fetch('/api/callagents/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || "Creation failed");
+            }
+            
+            const newAgent = await response.json();
+
+            toast.success(mode === 'trainee' ? "Training Agent Ready!" : "Interview Agent Published!");
+            onClose();
+            
+            // Redirect based on mode
+            if (mode === 'trainee') {
+                router.push(`/agents/recruited/${newAgent.id}`);
+            } else {
+                router.push(`/agents/recruiter/${newAgent.id}/settings`);
+            }
+
+        } catch (error) {
+            console.error(error);
+            toast.error(error.message);
+        } finally {
+            setIsGeneratingPrompt(false);
+        }
+    };
+
     const handleFileChange = (e) => {
         const file = e.target.files[0];
-        if (file) setFormData(prev => ({ ...prev, fileName: file.name }));
+        if (file) {
+            setFormData(prev => ({ 
+                ...prev, 
+                fileName: file.name,
+                pdfFile: file // Store the actual file object for FormData
+            }));
+        }
     };
 
     const handleAvatarChange = (e) => {
@@ -194,7 +309,7 @@ export default function CreateInterviewModal({ isOpen, onClose, mode = 'recruite
                                                         <div className="flex flex-col items-center text-green-600 z-10">
                                                             <FiCheck className="w-10 h-10 mb-2" />
                                                             <span className="font-semibold text-lg">{formData.fileName}</span>
-                                                            <button onClick={(e) => {e.stopPropagation(); setFormData({...formData, fileName: null})}} className="text-sm underline mt-2 hover:text-green-700">Remove File</button>
+                                                            <button onClick={(e) => {e.stopPropagation(); setFormData({...formData, fileName: null, pdfFile: null})}} className="text-sm underline mt-2 hover:text-green-700">Remove File</button>
                                                         </div>
                                                     ) : (
                                                         <div className="z-10 pointer-events-none">
@@ -227,7 +342,7 @@ export default function CreateInterviewModal({ isOpen, onClose, mode = 'recruite
                                 </div>
 
                                 {/* Prompt Editor */}
-                                <div className={`p-1 rounded-2xl `}>
+                                <div className={`p-1 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600`}>
                                     <div className={`bg-white dark:bg-gray-900 rounded-xl p-6`}>
                                         <div className="flex justify-between items-center mb-4">
                                             <label className={`text-sm font-bold uppercase tracking-wider flex items-center ${uiColors.textPrimary}`}>
@@ -354,7 +469,7 @@ export default function CreateInterviewModal({ isOpen, onClose, mode = 'recruite
 
                             <button 
                                 onClick={handleNext} 
-                                className={`flex items-center px-8 py-3 rounded-xl font-bold text-white  hover:scale-105 active:scale-95 transition-transform ${uiColors.accentPrimaryGradient}`}
+                                className={`flex items-center px-8 py-3 rounded-xl font-bold text-white shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-transform ${uiColors.accentPrimaryGradient}`}
                             >
                                 {step === 3 ? (mode === 'trainee' ? 'Launch Training' : 'Publish Agent') : 'Continue'} 
                                 <FiArrowRight className="ml-2" />

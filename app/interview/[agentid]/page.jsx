@@ -1,35 +1,15 @@
 // app/interview/[agentid]/page.jsx
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiMic, FiVideo, FiCheckCircle, FiLoader, FiXCircle, FiCpu } from 'react-icons/fi';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { FiMic, FiVideo, FiCheckCircle, FiLoader, FiCpu } from 'react-icons/fi';
 import Image from 'next/image';
 import Vapi from '@vapi-ai/web';
 import { toast } from 'react-hot-toast';
 
 // Constants & Utilities
 import { uiColors } from '@/app/callagents/_constants/uiConstants';
-import { uploadFileToFirebase } from '@/lib/firebase/upload'; // You must have this helper
-
-// --- MOCK AGENT FETCH (Replace with real API later) ---
-const fetchPublicAgentData = async (agentId) => {
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 800));
-    return {
-        id: agentId,
-        name: "Senior React Developer Interview",
-        recruiterName: "Sarah Connor",
-        avatarUrl: null, // Default
-        voiceProvider: "vapi", // or 'google'
-        voiceId: "uuid-voice-id",
-        greetingMessage: "Hello! I'm here to assess your React skills. Could you start by introducing yourself?",
-        recruitmentConfig: {
-            antiCheatEnabled: true,
-            durationLimit: 900 // 15 mins
-        }
-    };
-};
 
 // --- CONSTANTS ---
 const SCREENSHOT_COUNT = 10;
@@ -49,20 +29,37 @@ export default function InterviewPage({ params }) {
     const [transcripts, setTranscripts] = useState([]);
     const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
     
+    // Session State
+    const [sessionId, setSessionId] = useState(null);
+
     // Refs
     const videoRef = useRef(null);
     const streamRef = useRef(null);
     const vapiRef = useRef(null);
     const screenshotIntervals = useRef([]);
 
-    // 1. Load Agent Data
+    // 1. Load Agent Data (REAL API)
     useEffect(() => {
-        fetchPublicAgentData(agentid).then(data => {
-            setAgent(data);
-            setStep('welcome');
-        }).catch(err => {
-            toast.error("Interview invalid or expired.");
-        });
+        const fetchAgent = async () => {
+            try {
+                const res = await fetch(`/api/interview/${agentid}`);
+                if (!res.ok) throw new Error("Interview not found");
+                const data = await res.json();
+                
+                // Normalize data structure
+                setAgent({
+                    ...data,
+                    voiceProvider: data.voiceConfig?.voiceProvider,
+                    voiceId: data.voiceConfig?.voiceId,
+                    recruitmentConfig: data.recruitmentConfig || { antiCheatEnabled: true }
+                });
+                setStep('welcome');
+            } catch (err) {
+                console.error(err);
+                toast.error("Invalid Interview Link");
+            }
+        };
+        fetchAgent();
     }, [agentid]);
 
     // 2. Cleanup on Unmount
@@ -96,56 +93,88 @@ export default function InterviewPage({ params }) {
     const startInterview = async () => {
         if (!candidate.name || !candidate.email) return toast.error("Please fill in your details.");
         if (!permStatus.camera) return toast.error("Please allow camera access.");
+        if (!VAPI_PUBLIC_KEY) return toast.error("System Error: Voice Key Missing");
 
-        setStep('interview');
         setStatus('connecting');
 
-        // Initialize Vapi
-        if (!VAPI_PUBLIC_KEY) return toast.error("System Error: Voice Key Missing");
-        
-        const vapi = new Vapi(VAPI_PUBLIC_KEY);
-        vapiRef.current = vapi;
-
-        // Setup Listeners
-        vapi.on('call-start', () => {
-            setStatus('active');
-            scheduleScreenshots(); // Start Anti-Cheat
-        });
-        
-        vapi.on('speech-start', () => setIsAgentSpeaking(true));
-        vapi.on('speech-end', () => setIsAgentSpeaking(false));
-        
-        vapi.on('message', (msg) => {
-            if (msg.type === 'transcript' && msg.transcriptType === 'final') {
-                setTranscripts(prev => [...prev, { 
-                    role: msg.role === 'assistant' ? 'AI' : 'You', 
-                    text: msg.transcript 
-                }]);
-            }
-        });
-
-        vapi.on('call-end', () => {
-            setStatus('ended');
-            setStep('completed');
-        });
-
-        // Start Call
         try {
+            // A. Create Session in DB
+            const res = await fetch('/api/interview/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    agentId: agentid,
+                    candidateName: candidate.name,
+                    candidateEmail: candidate.email
+                })
+            });
+
+            if (!res.ok) throw new Error("Failed to initialize session");
+            const data = await res.json();
+            setSessionId(data.sessionId); // Store Session ID for snapshots
+            
+            // Move to Interview View
+            setStep('interview');
+
+            // B. Initialize Vapi
+            const vapi = new Vapi(VAPI_PUBLIC_KEY);
+            vapiRef.current = vapi;
+
+            // Setup Listeners
+            vapi.on('call-start', () => {
+                setStatus('active');
+                scheduleScreenshots(data.sessionId); // Start Anti-Cheat with Session ID
+            });
+            
+            vapi.on('speech-start', () => setIsAgentSpeaking(true));
+            vapi.on('speech-end', () => setIsAgentSpeaking(false));
+            
+            vapi.on('message', (msg) => {
+                if (msg.type === 'transcript' && msg.transcriptType === 'final') {
+                    setTranscripts(prev => [...prev, { 
+                        role: msg.role === 'assistant' ? 'AI' : 'You', 
+                        text: msg.transcript 
+                    }]);
+                }
+            });
+
+            vapi.on('call-end', () => {
+                setStatus('ended');
+                setStep('completed');
+            });
+            
+            vapi.on('error', (e) => {
+                console.error("Vapi Error", e);
+                setStatus('error');
+            });
+
+            // C. Start Call
+            // Note: We inject the system prompt generated during ingestion
             await vapi.start({
                 model: {
                     provider: "google",
                     model: "gemini-2.5-flash",
                     messages: [
-                        { role: "system", content: `You are an interviewer. Your name is ${agent.name}. Interview the candidate named ${candidate.name}.` }
+                        { 
+                            role: "system", 
+                            content: agent.recruitmentConfig.systemPrompt || `You are an interviewer named ${agent.name}.` 
+                        }
                     ]
                 },
                 voice: {
-                    provider: agent.voiceProvider,
-                    voiceId: agent.voiceId,
+                    provider: agent.voiceProvider || 'vapi',
+                    voiceId: agent.voiceId || 'monitor',
+                },
+                // *** CRITICAL ADDITION ***
+                metadata: {
+                    sessionId: data.sessionId, // This ID comes from the '/api/interview/session' response
+                    agentId: agentid
                 }
             });
+
         } catch (e) {
             console.error(e);
+            toast.error("Could not start interview. Please try again.");
             setStatus('error');
         }
     };
@@ -157,24 +186,8 @@ export default function InterviewPage({ params }) {
     };
 
     // --- ANTI-CHEAT ENGINE ---
-    const scheduleScreenshots = () => {
-        if (!agent.recruitmentConfig.antiCheatEnabled) return;
-
-        // Take 10 screenshots at random intervals within 15 minutes (or session duration)
-        const durationMs = 1000 * 60 * 10; // Assume 10 min avg
-        
-        for (let i = 0; i < SCREENSHOT_COUNT; i++) {
-            const randomDelay = Math.random() * durationMs;
-            const timeoutId = setTimeout(() => captureAndUploadFrame(), randomDelay);
-            screenshotIntervals.current.push(timeoutId);
-        }
-        
-        // Take one immediately
-        captureAndUploadFrame();
-    };
-
-    const captureAndUploadFrame = async () => {
-        if (!videoRef.current || !candidate.email) return;
+    const captureAndUploadFrame = async (activeSessionId) => {
+        if (!videoRef.current || !activeSessionId) return;
 
         const canvas = document.createElement('canvas');
         canvas.width = videoRef.current.videoWidth;
@@ -183,13 +196,38 @@ export default function InterviewPage({ params }) {
         
         canvas.toBlob(async (blob) => {
             if (!blob) return;
-            // Name: interview_id/email/timestamp.jpg
-            const fileName = `interviews/${agent.id}/${candidate.email}/${Date.now()}.jpg`;
-            // NOTE: In a real app, use a client-side upload or signed URL. 
-            // For now, assume uploadFileToFirebase handles this.
-            // await uploadFileToFirebase(blob, fileName); 
-            console.log(`[Anti-Cheat] Snapshot taken: ${fileName}`);
+
+            const formData = new FormData();
+            formData.append('image', blob, 'snapshot.jpg');
+            formData.append('sessionId', activeSessionId);
+            formData.append('agentId', agentid);
+
+            try {
+                await fetch('/api/interview/snapshot', {
+                    method: 'POST',
+                    body: formData
+                });
+                console.log(`[Anti-Cheat] Snapshot uploaded for session ${activeSessionId}`);
+            } catch (err) {
+                console.error("Snapshot upload failed", err);
+            }
         }, 'image/jpeg', 0.7);
+    };
+
+    const scheduleScreenshots = (activeSessionId) => {
+        if (!agent.recruitmentConfig?.antiCheatEnabled) return;
+
+        // Take 10 screenshots over 15 mins (approx duration)
+        const durationMs = 1000 * 60 * 15; 
+        
+        for (let i = 0; i < SCREENSHOT_COUNT; i++) {
+            const randomDelay = Math.random() * durationMs;
+            const timeoutId = setTimeout(() => captureAndUploadFrame(activeSessionId), randomDelay);
+            screenshotIntervals.current.push(timeoutId);
+        }
+        
+        // Take one immediately to verify camera
+        captureAndUploadFrame(activeSessionId);
     };
 
     // --- RENDERERS ---
@@ -207,6 +245,7 @@ export default function InterviewPage({ params }) {
                 handlePermissions={handlePermissions}
                 permStatus={permStatus}
                 onStart={startInterview}
+                isConnecting={status === 'connecting'}
             />
         );
     }
@@ -267,8 +306,10 @@ export default function InterviewPage({ params }) {
                     {/* Controls Side */}
                     <div className="w-64 flex flex-col gap-3">
                         <div className="flex-1 bg-gray-800/50 rounded-2xl border border-gray-700 flex items-center justify-center flex-col p-4 text-center">
-                            <span className="text-4xl font-mono font-bold text-gray-500">12:45</span>
-                            <span className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Time Remaining</span>
+                            <span className="text-4xl font-mono font-bold text-gray-500">
+                                <LiveTimer isActive={status === 'active'} />
+                            </span>
+                            <span className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Duration</span>
                         </div>
                         <button 
                             onClick={endInterview}
@@ -304,7 +345,7 @@ export default function InterviewPage({ params }) {
 
 // --- SUB-COMPONENTS ---
 
-function WelcomeView({ agent, candidate, setCandidate, handlePermissions, permStatus, onStart }) {
+function WelcomeView({ agent, candidate, setCandidate, handlePermissions, permStatus, onStart, isConnecting }) {
     return (
         <div className="max-w-4xl mx-auto pt-10 px-4 md:px-0">
             <div className="grid md:grid-cols-2 gap-8 items-center">
@@ -314,7 +355,7 @@ function WelcomeView({ agent, candidate, setCandidate, handlePermissions, permSt
                         {agent.name}
                     </h1>
                     <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
-                        You are about to start an automated AI interview managed by <strong>{agent.recruiterName}</strong>.
+                        You are about to start an automated AI interview managed by <strong>{agent.recruiterName || 'Doweit Recruiter'}</strong>.
                     </p>
                     
                     <div className="space-y-4 mb-8">
@@ -381,11 +422,11 @@ function WelcomeView({ agent, candidate, setCandidate, handlePermissions, permSt
 
                         <button 
                             onClick={onStart}
-                            disabled={!permStatus.camera || !candidate.name}
-                            className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg transition-transform hover:scale-[1.02] active:scale-95
+                            disabled={!permStatus.camera || !candidate.name || isConnecting}
+                            className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg transition-transform hover:scale-[1.02] active:scale-95 flex items-center justify-center
                                 ${(!permStatus.camera || !candidate.name) ? 'bg-gray-400 cursor-not-allowed' : uiColors.accentPrimaryGradient}`}
                         >
-                            Start Interview
+                            {isConnecting ? <FiLoader className="animate-spin" /> : 'Start Interview'}
                         </button>
                     </div>
                 </div>
@@ -410,4 +451,28 @@ function UserVideoFeed({ stream, videoRef }) {
             className="w-full h-full object-cover transform scale-x-[-1]" // Mirror effect
         />
     );
+}
+
+function LiveTimer({ isActive }) {
+    const [seconds, setSeconds] = useState(0);
+
+    useEffect(() => {
+        let interval = null;
+        if (isActive) {
+            interval = setInterval(() => {
+                setSeconds(s => s + 1);
+            }, 1000);
+        } else if (!isActive && seconds !== 0) {
+            clearInterval(interval);
+        }
+        return () => clearInterval(interval);
+    }, [isActive, seconds]);
+
+    const format = (totalSeconds) => {
+        const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const s = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
+
+    return <>{format(seconds)}</>;
 }
