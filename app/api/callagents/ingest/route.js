@@ -93,7 +93,7 @@ export async function POST(req) {
         // 3. Call Gemini 1.5 Flash
         // Flash is chosen for speed and long-context window (perfect for PDFs)
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
+            model: "gemini-2.5-flash",
             generationConfig: { responseMimeType: "application/json" }
         });
 
