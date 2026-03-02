@@ -6,7 +6,7 @@ import os
 
 # 1. Folders you want to copy completely
 TARGET_FOLDERS = [
-    'lib'
+    'app/voice-agents-dashboard'
 ] 
 
 # 2. Individual files you want to copy
