@@ -85,7 +85,11 @@ export async function POST(req) {
 		return NextResponse.json(
 			{
 				message: "Character created successfully",
-				characterId: newCharacter.id,
+				// `characterId` kept for backward compat with older clients;
+				// new code should use `publicId` directly so URLs aren't sequential.
+				characterId: newCharacter.publicId || newCharacter.id,
+				id: newCharacter.id,
+				publicId: newCharacter.publicId,
 			},
 			{ status: 201 },
 		);
