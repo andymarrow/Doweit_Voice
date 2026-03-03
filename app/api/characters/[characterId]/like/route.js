@@ -7,6 +7,7 @@ import { db } from "@/lib/database";
 import { characters, characterLikes } from "@/lib/db/schemaCharacterAI";
 // *** THE FIX IS HERE: Added 'sql' to the import list ***
 import { eq, and, sql } from "drizzle-orm";
+import { resolveCharacterId } from "@/lib/utils/publicId";
 
 export async function POST(req, { params }) {
 	const { characterId } = params;
@@ -17,18 +18,11 @@ export async function POST(req, { params }) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
 
-	if (!characterId) {
+	const charIdInt = await resolveCharacterId(characterId);
+	if (!charIdInt) {
 		return NextResponse.json(
-			{ error: "Character ID is required" },
-			{ status: 400 },
-		);
-	}
-
-	const charIdInt = parseInt(characterId);
-	if (isNaN(charIdInt)) {
-		return NextResponse.json(
-			{ error: "Invalid Character ID" },
-			{ status: 400 },
+			{ error: "Character not found" },
+			{ status: 404 },
 		);
 	}
 
