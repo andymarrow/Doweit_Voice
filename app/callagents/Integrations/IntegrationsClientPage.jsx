@@ -18,14 +18,14 @@ const INTEGRATIONS_CONFIG = [
         id: 'twilio',
         name: 'Twilio',
         logo: '/integrations/twilio.png',
-        description: 'Connect your Twilio account and use directly your phone numbers with your assistants here on the platform.',
-        howItWorks: 'Integrate your Twilio account to purchase and manage phone numbers directly within our platform, enhancing your agents with powerful voice and SMS capabilities.',
-        docsUrl: '#',
+        description: 'Bring your own Twilio phone numbers — your agents can answer inbound calls and place outbound ones from numbers you own.',
+        howItWorks: 'Paste your Twilio Account SID and Auth Token below. Then go to the Phone Numbers page, import a number from Twilio, and assign it to any agent from that agent\'s dashboard. Inbound calls to that number ring the agent automatically.',
+        docsUrl: '/.claude/guide/twilio.md',
         websiteUrl: 'https://www.twilio.com',
-        note: 'Linking your Twilio account will make your purchased phone numbers manageable only through our platform.',
+        note: 'Once connected, Doweit pushes your Twilio credentials to Vapi (encrypted on Vapi\'s side) so Vapi can route calls. We do NOT charge you for purchases — you buy numbers on Twilio.',
         fields: [
-            { id: 'accountSid', label: 'Account SID', type: 'password', placeholder: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
-            { id: 'authToken', label: 'Auth Token', type: 'password', placeholder: 'Your 32 character Auth Token' },
+            { id: 'accountSid', label: 'Account SID', type: 'password', placeholder: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
+            { id: 'authToken', label: 'Auth Token', type: 'password', placeholder: 'Your 32-character Auth Token' },
         ]
     },
     {
@@ -70,24 +70,59 @@ const INTEGRATIONS_CONFIG = [
         id: 'slack',
         name: 'Slack',
         logo: '/integrations/slack.png',
-        description: 'Get real-time notifications in your Slack channels for important events.',
-        howItWorks: 'Connect your Slack workspace to send automated messages to specific channels. You can configure alerts for new leads, completed calls, or specific actions taken by your agents.',
-        docsUrl: '#',
+        description: 'Send post-call summaries and extracted actions to a Slack channel — live, formatted, with a one-click "Open call" button.',
+        howItWorks: 'Connect your Slack workspace, then go to any agent\'s Integrations sidebar to choose a channel and customise the message. Every call automatically posts a Block Kit message after the AI extracts the action data.',
+        docsUrl: '/.claude/guide/slack.md',
         websiteUrl: 'https://slack.com',
+        note: 'Once connected, /invite the Doweit bot into the channels you want messages in. Private channels need explicit invites.',
         fields: [
             { id: 'slackConnect', type: 'oauth', provider: 'slack', text: 'Add to Slack' }
         ]
     },
     {
-        id: 'trello',
-        name: 'Trello',
-        logo: '/integrations/trello.jpg',
-        description: 'Create new Trello cards from call data for easy task management.',
-        howItWorks: 'Connect your Trello account to automatically create new cards on a specified board and list. This is perfect for turning conversations into actionable support tickets or sales follow-ups.',
-        docsUrl: '#',
-        websiteUrl: 'https://trello.com',
+        id: 'telegram',
+        name: 'Telegram',
+        logo: '/integrations/telegram.png',
+        description: 'Send formatted post-call messages to a Telegram chat or group via your own bot.',
+        howItWorks: 'Create a bot with @BotFather, paste the token below, then per agent pick the chat ID to message. Works for personal chats, groups, and channels.',
+        docsUrl: '/.claude/guide/telegram.md',
+        websiteUrl: 'https://telegram.org',
+        note: 'You need to start a chat with your bot at least once before it can message you. For groups, add the bot as a member.',
         fields: [
-            { id: 'trelloConnect', type: 'oauth', provider: 'trello', text: 'Connect with Trello' }
+            { id: 'botToken', label: 'Bot Token', type: 'password', placeholder: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11' },
+        ]
+    },
+    {
+        id: 'calcom',
+        name: 'Cal.com',
+        logo: '/integrations/calcom.png',
+        description: "Give your agents real-time scheduling powers — they can check availability and create bookings during a live call.",
+        howItWorks: 'Paste your Cal.com API key here, then on each agent\'s Integrations page choose an event type, scope (read-only / read+book), and time zone. The agent gets function tools so callers can ask "when are you free?" and book on the spot.',
+        docsUrl: '/.claude/guide/calcom.md',
+        websiteUrl: 'https://cal.com',
+        note: 'Get your API key in Cal.com under Settings → Developer → API Keys. Self-hosted? Use the optional base URL field to point at your instance.',
+        fields: [
+            { id: 'apiKey', label: 'Cal.com API Key', type: 'password', placeholder: 'cal_live_...' },
+            { id: 'baseUrl', label: 'Base URL (optional, for self-hosted)', type: 'text', placeholder: 'https://api.cal.com/v1' },
+        ],
+    },
+    {
+        id: 'email',
+        name: 'Email (SMTP)',
+        logo: '/integrations/email.png',
+        description: 'Email beautifully-formatted call summaries to one or more recipients via your own SMTP server (Gmail, Mailgun, etc.).',
+        howItWorks: 'Enter SMTP credentials (host, port, user, password). The platform validates them by opening a connection before saving. Per-agent rules then specify the To/Cc/Bcc recipients and template.',
+        docsUrl: '/.claude/guide/email.md',
+        websiteUrl: 'https://nodemailer.com',
+        note: 'For Gmail, use an App Password (not your account password). Settings: smtp.gmail.com, port 465, SSL/secure on.',
+        fields: [
+            { id: 'host', label: 'SMTP host', type: 'text', placeholder: 'smtp.gmail.com' },
+            { id: 'port', label: 'Port', type: 'text', placeholder: '465' },
+            { id: 'secure', label: 'Use SSL/TLS (port 465)', type: 'checkbox' },
+            { id: 'smtpUser', label: 'SMTP user', type: 'text', placeholder: 'you@gmail.com' },
+            { id: 'password', label: 'SMTP password / App password', type: 'password', placeholder: '••••••••••••••••' },
+            { id: 'fromName', label: 'From name (optional)', type: 'text', placeholder: 'Doweit Voice' },
+            { id: 'fromEmail', label: 'From email (optional)', type: 'text', placeholder: 'agent@example.com' },
         ]
     },
 ];
@@ -127,16 +162,21 @@ export default function IntegrationsPage() {
     // Check for success/error parameters in the URL on mount
     useEffect(() => {
         const status = searchParams.get('status');
+        const provider = searchParams.get('provider');
         const error = searchParams.get('error');
 
         if (status === 'success') {
-            toast.success("Successfully connected to Google!");
-            // Clean the URL
+            const label = provider
+                ? provider[0].toUpperCase() + provider.slice(1)
+                : 'the integration';
+            toast.success(`Successfully connected to ${label}!`);
             router.replace('/callagents/Integrations');
         } else if (error) {
-            toast.error("Failed to connect to Google. Please try again.");
-            console.error("Google OAuth Error Code:", error);
-            // Clean the URL
+            // Backend prefixes provider-specific errors with the provider name
+            // (e.g. "slack_exchange_failed"). Strip that for the toast.
+            const friendly = String(error).replace(/_/g, ' ');
+            toast.error(`Failed to connect: ${friendly}`);
+            console.error("OAuth error code:", error);
             router.replace('/callagents/Integrations');
         }
 
