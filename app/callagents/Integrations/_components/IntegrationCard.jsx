@@ -2,10 +2,10 @@
 "use client";
 
 import React from 'react';
-import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { FiCheckCircle } from 'react-icons/fi'; // Import the checkmark icon
 import { uiColors } from '../../_constants/uiConstants';
+import IntegrationLogo from './IntegrationLogo';
 
 const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -38,7 +38,7 @@ export default function IntegrationCard({ integration, onCardClick }) {
             )}
 
             <div className={`relative w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg border ${uiColors.borderPrimary}`}>
-                <Image src={integration.logo} alt={`${integration.name} Logo`} width={24} height={24} objectFit="contain" />
+                <IntegrationLogo integration={integration} size={24} />
             </div>
             <div className="flex-grow">
                 <h3 className={`font-semibold ${uiColors.textPrimary}`}>{integration.name}</h3>
