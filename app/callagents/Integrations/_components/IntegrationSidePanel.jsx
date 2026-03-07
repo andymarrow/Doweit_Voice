@@ -2,11 +2,11 @@
 "use client";
 
 import React from 'react';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiInfo, FiBookOpen, FiGlobe, FiCheckCircle, FiCircle } from 'react-icons/fi';
 import { uiColors } from '../../_constants/uiConstants';
 import DynamicIntegrationForm from './forms/DynamicIntegrationForm';
+import IntegrationLogo from './IntegrationLogo';
 import Link from 'next/link';
 
 const panelVariants = {
@@ -44,7 +44,7 @@ export default function IntegrationSidePanel({ isOpen, onClose, integration, onS
                         <div className={`flex items-center justify-between p-4 border-b ${uiColors.borderPrimary}`}>
                             <div className="flex items-center space-x-3">
                                 <div className={`relative w-8 h-8 flex items-center justify-center rounded-md border ${uiColors.borderPrimary}`}>
-                                    <Image src={integration.logo} alt={`${integration.name} Logo`} width={20} height={20} objectFit="contain" />
+                                    <IntegrationLogo integration={integration} size={20} />
                                 </div>
                                 <h2 className={`text-lg font-semibold ${uiColors.textPrimary}`}>{integration.name}</h2>
                             </div>
