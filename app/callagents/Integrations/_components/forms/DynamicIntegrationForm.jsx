@@ -11,7 +11,7 @@ export default function DynamicIntegrationForm({ integration, onSuccess, isConne
     // This state is only for key-based auth (like ElevenLabs, Twilio)
     const initialFormState = integration.fields.reduce((acc, field) => {
         if (field.type !== 'info' && field.type !== 'oauth') {
-            acc[field.id] = '';
+            acc[field.id] = field.type === 'checkbox' ? false : '';
         }
         return acc;
     }, {});
@@ -21,8 +21,11 @@ export default function DynamicIntegrationForm({ integration, onSuccess, isConne
     const [error, setError] = useState('');
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -63,9 +66,24 @@ export default function DynamicIntegrationForm({ integration, onSuccess, isConne
         switch (field.type) {
             case 'info':
                 return <p key={field.id} className={`text-sm ${uiColors.textSecondary}`}>{field.text}</p>;
-            
+
             case 'oauth':
                 return <OAuthConnectButton key={field.id} field={field} onSuccess={onSuccess} integrationId={integration.id} />;
+
+            case 'checkbox':
+                return (
+                    <label key={field.id} className={`flex items-center gap-2 text-sm ${uiColors.textSecondary}`}>
+                        <input
+                            type="checkbox"
+                            name={field.id}
+                            id={field.id}
+                            checked={!!formData[field.id]}
+                            onChange={handleChange}
+                            disabled={isConnecting || isConnected}
+                        />
+                        {field.label}
+                    </label>
+                );
 
             default: // Renders text, password, etc.
                 return (
