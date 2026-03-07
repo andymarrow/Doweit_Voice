@@ -4,27 +4,23 @@
 
 import React, { useState } from 'react';
 import { FiLoader } from 'react-icons/fi';
-import Image from 'next/image';
 import { uiColors } from '../../../_constants/uiConstants';
+import IntegrationLogo from '../IntegrationLogo';
 
 export default function OAuthConnectButton({ field, onSuccess, integrationId }) {
     const [isConnecting, setIsConnecting] = useState(false);
 
-    const getLogo = (provider) => {
-        switch(provider) {
-            case 'google': return '/integrations/google-logo.svg';
-            case 'slack': return '/integrations/slack.png';
-            case 'trello': return '/integrations/trello.jpg';
-            default: return '';
-        }
-    };
-
     const handleConnect = () => {
         setIsConnecting(true);
-        // --- THIS IS THE KEY CHANGE ---
-        // Instead of a timeout, redirect to your backend API route.
-        // The browser will handle the rest of the redirection flow.
         window.location.href = `/api/integrations/connect/${field.provider}`;
+    };
+
+    // Pass a synthetic integration object to IntegrationLogo so the fallback
+    // renders the right colored letter when a logo PNG is missing.
+    const logoIntegration = {
+        id: field.provider,
+        name: field.provider || "Integration",
+        logo: field.logo || null,
     };
 
     return (
@@ -39,7 +35,11 @@ export default function OAuthConnectButton({ field, onSuccess, integrationId }) 
                     <FiLoader className="w-5 h-5 animate-spin" />
                 ) : (
                     <>
-                        {field.provider && <Image src={getLogo(field.provider)} alt="" width={20} height={20} className="mr-2" />}
+                        {field.provider && (
+                            <span className="mr-2">
+                                <IntegrationLogo integration={logoIntegration} size={20} />
+                            </span>
+                        )}
                         {field.text}
                     </>
                 )}
