@@ -346,7 +346,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 								// Link to the chat page of the recent character
 								<Link
 									key={character.id}
-									href={`/characterai/chat/${character.id}`}
+									href={`/characterai/chat/${character.publicId || character.id}`}
 									legacyBehavior
 								>
 									<a
