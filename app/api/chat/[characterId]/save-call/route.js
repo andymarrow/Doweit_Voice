@@ -5,6 +5,7 @@ import { db } from "@/lib/database";
 import { chatMessages } from "@/lib/db/schemaCharacterAI"; // Adjust the import path if necessary
 import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
+import { resolveCharacterId } from "@/lib/utils/publicId";
 
 export async function POST(req, { params }) {
 	try {
@@ -16,11 +17,11 @@ export async function POST(req, { params }) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		const characterId = parseInt(params.characterId, 10); // Ensure characterId is a number
-		if (isNaN(characterId)) {
+		const characterId = await resolveCharacterId(params.characterId);
+		if (!characterId) {
 			return NextResponse.json(
-				{ error: "Invalid character ID" },
-				{ status: 400 },
+				{ error: "Character not found" },
+				{ status: 404 },
 			);
 		}
 
