@@ -82,7 +82,7 @@ function CharacterCard({ character, currentUserId, onLikeToggle }) {
 	const handleShareClick = (e) => {
 		e.preventDefault();
 		// Implement share logic here (e.g., copy link to clipboard)
-		const shareUrl = `${window.location.origin}/characterai/chat/${character.id}`;
+		const shareUrl = `${window.location.origin}/characterai/chat/${character.publicId || character.id}`;
 		navigator.clipboard
 			.writeText(shareUrl)
 			.then(() => {
@@ -208,7 +208,7 @@ function CharacterCard({ character, currentUserId, onLikeToggle }) {
 					</div>
 				</div>
 				{/* Chat Button */}
-				<Link href={`/characterai/chat/${character.id}`} legacyBehavior>
+				<Link href={`/characterai/chat/${character.publicId || character.id}`} legacyBehavior>
 					<a
 						className={`inline-flex items-center px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${uiColors.accentPrimaryGradient} text-white ${uiColors.hoverBgSubtle}`}
 					>
