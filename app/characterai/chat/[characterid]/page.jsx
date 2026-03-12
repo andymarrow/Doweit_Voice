@@ -709,7 +709,7 @@ export default function SingleCharacterChatRoom() {
 			console.warn("Cannot share: character not loaded.");
 			return;
 		}
-		const shareUrl = `${window.location.origin}/characterai/chat/${character.id}`;
+		const shareUrl = `${window.location.origin}/characterai/chat/${character.publicId || character.id}`;
 		try {
 			if (navigator.share) {
 				await navigator.share({
