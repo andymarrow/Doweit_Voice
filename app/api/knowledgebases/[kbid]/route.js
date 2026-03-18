@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { knowledgeBases } from "@/lib/db/schemaCharacterAI"; // Import KB and User schemas
 import { eq, and, or } from "drizzle-orm";
+import { resolveKnowledgeBaseId } from "@/lib/utils/publicId";
 
 // Define allowed fields that can be updated via this PATCH route for the KB itself
 const ALLOWED_KB_UPDATE_FIELDS = [
@@ -16,12 +17,6 @@ const ALLOWED_KB_UPDATE_FIELDS = [
 	"status", // Allow owner to update status (e.g., trigger re-processing)
 ];
 
-// Helper to parse KB ID
-function parseKbId(params) {
-	const id = parseInt(params.kbid, 10);
-	return isNaN(id) ? null : id;
-}
-
 // --- GET function: Fetch a specific Knowledge Base ---
 // GET /api/knowledgebases/[kbid]
 export async function GET(req, { params }) {
@@ -29,7 +24,7 @@ export async function GET(req, { params }) {
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
 
-	const kbId = parseKbId(params);
+	const kbId = await resolveKnowledgeBaseId(params.kbid);
 
 	if (kbId === null) {
 		console.warn(`[API KB DETAIL GET] Invalid kbId provided: ${params.kbid}`);
@@ -112,7 +107,7 @@ export async function PATCH(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const kbId = parseKbId(params);
+	const kbId = await resolveKnowledgeBaseId(params.kbid);
 
 	if (kbId === null) {
 		console.warn(`[API KB UPDATE PATCH] Invalid kbId provided: ${params.kbid}`);
@@ -280,7 +275,7 @@ export async function DELETE(req, { params }) {
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
 
-	const kbId = parseKbId(params);
+	const kbId = await resolveKnowledgeBaseId(params.kbid);
 
 	if (kbId === null) {
 		console.warn(`[API KB DELETE] Invalid kbId provided: ${params.kbid}`);
