@@ -136,7 +136,7 @@ export default function KnowledgeBasePage() {
 			}
 
 			handleCloseAddModal(); // Close the modal first
-			router.push(`/callagents/knowledgebase/${createdKb.id}`); // Navigate to the detail page
+			router.push(`/callagents/knowledgebase/${createdKb.publicId || createdKb.id}`); // Navigate to the detail page
 		} catch (err) {
 			console.error("[KnowledgeBasePage] Error creating knowledge base:", err);
 			// Set error state for creation
@@ -226,7 +226,7 @@ export default function KnowledgeBasePage() {
 								key={kb.id} // Use KB ID as key
 								kb={kb} // Pass the KB data
 								// Pass the navigation handler to make the card clickable
-								onClick={() => handleCardClick(kb.id)}
+								onClick={() => handleCardClick(kb.publicId || kb.id)}
 								// Optional: Pass delete handler if you add a delete button here
 								// onDelete={handleDeleteKb}
 								// Note: Edit/View handlers are typically not needed on the main list card as the click navigates
