@@ -31,7 +31,7 @@ import {
 // Data for the tool icons/links (remains here as it's specific to this part of the page)
 const agentTools = [
 	{ name: "Alan AI", icon: FiCpu, href: "/agents/alanai" },
-	{ name: "Recruitment Agent", icon: FiBriefcase, href: "/agents/marketplace" },
+	{ name: "Recruitment Agent", icon: FiBriefcase, href: "/agents" },
 	{ name: "Audio Booker", icon: FiBookOpen, href: "/agents/audiobooker" },
 	{ name: "Call Agents", icon: FiPhoneCall, href: "/callagents" }, // Note: Duplicate href with Meeting Leader
 	{ name: "Tutor", icon: FaMicrophoneAlt, href: "/agents/tutor" },
