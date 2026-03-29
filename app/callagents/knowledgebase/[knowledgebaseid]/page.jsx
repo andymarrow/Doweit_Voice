@@ -3,9 +3,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { FiSave, FiLoader, FiAlertTriangle, FiGlobe, FiLock } from 'react-icons/fi'; // Icons
+import { FiSave, FiLoader, FiAlertTriangle, FiGlobe, FiLock, FiTrash2 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 
 // Import components
@@ -79,7 +79,10 @@ const contentMethodComponents = {
 
 export default function KnowledgeBaseDetailPage() {
     const params = useParams();
-    const kbId = parseInt(params.knowledgebaseid, 10);
+    const router = useRouter();
+    // The URL segment can be either a UUID (publicId) or a legacy integer.
+    // The API resolves both forms — keep the raw string here for fetch URLs.
+    const kbId = params.knowledgebaseid;
 
     const [knowledgeBase, setKnowledgeBase] = useState(null); // Stores the fetched KB data
     const [isLoading, setIsLoading] = useState(true); // Loading initial fetch
@@ -95,6 +98,10 @@ export default function KnowledgeBaseDetailPage() {
     // State for adding content flow
     const [addContentMethod, setAddContentMethod] = useState(CONTENT_METHODS.CHOICES); // Controls current content addition step
     const [isAddingContent, setIsAddingContent] = useState(false); // State for content addition API call
+
+    // Delete-content + delete-KB state
+    const [deletingItemId, setDeletingItemId] = useState(null);
+    const [isDeletingKb, setIsDeletingKb] = useState(false);
 
 
     // --- Fetch KB Data on mount ---
@@ -314,6 +321,52 @@ export default function KnowledgeBaseDetailPage() {
      };
 
 
+    // Delete a single content entry from the KB by sending the trimmed
+    // content array back through the existing PATCH endpoint.
+    const handleDeleteContentItem = async (item, index) => {
+        if (!knowledgeBase?.isOwner || !kbId) return;
+        const itemKey = item.id || `item-${index}`;
+        if (!confirm('Delete this entry from the knowledge base? This cannot be undone.')) return;
+
+        setDeletingItemId(itemKey);
+        try {
+            const currentContent = Array.isArray(knowledgeBase.content) ? knowledgeBase.content : [];
+            const updatedContent = currentContent.filter((existing, i) => {
+                const existingKey = existing.id || `item-${i}`;
+                return existingKey !== itemKey;
+            });
+            const updatedKb = await updateKnowledgeBase(kbId, { content: updatedContent });
+            setKnowledgeBase(updatedKb);
+            toast.success('Entry deleted.');
+        } catch (err) {
+            console.error('[KB Detail Page] Error deleting content item:', err);
+            toast.error(`Delete failed: ${err.message}`);
+        } finally {
+            setDeletingItemId(null);
+        }
+    };
+
+    // Delete the entire knowledge base, then navigate back to the list.
+    const handleDeleteKb = async () => {
+        if (!knowledgeBase?.isOwner || !kbId || isDeletingKb) return;
+        if (!confirm(`Permanently delete "${knowledgeBase.name}"? Agents linked to it will lose this knowledge base.`)) return;
+
+        setIsDeletingKb(true);
+        try {
+            const res = await fetch(`/api/knowledgebases/${kbId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Failed (${res.status})`);
+            }
+            toast.success('Knowledge base deleted.');
+            router.push('/callagents/knowledgebase');
+        } catch (err) {
+            console.error('[KB Detail Page] Error deleting KB:', err);
+            toast.error(`Delete failed: ${err.message}`);
+            setIsDeletingKb(false);
+        }
+    };
+
      // Determine the current content input component to render
      const CurrentContentMethodComponent = contentMethodComponents[addContentMethod];
 
@@ -390,7 +443,12 @@ export default function KnowledgeBaseDetailPage() {
              >
                  <h2 className={`text-xl font-semibold ${uiColors.textPrimary}`}>Knowledge Base Content ({knowledgeBase.content?.length || 0})</h2>
                  {/* Display the list of existing content chunks */}
-                 <KbContentList content={knowledgeBase.content || []} />
+                 <KbContentList
+                    content={knowledgeBase.content || []}
+                    isOwner={knowledgeBase.isOwner}
+                    onDeleteItem={handleDeleteContentItem}
+                    deletingItemId={deletingItemId}
+                 />
              </motion.div>
 
 
@@ -422,13 +480,31 @@ export default function KnowledgeBaseDetailPage() {
                  </motion.div>
              )}
 
-             {/* Optional: Delete KB Button (Show only if owned) */}
-             {/* Implement delete handler and button here if needed */}
-             {/* {knowledgeBase.isOwner && (
-                  <motion.div ... variants={itemVariants}>
-                      <button onClick={handleDeleteKb} ... >Delete Knowledge Base</button>
-                  </motion.div>
-             )} */}
+             {/* Danger zone: permanently delete the KB. Owner-only. */}
+             {knowledgeBase.isOwner && (
+                 <motion.div
+                     className={`rounded-lg border border-red-300 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10 p-6`}
+                     variants={itemVariants}
+                 >
+                     <div className="flex items-start justify-between gap-4 flex-wrap">
+                         <div>
+                             <h3 className="text-base font-semibold text-red-700 dark:text-red-300 mb-1">Danger zone</h3>
+                             <p className="text-sm text-red-700/80 dark:text-red-300/80 max-w-xl">
+                                 Deleting this knowledge base is permanent. Any agents using it will fall back to no knowledge base.
+                             </p>
+                         </div>
+                         <button
+                             type="button"
+                             onClick={handleDeleteKb}
+                             disabled={isDeletingKb}
+                             className="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                             {isDeletingKb ? <FiLoader className="mr-2 w-4 h-4 animate-spin" /> : <FiTrash2 className="mr-2 w-4 h-4" />}
+                             Delete Knowledge Base
+                         </button>
+                     </div>
+                 </motion.div>
+             )}
 
         </motion.div>
     );
