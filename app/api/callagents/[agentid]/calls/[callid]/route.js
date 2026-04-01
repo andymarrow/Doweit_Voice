@@ -7,6 +7,7 @@ import { db } from "@/lib/database";
 import { calls } from "@/lib/db/schemaCharacterAI";
 import { eq } from "drizzle-orm";
 import { VapiClient } from "@vapi-ai/server-sdk";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 const VAPI_SECRET_API_KEY = process.env.VAPI_SECRET_KEY;
 
@@ -29,15 +30,11 @@ export async function DELETE(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = parseInt(params.agentid, 10);
+	const agentId = await resolveCallAgentId(params.agentid);
 	const callId = parseInt(params.callid, 10); // Get the specific call ID
 
-	// Validate IDs
-	if (isNaN(agentId)) {
-		console.warn(
-			`[API CALL DELETE] Invalid agentId provided: ${params.agentid}`,
-		);
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 	if (isNaN(callId)) {
 		console.warn(`[API CALL DELETE] Invalid callId provided: ${params.callid}`);
