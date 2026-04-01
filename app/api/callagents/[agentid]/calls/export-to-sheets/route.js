@@ -9,17 +9,18 @@ import { getAuthenticatedClient } from "@/lib/google/googleAuth";
 import { prepareCallDataForExport } from "@/lib/exportEngine";
 import { ensureHeaderRow, appendRows } from "@/lib/google/sheetsHelper";
 import { eq, and, inArray } from "drizzle-orm";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 export async function POST(req, { params }) {
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
 
-	const agentId = parseInt(params.agentid, 10);
+	const agentId = await resolveCallAgentId(params.agentid);
 
 	if (!userId)
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	if (isNaN(agentId))
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	if (!agentId)
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 
 	try {
 		const { callIds } = await req.json();
