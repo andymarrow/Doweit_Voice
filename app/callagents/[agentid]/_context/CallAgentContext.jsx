@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/[agentid]/_context/CallAgentContext.js
 "use client"; // This context will be used by client components
 

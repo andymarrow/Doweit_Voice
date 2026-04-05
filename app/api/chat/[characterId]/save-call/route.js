@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/chat/[characterId]/save-call/route.js
 import { NextResponse } from "next/server";
 import { db } from "@/lib/database";

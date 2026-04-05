@@ -1,3 +1,4 @@
+"use client";
 // characterai/create/_components/VoiceModal.jsx
 "use client";
 
@@ -355,4 +356,3 @@ function VoiceModal({ isOpen, onClose, onVoiceSelect }) {
 }
 
 export default VoiceModal;
-

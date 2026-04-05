@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-dashboard/_components/sidebar.jsx
 "use client";
 
@@ -582,4 +583,3 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 };
 
 export default Sidebar;
-

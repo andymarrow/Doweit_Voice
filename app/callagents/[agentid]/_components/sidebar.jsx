@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-CallAgents/[agentid]/_components/sidebar.jsx
 "use client";
 

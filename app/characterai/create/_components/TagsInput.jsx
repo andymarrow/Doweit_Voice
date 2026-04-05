@@ -1,3 +1,4 @@
+"use client";
 // characterai/create/_components/TagsInput.jsx
 "use client";
 
@@ -87,4 +88,3 @@ function TagsInput({ tags, onAddTag, onRemoveTag }) {
 }
 
 export default TagsInput;
-

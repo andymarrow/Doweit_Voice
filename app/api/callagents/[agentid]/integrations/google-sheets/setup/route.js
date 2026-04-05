@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/callagents/[agentid]/integrations/google-sheets/setup/route.js
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
@@ -145,4 +146,3 @@ export async function POST(req, { params }) {
 		);
 	}
 }
-

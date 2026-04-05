@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-dashboard/layout.jsx
 "use client";
 
@@ -28,4 +29,3 @@ export default function DashboardLayout({ children }) {
 		</div>
 	);
 }
-

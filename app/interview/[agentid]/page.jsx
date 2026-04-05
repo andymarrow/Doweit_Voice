@@ -1,3 +1,4 @@
+"use client";
 // app/interview/[agentid]/page.jsx
 "use client";
 

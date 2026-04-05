@@ -1,3 +1,4 @@
+"use client";
 // characterai/chat/[characterid]/_components/SimulatedCallModal.jsx
 "use client";
 
@@ -246,4 +247,3 @@ function SimulatedCallModal({
 }
 
 export default SimulatedCallModal;
-

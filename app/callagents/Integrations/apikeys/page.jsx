@@ -1,3 +1,4 @@
+"use client";
 //app/callagents/Integrations/apikeys/page.jsx
 "use client";
 

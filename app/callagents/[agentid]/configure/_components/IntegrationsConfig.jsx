@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/[agentid]/configure/_components/IntegrationsConfig.jsx
 "use client";
 

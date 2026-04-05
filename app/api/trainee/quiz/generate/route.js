@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/trainee/quiz/generate/route.js
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";

@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/Integrations/_components/IntegrationsSidebar.jsx
 "use client";
 

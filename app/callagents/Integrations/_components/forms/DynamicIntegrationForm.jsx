@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/Integrations/_components/forms/DynamicIntegrationForm.jsx
 "use client";
 

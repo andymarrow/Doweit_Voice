@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-CallAgents/[agentid]/actions/_components/AddActionModal.jsx
 "use client";
 

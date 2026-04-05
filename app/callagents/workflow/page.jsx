@@ -1,3 +1,4 @@
+"use client";
 
 // Placeholder Simple Modals (for demo purposes)
 // app/callagents/workflow/page.jsx

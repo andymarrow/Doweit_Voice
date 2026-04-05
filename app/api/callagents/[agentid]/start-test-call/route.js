@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/callagents/[agentid]/start-test-call/route.js
 
 import { NextResponse } from "next/server";

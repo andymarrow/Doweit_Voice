@@ -1,3 +1,4 @@
+"use client";
 // characterai/create/_components/VoiceItem.jsx
 "use client";
 
@@ -99,4 +100,3 @@ function VoiceItem({
 }
 
 export default VoiceItem;
-

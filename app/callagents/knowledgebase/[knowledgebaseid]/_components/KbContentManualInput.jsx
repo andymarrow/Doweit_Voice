@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/knowledgebase/[knowledgebaseid]/_components/KbContentManualInput.jsx
 "use client";
 

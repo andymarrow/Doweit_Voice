@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RecruiterDashboard } from './modules/recruiter/Dashboard';
 import { MyInterviews } from './modules/recruiter/MyInterviews';
@@ -38,7 +38,7 @@ import {
   'lucide-react';
 import { cn } from './lib/utils';
 
-export default function App() {
+function AgentsPageContent() {
   const searchParams = useSearchParams();
 
   const [activeModule, setActiveModule] = useState('recruiter');
@@ -292,4 +292,12 @@ export default function App() {
       `}</style>
     </div>);
 
+}
+
+export default function AgentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AgentsPageContent />
+    </Suspense>
+  );
 }

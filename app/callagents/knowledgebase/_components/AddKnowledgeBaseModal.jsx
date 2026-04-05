@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/knowledgebase/_components/AddKnowledgeBaseModal.jsx
 "use client";
 

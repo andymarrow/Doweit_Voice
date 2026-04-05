@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-CallAgents/[agentid]/actions/page.jsx
 "use client";
 

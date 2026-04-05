@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/knowledgebase/[knowledgebaseid]/page.jsx
 "use client";
 

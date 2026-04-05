@@ -1,3 +1,4 @@
+"use client";
 // /app/callagents/actions/_components/CreateActionModal.jsx
 "use client";
 
