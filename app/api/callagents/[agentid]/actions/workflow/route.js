@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/callagents/[agentid]/workflow/route.js
 
 import { NextResponse } from "next/server";

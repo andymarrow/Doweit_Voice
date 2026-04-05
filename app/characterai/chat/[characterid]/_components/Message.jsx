@@ -1,3 +1,4 @@
+"use client";
 // characterai/chat/[characterid]/_components/Message.jsx
 "use client";
 
@@ -127,4 +128,3 @@ function Message({
 }
 
 export default Message;
-

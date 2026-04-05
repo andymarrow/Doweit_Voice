@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/integrations/connect/elevenlabs/route.js
 
 import { NextResponse } from "next/server";

@@ -1,3 +1,4 @@
+"use client";
 // characterai/create/_components/ImageUploadSection.jsx
 "use client";
 

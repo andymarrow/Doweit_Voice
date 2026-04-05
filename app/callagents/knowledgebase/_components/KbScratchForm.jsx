@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/knowledgebase/_components/KbScratchForm.jsx
 "use client";
 

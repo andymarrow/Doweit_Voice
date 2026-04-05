@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/interview/snapshot/route.js
 import { NextResponse } from "next/server";
 import { db } from "@/lib/database";

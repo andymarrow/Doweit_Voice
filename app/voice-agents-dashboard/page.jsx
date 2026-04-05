@@ -60,10 +60,10 @@ export default function DashboardPage() {
 			>
 				{/* Background Image */}
 				<Image
-					src="/AppCategory/mobileApplication.jpg" // Use your image path
+					src="/AppCategory/mobileApplication.jpg"
 					alt="AI Voice Agents Banner"
-					layout="fill"
-					objectFit="cover"
+					fill
+					style={{ objectFit: "cover" }}
 					priority={true}
 					className="z-0"
 				/>

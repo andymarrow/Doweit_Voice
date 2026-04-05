@@ -1,3 +1,4 @@
+"use client";
 // characterai/_components/sidebar.jsx
 "use client";
 

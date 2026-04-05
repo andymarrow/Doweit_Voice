@@ -1,3 +1,4 @@
+"use client";
 // characterai/layout.jsx
 "use client";
 

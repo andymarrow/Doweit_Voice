@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-CallAgents/layout.jsx
 "use client";
 

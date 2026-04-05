@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/chat/[characterId]/route.js - Handles fetching chat history
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";

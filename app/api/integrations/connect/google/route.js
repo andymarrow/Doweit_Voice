@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/integrations/connect/google/route.js
 import { NextResponse } from "next/server";
 import { getGoogleAuthClient, GOOGLE_AUTH_SCOPES } from "@/lib/google/googleAuth";

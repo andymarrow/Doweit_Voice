@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/[agentid]/AgentLayoutClient.jsx
 "use client";
 

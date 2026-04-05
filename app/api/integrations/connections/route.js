@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 // app/api/integrations/connections/route.js
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";

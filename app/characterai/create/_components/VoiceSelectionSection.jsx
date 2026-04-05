@@ -1,3 +1,4 @@
+"use client";
 // characterai/create/_components/VoiceSelectionSection.jsx
 "use client";
 
@@ -170,4 +171,3 @@ function VoiceSelectionSection({ selectedVoice, onChooseVoiceClick }) {
 }
 
 export default VoiceSelectionSection;
-

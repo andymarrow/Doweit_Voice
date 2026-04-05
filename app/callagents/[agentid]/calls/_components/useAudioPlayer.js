@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-CallAgents/[agentid]/calls/_components/useAudioPlayer.js
 "use client";
 

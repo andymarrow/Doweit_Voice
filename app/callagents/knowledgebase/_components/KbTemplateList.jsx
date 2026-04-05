@@ -1,3 +1,4 @@
+"use client";
 // app/callagents/knowledgebase/_components/KbTemplateList.jsx
 "use client";
 

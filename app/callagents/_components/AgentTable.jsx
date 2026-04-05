@@ -1,3 +1,4 @@
+"use client";
 // voice-agents-dashboard/_components/AgentTable.jsx
 "use client";
 
