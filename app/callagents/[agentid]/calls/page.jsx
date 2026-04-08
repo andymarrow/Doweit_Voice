@@ -59,7 +59,7 @@ const deleteCall = async (agentId, callId) => {
 export default function CallsPage() {
     // Get agent data from context
     const agent = useCallAgent();
-    const agentId = agent?.id; // Use agent ID from context
+    const agentId = agent?.publicId;
 
     const [allCalls, setAllCalls] = useState([]); // State for all calls fetched from API
     const [isLoading, setIsLoading] = useState(true); // Loading state for initial fetch
@@ -341,7 +341,7 @@ export default function CallsPage() {
                         calls={filteredCalls} 
                         onViewDetails={handleViewDetails} 
                         agentName={agent.name} 
-                        agentId={agent.id}
+                        agentId={agent.publicId}
                         selectedCallIds={selectedCallIds}
                         onSelectCall={handleSelectCall}
                         onSelectAll={handleSelectAll}
