@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 // Import constants - Adjust path if necessary
 import { uiColors } from '@/app/callagents/_constants/uiConstants'; // Ensure correct path
 import { itemVariants, sectionVariants } from '@/app/callagents/_constants/uiConstants'; // Assuming variants
-import { FiPlayCircle } from 'react-icons/fi';
+import { FiPlayCircle,FiCheck } from 'react-icons/fi';
 // Removed accentClasses import as it wasn't used directly in the button class
 
 // FIX: Accept agentName as a prop
