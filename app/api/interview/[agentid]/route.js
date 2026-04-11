@@ -3,14 +3,15 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/database";
 import { callAgents, users } from "@/lib/db/schemaCharacterAI";
 import { eq, and } from "drizzle-orm";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
-    const agentId = parseInt(params.agentid, 10);
-    
-    if (isNaN(agentId)) {
-        return NextResponse.json({ error: "Invalid Link" }, { status: 400 });
+    const agentId = await resolveCallAgentId(params.agentid);
+
+    if (!agentId) {
+        return NextResponse.json({ error: "Invalid Link" }, { status: 404 });
     }
 
     try {
