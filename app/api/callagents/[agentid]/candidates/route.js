@@ -5,16 +5,20 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { interviews, callAgents } from "@/lib/db/schemaCharacterAI";
 import { eq, and, desc } from "drizzle-orm";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req, { params }) {
     const { user } = await getSession(await headers());
     const userId = user?.id;
-    const agentId = parseInt(params.agentid, 10);
+    const agentId = await resolveCallAgentId(params.agentid);
 
     if (!userId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!agentId) {
+        return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
     try {
