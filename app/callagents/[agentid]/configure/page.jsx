@@ -67,7 +67,7 @@ export default function AgentConfigurePage() {
 	const [isDirty, setIsDirty] = useState(false); // Track if changes have been made
 
 	// Get agentId from the initialAgent object
-	const agentId = initialAgent?.id;
+	const agentId = initialAgent?.publicId;
 	const router = useRouter();
 
 	// Effect to initialize configData state when the initialAgent object is available
