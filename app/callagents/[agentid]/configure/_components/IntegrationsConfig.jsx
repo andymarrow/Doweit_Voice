@@ -41,7 +41,7 @@ export default function IntegrationsConfig() {
         setIsSettingUp(true);
         toast.loading('Setting up Google Sheet...');
         try {
-            const response = await fetch(`/api/callagents/${agent.id}/integrations/google-sheets/setup`, {
+            const response = await fetch(`/api/callagents/${agent.publicId}/integrations/google-sheets/setup`, {
                 method: 'POST',
             });
             const data = await response.json();
