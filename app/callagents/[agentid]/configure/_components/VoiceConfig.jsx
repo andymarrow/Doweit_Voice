@@ -28,10 +28,10 @@ function VoiceConfig({ config, onConfigChange, agentId }) {
         console.log("[VoiceConfig] Voice selected from modal:", voice);
         // Update the voiceConfig in the parent state with the new voice details
         onConfigChange('voiceConfig', {
-            ...voiceConfig, // Keep existing voiceConfig properties
+            ...voiceConfig,
             voiceId: voice.voiceId,
             voiceName: voice.name,
-            voiceProvider: voice.platform, // Map platform to provider
+            voiceProvider: voice.provider, // actual Vapi provider string (e.g. "11labs", "openai", "cartesia")
             // You might want to store other voice details here too
             // e.g., voiceAvatarUrl: voice.avatar,
             // gender: voice.gender, accent: voice.accent
