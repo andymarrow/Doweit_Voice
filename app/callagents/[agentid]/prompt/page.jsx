@@ -67,8 +67,7 @@ export default function PromptPage() {
     const [saveError, setSaveError] = useState(null);
     const [isDirty, setIsDirty] = useState(false); // Track if changes have been made
 
-    // Get agentId from the initialAgent object
-    const agentId = initialAgent?.id;
+    const agentId = initialAgent?.publicId;
 
     // Effect to initialize prompt state when the initialAgent object is available
     useEffect(() => {
