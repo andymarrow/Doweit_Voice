@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Keep useEffect if initial setup is needed
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { FiCheck, FiChevronRight, FiLoader, FiTrash2, FiX } from 'react-icons/fi'; // Include FiX for vocab remove
+import { FiCheck, FiChevronRight, FiExternalLink, FiLoader, FiTrash2, FiUpload, FiX } from 'react-icons/fi';
 
 import { toast } from 'react-hot-toast';
 
@@ -29,15 +29,52 @@ const [isDeleting, setIsDeleting] = useState(false); // State to handle deletion
     // Their values come from the 'config' prop.
     // Only need state for temporary input like 'newVocabTerm'.
      const [newVocabTerm, setNewVocabTerm] = useState('');
-    
+
+    // Image upload
+    const fileInputRef = useRef(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [localPreview, setLocalPreview] = useState(null);
+
      const router=useRouter();
      
-    // Placeholder function for image handling (more complex in reality)
-    // This would ideally trigger an API call to remove/update the avatarUrl
     const handleRemoveImage = () => {
-        // In a real app, you'd call an API here, then update the state via onConfigChange
-        console.log(`[GeneralConfig] Removing image for agent ${agentId} (simulated)`);
-        onConfigChange('avatarUrl', null); // Update parent state to null
+        if (localPreview) {
+            URL.revokeObjectURL(localPreview);
+            setLocalPreview(null);
+        }
+        onConfigChange('avatarUrl', null);
+    };
+
+    const handleImageClick = () => fileInputRef.current?.click();
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Show local preview immediately (optimistic)
+        const objectUrl = URL.createObjectURL(file);
+        setLocalPreview(objectUrl);
+        setIsUploading(true);
+
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch(`/api/callagents/${agentId}/avatar`, { method: 'POST', body: fd });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Upload failed');
+            }
+            const { avatarUrl } = await res.json();
+            onConfigChange('avatarUrl', avatarUrl);
+            toast.success('Image updated');
+        } catch (err) {
+            toast.error(err.message || 'Failed to upload image');
+            setLocalPreview(null);
+        } finally {
+            setIsUploading(false);
+            URL.revokeObjectURL(objectUrl);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
      const handleSetupSheet = async () => {
@@ -232,42 +269,74 @@ const [isDeleting, setIsDeleting] = useState(false); // State to handle deletion
                 <label className={`block text-lg font-medium ${uiColors.textSecondary}`}>
                     Image
                 </label>
-                <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
-                    An optional image that will be displayed in your agents list.
+                <p className={`text-md mb-3 ${uiColors.textPlaceholder}`}>
+                    An optional image displayed in your agents list.
                 </p>
-                <div className="flex items-center space-x-4">
-                     {/* Use avatarUrl from config */}
-                     {config.avatarUrl && (
-                         <div className="flex-shrink-0">
-                             <Image
-                                 src={config.avatarUrl}
-                                 alt="Agent Avatar"
-                                 width={64}
-                                 height={64}
-                                 className="rounded-md object-cover" // Added object-cover
-                             />
-                         </div>
-                     )}
-                    <div className="flex flex-col items-start">
-                         <p className={`text-md ${uiColors.textPlaceholder} mb-2`}>
-                             Recommended size: 250px x 250px
-                         </p>
-                         {/* Placeholder for file upload button */}
-                         {/* You'd replace this with actual file input logic */}
-                         {/* <button className={`px-3 py-1.5 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}>
-                             Upload Image
-                         </button> */}
-                         {/* Show remove button only if an image exists */}
-                         {config.avatarUrl && (
-                              <button
-                                  onClick={handleRemoveImage} // Use the handler
-                                  className={`inline-flex items-center px-3 py-1.5 text-lg rounded-md ${uiColors.bgSecondary} ${uiColors.textSecondary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}
-                              >
-                                  <FiTrash2 className="mr-1 w-4 h-4" /> Remove
-                              </button>
-                         )}
+                <div className="flex items-center gap-4">
+                    {/* Clickable avatar preview */}
+                    <button
+                        type="button"
+                        onClick={handleImageClick}
+                        disabled={isUploading}
+                        className={`relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 group ${uiColors.bgSecondary} border ${uiColors.borderPrimary} flex items-center justify-center focus:outline-none focus:ring-2 ${uiColors.ringAccentShade} disabled:opacity-70`}
+                    >
+                        {localPreview ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={localPreview} alt="Preview" className="w-full h-full object-cover" />
+                        ) : config.avatarUrl ? (
+                            <Image src={config.avatarUrl} alt="Agent avatar" fill className="object-cover" sizes="64px" />
+                        ) : (
+                            <span className={`text-lg font-bold select-none ${uiColors.textSecondary}`}>
+                                {(() => {
+                                    const parts = (config.name || '').trim().split(/\s+/);
+                                    return ((parts[0]?.[0] || '').toUpperCase() + (parts.length > 1 ? (parts[parts.length - 1]?.[0] || '').toUpperCase() : '')) || '?';
+                                })()}
+                            </span>
+                        )}
+                        {/* Hover / uploading overlay */}
+                        <span className={`absolute inset-0 flex items-center justify-center transition-opacity bg-black/40 ${isUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                            {isUploading
+                                ? <FiLoader className="w-5 h-5 text-white animate-spin" />
+                                : <FiUpload className="w-5 h-5 text-white" />
+                            }
+                        </span>
+                    </button>
+
+                    {/* Buttons + hint */}
+                    <div className="flex flex-col gap-2">
+                        <button
+                            type="button"
+                            onClick={handleImageClick}
+                            disabled={isUploading}
+                            className={`inline-flex items-center px-3 py-1.5 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle} disabled:opacity-50`}
+                        >
+                            {isUploading
+                                ? <FiLoader className="mr-1.5 w-4 h-4 animate-spin" />
+                                : <FiUpload className="mr-1.5 w-4 h-4" />
+                            }
+                            {(config.avatarUrl || localPreview) ? 'Replace image' : 'Upload image'}
+                        </button>
+                        {(config.avatarUrl || localPreview) && !isUploading && (
+                            <button
+                                type="button"
+                                onClick={handleRemoveImage}
+                                className={`inline-flex items-center px-3 py-1.5 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textSecondary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}
+                            >
+                                <FiTrash2 className="mr-1.5 w-4 h-4" /> Remove
+                            </button>
+                        )}
+                        <p className={`text-xs ${uiColors.textPlaceholder}`}>PNG, JPG, WebP · max 5 MB · 250×250 px recommended</p>
                     </div>
                 </div>
+
+                {/* Hidden file input */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    className="hidden"
+                    onChange={handleFileChange}
+                />
             </div>
 
             {/* Voice Engine */}
@@ -359,47 +428,16 @@ const [isDeleting, setIsDeleting] = useState(false); // State to handle deletion
                  </select>
             </div>
 
-            {/* Knowledge Base */}
-             <div>
-                 <label className={`block text-lg font-medium ${uiColors.textSecondary}`}>
-                     Knowledge Base
-                 </label>
-                 <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
-                     Fine-tune the agent by linking a knowledge base.
-                 </p>
-                 <div className={`p-3 rounded-md border ${uiColors.borderPrimary} w-full sm:max-w-md flex items-center justify-between ${uiColors.bgSecondary} cursor-pointer ${uiColors.hoverBgSubtle}`}
-                      onClick={handleOpenSelectKbModal} // *** Open modal on click ***
-                 >
-                    {isLoadingLinkedKb ? (
-                         <span className={`text-sm ${uiColors.textSecondary} flex items-center`}>
-                              <FiLoader className="animate-spin mr-2" /> Loading linked KB...
-                         </span>
-                    ) : linkedKbError ? (
-                         <span className={`text-sm ${uiColors.textDanger}`}>{linkedKbError}</span>
-                    ) : config.knowledgeBaseId ? (
-                         // Display the fetched linked KB name and ID
-                         <span className={`text-sm ${uiColors.textPrimary}`}>
-                              Linked: <strong className="font-medium">{linkedKbName || 'Loading...'}</strong> (ID: {config.knowledgeBaseId})
-                         </span>
-                    ) : (
-                         // Display 'No Knowledge Base linked' when ID is null
-                         <span className={`text-sm ${uiColors.textSecondary}`}>No Knowledge Base linked</span>
-                    )}
-                     {/* Icon indicating clickable */}
-                     <FiChevronRight className={`w-5 h-5 ${uiColors.textSecondary}`} />
-                 </div>
-                  {/* Optional: Link to view the linked KB on the KB detail page (if exists and isOwner or public) */}
-                   {config.knowledgeBaseId && !isLoadingLinkedKb && !linkedKbError && (
-                       <div className="mt-2 text-sm">
-                           {/* You need to determine if the linked KB is accessible/owned to show this link */}
-                           {/* A more complex implementation might require fetching the KB's isOwner/isPublic status here */}
-                           {/* For now, assuming you can link, you can view if accessible */}
-                            {/* <a href={`/callagents/knowledgebase/${config.knowledgeBaseId}`} target="_blank" rel="noopener noreferrer" className={uiColors.textAccent}>
-                                View Knowledge Base <FiCheck className="inline w-3 h-3 ml-0.5 -mt-0.5" />
-                            </a> */}
-                       </div>
-                   )}
-             </div>
+            {/* Knowledge Base — picker + preview + open-editor link */}
+            <KnowledgeBaseSection
+                kbId={config.knowledgeBaseId}
+                linkedKbName={linkedKbName}
+                isLoadingLinkedKb={isLoadingLinkedKb}
+                linkedKbError={linkedKbError}
+                onPick={handleOpenSelectKbModal}
+                onUnlink={() => onConfigChange('knowledgeBaseId', null)}
+                uiColors={uiColors}
+            />
 
 
             {/* Custom Vocabulary */}
@@ -576,6 +614,130 @@ const [isDeleting, setIsDeleting] = useState(false); // State to handle deletion
              />
 
 
+        </div>
+    );
+}
+
+/**
+ * KnowledgeBaseSection
+ *
+ * Inline KB picker for the agent's General config. Beyond just letting the
+ * user pick + unlink, it pulls the linked KB's content and shows a
+ * read-only preview so the user can confirm at a glance what the agent has
+ * been trained on. The "Open editor" button takes them to the full KB page
+ * for proper editing — keeps this card from becoming a full-fat editor.
+ */
+function KnowledgeBaseSection({ kbId, linkedKbName, isLoadingLinkedKb, linkedKbError, onPick, onUnlink, uiColors }) {
+    const [kbContent, setKbContent] = useState(null);
+    const [contentLoading, setContentLoading] = useState(false);
+
+    useEffect(() => {
+        if (!kbId) { setKbContent(null); return; }
+        let cancelled = false;
+        setContentLoading(true);
+        fetch(`/api/knowledgebases/${kbId}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => { if (!cancelled) setKbContent(data); })
+            .catch(() => { if (!cancelled) setKbContent(null); })
+            .finally(() => { if (!cancelled) setContentLoading(false); });
+        return () => { cancelled = true; };
+    }, [kbId]);
+
+    // KB content can come back as { content: [{type,value,...}] } OR a flat
+    // string depending on KB type — flatten everything to a readable preview.
+    const previewText = (() => {
+        if (!kbContent) return '';
+        const items = Array.isArray(kbContent.content) ? kbContent.content : [];
+        if (items.length === 0 && typeof kbContent.content === 'string') return kbContent.content;
+        return items.map((it) => {
+            if (typeof it === 'string') return it;
+            if (it?.value) return it.value;
+            if (it?.url) return `[URL] ${it.url}`;
+            if (it?.fileName) return `[File] ${it.fileName}`;
+            return JSON.stringify(it);
+        }).join('\n\n');
+    })();
+
+    return (
+        <div>
+            <label className={`block text-lg font-medium ${uiColors.textSecondary}`}>
+                Knowledge Base
+            </label>
+            <p className={`text-md mb-2 ${uiColors.textPlaceholder}`}>
+                Fine-tune the agent by linking a knowledge base. Preview what it contains below.
+            </p>
+
+            <div className={`p-3 rounded-md border ${uiColors.borderPrimary} w-full sm:max-w-md flex items-center justify-between ${uiColors.bgSecondary}`}>
+                {isLoadingLinkedKb ? (
+                    <span className={`text-sm ${uiColors.textSecondary} flex items-center`}>
+                        <FiLoader className="animate-spin mr-2" /> Loading linked KB…
+                    </span>
+                ) : linkedKbError ? (
+                    <span className={`text-sm ${uiColors.textDanger}`}>{linkedKbError}</span>
+                ) : kbId ? (
+                    <span className={`text-sm ${uiColors.textPrimary}`}>
+                        Linked: <strong className="font-medium">{linkedKbName || 'Loading…'}</strong>
+                        <span className={`ml-1 text-xs ${uiColors.textPlaceholder}`}>(ID {kbId})</span>
+                    </span>
+                ) : (
+                    <span className={`text-sm ${uiColors.textSecondary}`}>No Knowledge Base linked</span>
+                )}
+            </div>
+
+            {/* Action row */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    onClick={onPick}
+                    className={`inline-flex items-center px-3 py-1.5 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}
+                >
+                    {kbId ? 'Change linked KB' : 'Link a Knowledge Base'}
+                </button>
+                {kbId && (
+                    <a
+                        href={`/callagents/knowledgebase/${kbId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center px-3 py-1.5 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textPrimary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}
+                    >
+                        Open editor <FiExternalLink className="ml-1.5 w-3.5 h-3.5" />
+                    </a>
+                )}
+                {kbId && (
+                    <button
+                        type="button"
+                        onClick={onUnlink}
+                        className={`inline-flex items-center px-3 py-1.5 text-sm rounded-md ${uiColors.bgSecondary} ${uiColors.textSecondary} border ${uiColors.borderPrimary} ${uiColors.hoverBgSubtle}`}
+                    >
+                        <FiX className="mr-1 w-4 h-4" /> Unlink
+                    </button>
+                )}
+            </div>
+
+            {/* Inline preview of the linked KB so users can SEE what's in it */}
+            {kbId && (
+                <div className={`mt-3 rounded-md border ${uiColors.borderPrimary} ${uiColors.bgSecondary}`}>
+                    <div className={`px-3 py-2 border-b ${uiColors.borderPrimary} flex items-center justify-between`}>
+                        <span className={`text-xs uppercase tracking-wider font-semibold ${uiColors.textPlaceholder}`}>
+                            Knowledge base content
+                        </span>
+                        {contentLoading && <FiLoader className={`animate-spin w-3.5 h-3.5 ${uiColors.textPlaceholder}`} />}
+                    </div>
+                    <div className="p-3 max-h-72 overflow-y-auto">
+                        {contentLoading && !kbContent ? (
+                            <p className={`text-sm ${uiColors.textPlaceholder}`}>Loading content…</p>
+                        ) : previewText ? (
+                            <pre className={`text-xs whitespace-pre-wrap break-words font-sans ${uiColors.textPrimary}`}>
+                                {previewText}
+                            </pre>
+                        ) : (
+                            <p className={`text-sm ${uiColors.textPlaceholder}`}>
+                                This KB is empty — open the editor to add text, files, or URLs.
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
