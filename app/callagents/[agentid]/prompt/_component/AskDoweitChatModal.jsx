@@ -11,7 +11,7 @@ function AskDoweitChatModal({ isOpen, onClose, agent }) {
     if (!isOpen) return null;
 
     // Extract relevant info from agent object
-    const agentId = agent?.id;
+    const agentId = agent?.publicId;
     const agentName = agent?.name || 'Unnamed Agent';
     const promptText = agent?.prompt || 'No prompt available.';
     const knowledgeBaseId = agent?.knowledgeBaseId;
