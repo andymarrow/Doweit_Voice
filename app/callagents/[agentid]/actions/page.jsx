@@ -78,7 +78,7 @@ export default function ActionsPage() {
     // Get agent data from context
     const agent = useCallAgent();
 	const router = useRouter();
-    const agentId = agent?.id; // Use agent ID from context
+    const agentId = agent?.publicId;
 
     // State for the active tab
     const [activeActionTab, setActiveActionTab] = useState('before'); // Default to 'before'
