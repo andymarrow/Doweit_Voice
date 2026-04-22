@@ -10,7 +10,8 @@ import Image from 'next/image';
 import {
     FiLayers, FiEdit3, FiZap, FiCompass, FiPhoneCall, FiFileText, FiUploadCloud, // Example Icons
     FiChevronLeft, FiChevronRight,
-    FiCopy, FiCheck // Added Copy and Check icons
+    FiCopy, FiCheck, // Added Copy and Check icons
+    FiShare2 // Integrations
 } from 'react-icons/fi';
 
 // Import constants
@@ -27,7 +28,7 @@ const detailSidebarNavItems = [
     { name: 'Actions', icon: FiZap, hrefSegment: 'actions' },
     { name: 'Deployment', icon: FiUploadCloud, hrefSegment: 'deployment' },
     { name: 'Calls', icon: FiPhoneCall, hrefSegment: 'calls' },
-    { name: 'Template', icon: FiFileText, hrefSegment: 'template' }, // Assuming a Template page exists
+    { name: 'Integrations', icon: FiShare2, hrefSegment: 'integrations' }
 ];
 
 const hireExpertData = {
@@ -48,11 +49,11 @@ function DetailAgentSidebar({ isCollapsed, toggleCollapse, onTestButtonClick }) 
 
      // --- Copy ID Logic ---
      const handleCopyClick = async () => {
-         if (!agent || !agent.id) return; // Can't copy if no agent or ID
+         if (!agent || !agent.publicId) return; // Can't copy if no agent or ID
 
          try {
              // Use the modern Clipboard API
-             await navigator.clipboard.writeText(String(agent.id));
+             await navigator.clipboard.writeText(String(agent.publicId));
              setIsCopied(true); // Set copied state to true
 
              // Reset copied state after a few seconds
@@ -71,7 +72,7 @@ function DetailAgentSidebar({ isCollapsed, toggleCollapse, onTestButtonClick }) 
 
      // Agent data is guaranteed to be available here because the layout handles the notFound case.
      // You can destructure properties directly:
-     const { id: agentId, name: agentName, type: agentType, avatarUrl: agentAvatarUrl, voiceEngine: agentVoiceEngine } = agent;
+     const { publicId: agentId, name: agentName, type: agentType, avatarUrl: agentAvatarUrl, voiceEngine: agentVoiceEngine } = agent;
 
 
      return (
@@ -118,7 +119,7 @@ function DetailAgentSidebar({ isCollapsed, toggleCollapse, onTestButtonClick }) 
                          <div className={`font-semibold text-lg ${uiColors.textPrimary} truncate`}>{agentName || 'Unnamed Agent'}</div>
                          {/* Use agentType and agentId, add Copy button */}
                           <div className={`text-sm ${uiColors.textSecondary} flex items-center justify-center`}> {/* Added flex and justify-center */}
-                             <span>{agentType ? agentType.charAt(0).toUpperCase() + agentType.slice(1) : 'Unknown Type'} - ID: ...{agentId ? String(agentId).slice(-3) : 'N/A'}</span> {/* Display truncated ID */}
+                             <span>{agentType ? agentType.charAt(0).toUpperCase() + agentType.slice(1) : 'Unknown Type'} - ID: ...{agentId ? String(agentId).slice(-8) : 'N/A'}</span>
                              {/* Add Copy Button next to the ID */}
                              {agentId && ( // Only show copy button if agentId exists
                                  <button
