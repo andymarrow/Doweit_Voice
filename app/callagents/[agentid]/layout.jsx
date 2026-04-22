@@ -1,81 +1,35 @@
 // app/callagents/[agentid]/layout.jsx
 import { notFound } from "next/navigation";
-import { db } from "@/lib/database";
-import { callAgents } from "@/lib/db/schemaCharacterAI";
-import { eq, and } from "drizzle-orm";
 import AgentDetailLayoutClient from "./AgentLayoutClient";
 import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
+import { findCallAgent, maybeRedirectLegacyId } from "@/lib/utils/publicId";
 
-// Utility to safely parse agentId from params
-function parseAgentId(params) {
-	const id = parseInt(params.agentid, 10);
-	return isNaN(id) ? null : id;
-}
-
-// ***** THIS IS THE CORRECTED FUNCTION *****
-async function getAgentDataWithKb(agentId, userId) {
-	if (!agentId || !userId) {
-		return null;
-	}
-	console.log(
-		`[AGENT LAYOUT SERVER] Fetching agent ID ${agentId} AND its Knowledge Base for user ${userId}`,
-	);
-
-	try {
-		// Direct DB query in Server Component that JOINS the knowledge base
-		const agent = await db.query.callAgents.findFirst({
-			where: and(eq(callAgents.id, agentId), eq(callAgents.creatorId, userId)),
-			// This `with` clause tells Drizzle to also fetch the related knowledge base
-			// and attach it to the agent object as `agent.knowledgeBase`
-			with: {
-				knowledgeBase: true,
-			},
-		});
-
-		if (agent) {
-			console.log(
-				`[AGENT LAYOUT SERVER] Found Agent: ${agent.name}. Knowledge Base attached: ${!!agent.knowledgeBase}`,
-			);
-		} else {
-			console.log(`[AGENT LAYOUT SERVER] Agent not found for ID ${agentId}.`);
-		}
-
-		return agent;
-	} catch (error) {
-		console.error(
-			`[AGENT LAYOUT SERVER] Database error fetching agent ${agentId} for user ${userId}:`,
-			error,
-		);
-		return null;
-	}
-}
-
-// This Server Component layout fetches data and renders the Client wrapper
+// Server Component layout that fetches the agent server-side and wraps the
+// client tree. Accepts `agentid` as either the new publicId UUID or the
+// legacy integer id; in the legacy case it redirects the user to the
+// publicId variant so old URLs upgrade automatically.
 export default async function AgentDetailLayout({ children, params }) {
-	// const { userId } = auth();
-	const { user } = await getSession(await headers());
+	const headersList = await headers();
+	const { user } = await getSession(headersList);
 	const userId = user?.id;
-	if (!userId) {
-		notFound();
-	}
+	if (!userId) notFound();
 
-	const agentId = parseAgentId(params);
+	const raw = params.agentid;
+	if (!raw) notFound();
 
-	if (!agentId) {
-		notFound();
-	}
+	const agent = await findCallAgent(raw, {
+		with: { knowledgeBase: true },
+	});
+	if (!agent || agent.creatorId !== userId) notFound();
 
-	// Fetch the agent data ON THE SERVER using the corrected function
-	const agent = await getAgentDataWithKb(agentId, userId);
+	await maybeRedirectLegacyId({
+		raw,
+		publicId: agent.publicId,
+		prefix: "/callagents",
+		headersList,
+	});
 
-	// If agent is not found for this user, render a 404 page
-	if (!agent) {
-		notFound();
-	}
-
-	// Pass the fetched agent data (which now includes the full knowledge base object)
-	// to the Client Component wrapper
 	return (
 		<AgentDetailLayoutClient agent={agent}>{children}</AgentDetailLayoutClient>
 	);
