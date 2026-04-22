@@ -25,8 +25,7 @@ export default function AgentDetailLayoutClient({ agent, children }) {
     // State to manage test panel visibility
     const [isTestPanelOpen, setIsTestPanelOpen] = useState(false);
 
-    // Use agent.id from the fetched agent object, which is guaranteed to exist here
-    const agentId = agent.id;
+    const agentId = agent.publicId;
 
 
     // Define sidebar widths (can use state for dynamic width)
