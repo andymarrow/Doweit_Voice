@@ -12,6 +12,7 @@ import { sectionVariants, itemVariants, uiColors } from '../_constants/uiConstan
 
 // Import the custom hook to get agent data from context
 import { useCallAgent } from './_context/CallAgentContext'; // Adjust path!
+import PhoneNumberCard from './_components/PhoneNumberCard';
 
 
 // Simulate fetching dashboard metrics data (calls, actions counts)
@@ -31,8 +32,7 @@ export default function AgentDetailMainPage() {
     // Get the full agent object from context
     const agent = useCallAgent(); // This hook will throw if context is not available
 
-    // Use agent.id for fetching page-specific data
-    const agentId = agent.id;
+    const agentId = agent.publicId;
 
     // State for dashboard metrics data
     const [dashboardMetrics, setDashboardMetrics] = useState({
@@ -76,23 +76,9 @@ export default function AgentDetailMainPage() {
     return (
         <div className="flex flex-col space-y-6 w-full h-full"> {/* Container takes full width/height */}
 
-            {/* Important Alert Banner */}
-            {/* Check if agent has a phone number from agent object */}
-            {/* Assuming phoneNumber is a field in your callAgents table schema */}
-             {!agent.phoneNumber && (
-                 <motion.div
-                      className={`flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 p-4 rounded-md border ${uiColors.alertWarningBorder} ${uiColors.alertWarningBg} ${uiColors.alertWarningText}`}
-                      variants={itemVariants} initial="hidden" animate="visible"
-                 >
-                     <div className="flex items-center flex-1">
-                         <FiAlertTriangle className="flex-shrink-0 w-5 h-5 mr-3" />
-                          <span className="text-sm">Important! Your agent doesn't have a phone number and can't receive calls.</span>
-                     </div>
-                      <button className={`w-full sm:w-auto px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.accentPrimaryGradient}`}>
-                          Assign number
-                      </button>
-                  </motion.div>
-             )}
+            {/* Phone-number card — handles both connect-a-number and the
+                "Call my phone" outbound test once a number is assigned. */}
+            <PhoneNumberCard agent={agent} />
 
 
             {/* Dashboard Header/Controls */}
