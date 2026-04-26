@@ -1,162 +1,168 @@
-// voice-agents-dashboard/page.jsx
 "use client";
 
 import React from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
-import {
-	FiBookOpen,
-	FiBriefcase,
-	FiCpu,
-	FiMessageCircle,
-	FiPhoneCall,
-	FiUsers,
-} from "react-icons/fi";
-import { FaMicrophoneAlt } from "react-icons/fa";
+import { 
+    PhoneCall, 
+    MessageSquare, 
+    Code2, 
+    Briefcase, 
+    ArrowRight,
+    Sparkles
+} from "lucide-react"; 
 
-// Import the new components
-import FeaturedSection from "./_components/FeaturedSection";
-import CommunityCreation from "./_components/CommunityCreation";
+// --- Framer Motion Variants ---
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: { staggerChildren: 0.1, delayChildren: 0.1 },
+    },
+};
 
-// Import constants
-import {
-	sectionVariants,
-	itemVariants as bannerItemVariants,
-	accentButtonClasses,
-	accentTextClasses,
-	accentBorderClasses,
-} from "./_constants/uiConstants";
+const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 15 } },
+};
 
-// Data for the tool icons/links (remains here as it's specific to this part of the page)
-const agentTools = [
-	{ name: "Alan AI", icon: FiCpu, href: "/agents/alanai" },
-	{ name: "Recruitment Agent", icon: FiBriefcase, href: "/agents" },
-	{ name: "Audio Booker", icon: FiBookOpen, href: "/agents/audiobooker" },
-	{ name: "Call Agents", icon: FiPhoneCall, href: "/callagents" }, // Note: Duplicate href with Meeting Leader
-	{ name: "Tutor", icon: FaMicrophoneAlt, href: "/agents/tutor" },
-	{ name: "Character AI", icon: FiMessageCircle, href: "/characterai" },
-	{ name: "Meeting Leader", icon: FiUsers, href: "/agents/meetingleader" }, // Note: Duplicate href with Call Agents
-	// Add more tools as needed
+// --- Portal Data ---
+const portals = [
+    {
+        id: "callagents",
+        title: "Call Agents",
+        tagline: "Telephony & Operations",
+        description: "Deploy autonomous voice agents to handle inbound customer support, outbound sales, and live appointment booking 24/7.",
+        icon: PhoneCall,
+        href: "/callagents",
+        // Unsplash: Abstract soundwaves/tech
+        image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop", 
+        color: "from-blue-600/90 to-cyan-600/90",
+        hoverColor: "group-hover:border-cyan-500/50 group-hover:shadow-cyan-500/20"
+    },
+    {
+        id: "embedded",
+        title: "Web Assistants",
+        tagline: "Embedded SDK",
+        description: "Wrap your website with our SDK. Expose your JavaScript functions and let our AI execute them based on user voice commands.",
+        icon: Code2,
+        href: "/callagents/embedded",
+        // Unsplash: Glowing code/laptop
+        image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1000&auto=format&fit=crop",
+        color: "from-purple-600/90 to-pink-600/90",
+        hoverColor: "group-hover:border-purple-500/50 group-hover:shadow-purple-500/20"
+    },
+    {
+        id: "recruitment",
+        title: "Recruitment AI",
+        tagline: "Automated Hiring",
+        description: "Generate AI interviewers from Job Descriptions. Send candidates a magic link and get detailed scorecards and anti-cheat reports.",
+        icon: Briefcase,
+        href: "/agents",
+        // Unsplash: Professional office/interview abstract
+        image: "https://images.unsplash.com/photo-1573164713988-8665fc963095?q=80&w=1000&auto=format&fit=crop",
+        color: "from-emerald-600/90 to-teal-600/90",
+        hoverColor: "group-hover:border-emerald-500/50 group-hover:shadow-emerald-500/20"
+    },
+    {
+        id: "character",
+        title: "Character AI",
+        tagline: "Entertainment & Chat",
+        description: "Create and chat with highly customized, persona-driven AI characters. Choose their voice, backstory, and share them with the community.",
+        icon: MessageSquare,
+        href: "/characterai",
+        // Unsplash: Creative neon abstract
+        image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop",
+        color: "from-orange-600/90 to-rose-600/90",
+        hoverColor: "group-hover:border-orange-500/50 group-hover:shadow-orange-500/20"
+    }
 ];
 
 export default function DashboardPage() {
-	return (
-		// Main content area wrapper. Added pb-8 for padding at the bottom.
-		<div
-			className="flex flex-col space-y-8 p-2 md:p-3 lg:p-4 pb-8 
-                         text-gray-800
-                         dark:text-gray-200
-                           hide-scrollbar"
-		>
-			{" "}
-			{/* Added base background, overflow, and hide-scrollbar here */}
-			{/* Banner Section */}
-			<motion.section
-				className="relative w-full rounded-xl overflow-hidden flex flex-col justify-center p-8 md:p-12 lg:p-16 min-h-[350px] md:min-h-[400px]" // Increased min height
-				variants={sectionVariants} // Using sectionVariants from constants
-				initial="hidden"
-				animate="visible"
-			>
-				{/* Background Image */}
-				<Image
-					src="/AppCategory/mobileApplication.jpg"
-					alt="AI Voice Agents Banner"
-					fill
-					style={{ objectFit: "cover" }}
-					priority={true}
-					className="z-0"
-				/>
+    return (
+        <div className="min-h-full flex flex-col p-4 md:p-6 lg:p-8 xl:max-w-7xl xl:mx-auto w-full">
+            
+            {/* --- 1. HERO / WELCOME SECTION --- */}
+            <motion.div 
+                className="relative w-full rounded-[2rem] overflow-hidden p-8 md:p-12 mb-8 border border-gray-200 dark:border-gray-800 shadow-sm"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+            >
+                <div className="absolute inset-0 bg-white dark:bg-gray-900 z-0"></div>
+                <div className="absolute -top-24 -right-24 w-96 h-96 bg-cyan-400/20 dark:bg-cyan-500/10 rounded-full blur-3xl z-0 pointer-events-none"></div>
+                <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-purple-500/20 dark:bg-purple-600/10 rounded-full blur-3xl z-0 pointer-events-none"></div>
+                <div className="absolute inset-0 z-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" 
+                     style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+                </div>
 
-				{/* Overlay */}
-				<div className="absolute inset-0 bg-black/50 dark:bg-black/60 z-10"></div>
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 text-xs font-bold uppercase tracking-widest mb-4 border border-cyan-100 dark:border-cyan-500/20">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Workspace Overview
+                        </div>
+                        <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-4">
+                            What are we building today?
+                        </h1>
+                        <p className="text-base md:text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
+                            Select a module below to manage your AI workforce. From autonomous call agents to embedded web assistants and interactive characters.
+                        </p>
+                    </div>
+                </div>
+            </motion.div>
 
-				{/* Banner Content */}
-				<div className="relative z-20 max-w-4xl mx-auto text-center text-white">
-					<motion.h1
-						className="text-3xl md:text-4xl lg:text-5xl font-extrabold mb-4 drop-shadow-md"
-						variants={bannerItemVariants} // Using renamed itemVariants
-					>
-						Discover Our Cutting-Edge AI Voice Agents
-					</motion.h1>
-					<motion.p
-						className="text-base md:text-lg mb-8 opacity-90 drop-shadow-sm"
-						variants={bannerItemVariants} // Using renamed itemVariants
-					>
-						Seamlessly integrate powerful AI into your workflow. Explore our
-						diverse range of agents, connect with the community, and unleash
-						your potential.
-					</motion.p>
-					{/* Main Call to Action Button */}
-					<motion.div variants={bannerItemVariants}>
-						<Link href="/marketplace" legacyBehavior>
-							<motion.a
-								className={`inline-block text-lg font-semibold px-8 py-3 rounded-full transition-transform duration-200 shadow-lg ${accentButtonClasses}`}
-								whileHover={{ scale: 1.05 }}
-								whileTap={{ scale: 0.98 }}
-							>
-								Explore Agents
-							</motion.a>
-						</Link>
-					</motion.div>
-				</div>
-			</motion.section>
-			{/* Agent Tools/Categories Section */}
-			{/* Note: This section still lives in page.jsx */}
-			<motion.section
-				className="w-full"
-				variants={sectionVariants} // Using sectionVariants from constants
-				initial="hidden"
-				animate="visible"
-			>
-				<h2
-					className="text-xl text-center md:text-2xl font-bold mb-6
-                               text-gray-800 dark:text-white"
-				>
-					Agent Tools
-				</h2>
-
-				{/* Horizontal Scrolling Container - REMOVED justify-center */}
-				<div className="flex overflow-x-auto justify-center space-x-6 pb-4 py-2 hide-scrollbar -mx-4 px-4 md:-mx-8 md:px-8 lg:-mx-12 lg:px-12">
-					{agentTools.map((tool) => (
-						// Using tool.name as key assumes unique names. If names can be same, add a unique ID to data.
-						<Link key={tool.name} href={tool.href} legacyBehavior>
-							<motion.a
-								className="group flex flex-col items-center space-y-2 flex-shrink-0 w-24 md:w-28 cursor-pointer text-center"
-								// variants={toolItemVariants} // Still uses toolItemVariants defined in constants
-								whileHover="hover"
-								whileTap={{ scale: 0.95 }}
-							>
-								{/* Icon Container - Uses subtle background and accent border on hover */}
-								<div
-									className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all duration-200 ease-in-out
-                                               bg-gray-100 dark:bg-gray-800
-                                               text-gray-600 dark:text-gray-300
-                                               border-2 border-transparent
-                                               group-hover:${accentBorderClasses} group-hover:${accentTextClasses}
-                                               group-hover:shadow-md dark:group-hover:shadow-lg`}
-								>
-									<tool.icon className="w-7 h-7 md:w-8 md:h-8" />
-								</div>
-								{/* Tool Name - Changes color on hover */}
-								<span
-									className="text-xs md:text-sm whitespace-normal transition-colors duration-200
-                                               text-gray-600 dark:text-gray-300
-                                               group-hover:${accentTextClasses}"
-								>
-									{tool.name}
-								</span>
-							</motion.a>
-						</Link>
-					))}
-				</div>
-			</motion.section>
-			{/* Featured Agents Section - Render the component */}
-			<FeaturedSection />
-			{/* Community Creations Section - Render the component */}
-			<CommunityCreation />
-			{/* Add other sections here as needed */}
-		</div>
-	);
+            {/* --- 2. MAIN PORTAL GRID --- */}
+            <motion.div 
+                className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+            >
+                {portals.map((portal) => (
+                    <motion.div key={portal.id} variants={itemVariants} className="h-full">
+                        <Link href={portal.href} className="block h-full">
+                            <div className={`group relative h-full rounded-[2rem] overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-xl transition-all duration-300 ${portal.hoverColor}`}>
+                                
+                                {/* Background Image */}
+                                <div 
+                                    className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105"
+                                    style={{ backgroundImage: `url(${portal.image})` }}
+                                ></div>
+                                
+                                {/* Gradient Overlay (Ensures text readability) */}
+                                <div className={`absolute inset-0 bg-gradient-to-br ${portal.color} opacity-90 dark:opacity-85 z-10`}></div>
+                                
+                                {/* Card Content */}
+                                <div className="relative z-20 p-8 flex flex-col h-full text-white">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-inner">
+                                            <portal.icon className="w-7 h-7 text-white" />
+                                        </div>
+                                        <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
+                                            <ArrowRight className="w-5 h-5" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-auto">
+                                        <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">
+                                            {portal.tagline}
+                                        </p>
+                                        <h2 className="text-3xl font-extrabold tracking-tight mb-3">
+                                            {portal.title}
+                                        </h2>
+                                        <p className="text-white/80 text-sm leading-relaxed max-w-[90%]">
+                                            {portal.description}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </Link>
+                    </motion.div>
+                ))}
+            </motion.div>
+            
+        </div>
+    );
 }
-
