@@ -7,7 +7,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import ThemeToggle from '@/components/Themetoggle';
+import { useSession, signOut } from '@/lib/auth-client';
 import { FiBookOpen, FiBriefcase, FiChevronDown, FiChevronLeft, FiChevronRight, FiChevronUp, FiExternalLink, FiPhone, FiSettings, FiShare2, FiUsers, FiZap, FiZapOff } from 'react-icons/fi';
+
+// Returns "FL" initials from a full name (or "U" if missing).
+function initialsFor(name, email) {
+    const src = (name || email || '').trim();
+    if (!src) return 'U';
+    const parts = src.split(/\s+/);
+    const first = (parts[0]?.[0] || '').toUpperCase();
+    const last  = parts.length > 1 ? (parts[parts.length - 1]?.[0] || '').toUpperCase() : '';
+    return (first + last) || src[0].toUpperCase();
+}
 
 // --- Reusable Accent Color Classes ---
 const accentClasses = {
@@ -34,17 +45,20 @@ const dropdownVariants = {
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const pathname = usePathname();
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+    const { data: session } = useSession();
+    const user = session?.user;
+    const displayName = user?.name || user?.email || 'Account';
+    const avatarLetters = initialsFor(user?.name, user?.email);
 
     const sidebarNavItems = [
         { name: 'Agents', icon: FiBriefcase, href: '/callagents' },
         { name: 'Knowledge Base', icon: FiBookOpen, href: '/callagents/knowledgebase' },
         { name: 'Actions', icon: FiZap, href: '/callagents/actions' },
         { name: 'Workflows', icon: FiShare2, href: '/callagents/workflow' },
-        { name: 'Contacts', icon: FiUsers, href: '/contacts' },
-        { name: 'Phone Numbers', icon: FiPhone, href: '/phone-numbers' },
+        { name: 'Contacts', icon: FiUsers, href: '/callagents/contacts' },
+        { name: 'Phone Numbers', icon: FiPhone, href: '/callagents/phone-numbers' },
         { name: 'Integrations', icon: FiSettings, href: '/callagents/Integrations' },
-        { name: 'Agency', icon: FiBriefcase, href: '/agency' },
-        { name: 'Getting Started', icon: FiZapOff, href: '/getting-started', badge: '0%' },
+        { name: 'Getting Started', icon: FiZapOff, href: '/callagents/getting-started', badge: '0%' },
     ];
 
     // --- KEY CHANGE: Define the sub-routes that are NOT the main "Agents" page ---
@@ -126,13 +140,18 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     {/* User Avatar (Placeholder) - Uses Accent Fill */}
                     <div className={`flex items-center ${isOpen ? '' : 'justify-center w-full'}`}>
                         {/* Avatar color uses solid accent */}
-                        <div className="w-8 h-8 bg-cyan-500 dark:bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-2 flex-shrink-0">
-                            P
-                        </div>
+                        {user?.image ? (
+                            // Real avatar from auth provider (e.g. Google profile picture).
+                            <img src={user.image} alt={displayName} className="w-8 h-8 rounded-full object-cover mr-2 flex-shrink-0" />
+                        ) : (
+                            <div className="w-8 h-8 bg-cyan-500 dark:bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-2 flex-shrink-0">
+                                {avatarLetters}
+                            </div>
+                        )}
                         <AnimatePresence>
                             {isOpen && (
-                                <motion.span key="profile-name" initial="collapsed" animate="open" exit="collapsed" variants={itemVariants} className="font-semibold whitespace-nowrap flex-grow text-gray-900 dark:text-white">
-                                    Miheretab sam
+                                <motion.span key="profile-name" initial="collapsed" animate="open" exit="collapsed" variants={itemVariants} className="font-semibold whitespace-nowrap flex-grow text-gray-900 dark:text-white truncate">
+                                    {displayName}
                                 </motion.span>
                             )}
                         </AnimatePresence>
@@ -168,7 +187,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                        <ThemeToggle />
                                    </div>
 
-                                <button onClick={() => {/* handle logout */}} className={`w-full text-left px-3 py-2 rounded transition-colors ${accentClasses.hoverBg}`}> {/* Subtle hover */}
+                                <button onClick={() => signOut()} className={`w-full text-left px-3 py-2 rounded transition-colors ${accentClasses.hoverBg}`}>
                                     Logout
                                 </button>
                             </div>
