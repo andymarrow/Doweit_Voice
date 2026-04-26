@@ -96,7 +96,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     const geminiTranscriptRef = useRef([]);
     const geminiStartTimeRef = useRef(null);
 
-    const agentId = agent?.id;
+    const agentId = agent?.publicId;
     const agentName = agent?.name || 'Unnamed Agent';
     
     // Determine if this agent is configured for Google Native
@@ -306,11 +306,25 @@ ${kbContent}
 // Cleanup whitespace
 everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
+            // Pull Cal.com tool definitions for this agent (if Cal.com is enabled).
+            // They're injected into the model so the agent can check availability /
+            // create bookings live during the test call.
+            let calcomAddons = null;
+            try {
+                const r = await fetch(`/api/callagents/${agentId}/integrations/calcom/runtime`);
+                if (r.ok) calcomAddons = await r.json();
+            } catch { /* non-fatal — calls just won't have calendar tools */ }
+            if (calcomAddons?.promptSuffix) {
+                everyContentPrompt = `${everyContentPrompt} ${calcomAddons.promptSuffix}`.trim();
+            }
+
             const vapiPayload = {
                 model: {
                     provider: "google",
 				    model: "gemini-2.5-flash",
-                    messages: [{ role: "system", content: everyContentPrompt }] },
+                    messages: [{ role: "system", content: everyContentPrompt }],
+                    ...(calcomAddons?.tools?.length ? { tools: calcomAddons.tools } : {}),
+                },
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
                 recordingEnabled: agent.callConfig?.enableRecordings || false,
