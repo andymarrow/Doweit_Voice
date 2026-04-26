@@ -16,6 +16,15 @@ import {
     uiAccentClasses
 } from '../_constants/uiConstants';
 
+// Returns "FL" initials from a full name (first letter of first + last word)
+function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    const first = (parts[0]?.[0] || '').toUpperCase();
+    const last  = parts.length > 1 ? (parts[parts.length - 1]?.[0] || '').toUpperCase() : '';
+    return first + last || '?';
+}
+
 // Utility to format date
 const formatDate = (isoString) => {
     if (!isoString) return 'N/A';
@@ -34,9 +43,13 @@ const formatDate = (isoString) => {
 function AgentTable({ agents }) { // Removed isLoading prop as parent handles loading state
     const router = useRouter();
 
-    const handleRowClick = (agentid) => {
-        console.log('Navigating to agent ID:', agentid);
-        router.push(`/callagents/${agentid}`);
+    const handleRowClick = (agent) => {
+        // Prefer the non-sequential publicId so URLs aren't enumerable.
+        // Older rows that were created before the publicId column gained a
+        // value still fall back to the integer id (the layout will redirect
+        // to the publicId once the user lands on the page).
+        const id = agent.publicId || agent.id;
+        router.push(`/callagents/${id}`);
     };
 
     // The parent handles the case where agents array is empty or loading,
@@ -45,12 +58,12 @@ function AgentTable({ agents }) { // Removed isLoading prop as parent handles lo
 
     return (
         <>
-            {/* Table Container */}
-            <div className={`rounded-lg overflow-hidden shadow-sm ${uiAccentClasses.borderColor} border`}>
-                 <div className="overflow-x-auto hide-scrollbar">
+            {/* Table Container — bounded vertical height + sticky header so long lists scroll inside the card instead of pushing the page. */}
+            <div className={`rounded-lg shadow-sm ${uiAccentClasses.borderColor} border`}>
+                 <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
                     <table className={`min-w-full divide-y ${uiAccentClasses.borderColor}`}>
-                        {/* Table Header */}
-                        <thead className={`${uiAccentClasses.bgPrimary}`}>
+                        {/* Table Header — sticky so it stays put while body scrolls. */}
+                        <thead className={`${uiAccentClasses.bgPrimary} sticky top-0 z-10 shadow-sm`}>
                             <tr>
                                 <th scope="col" className="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                                     {/* Checkbox - Placeholder */}
@@ -76,7 +89,7 @@ function AgentTable({ agents }) { // Removed isLoading prop as parent handles lo
                                     key={agent.id} // Use agent.id from the DB
                                     className={`transition-colors ${uiAccentClasses.hoverBgSubtle} cursor-pointer`}
                                      // Navigate using the real agent.id
-                                    onClick={() => handleRowClick(agent.id)}
+                                    onClick={() => handleRowClick(agent)}
                                 >
                                     {/* Checkbox Cell - Keep stopPropagation */}
                                     <td className="p-3 whitespace-nowrap text-sm font-medium text-gray-900 w-12">
@@ -90,9 +103,8 @@ function AgentTable({ agents }) { // Removed isLoading prop as parent handles lo
                                                     <Image src={agent.avatarUrl} alt={`${agent.name}'s avatar`} fill style={{objectFit:"cover"}} sizes="32px" />
                                                 </div>
                                             ) : (
-                                                // Placeholder avatar
                                                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center mr-3 text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                                    {agent.name ? agent.name.charAt(0).toUpperCase() + agent.name.slice(1) : ''}
+                                                    {getInitials(agent.name)}
                                                 </div>
                                             )}
                                             {agent.name}
