@@ -1,4 +1,3 @@
-"use client";
 // voice-agents-dashboard/_components/sidebar.jsx
 "use client";
 
@@ -6,28 +5,18 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import Link from "next/link";
-import {
-	FiHome,
-	FiGrid,
-	FiChevronDown,
-	FiChevronUp,
-	FiChevronLeft,
-	FiChevronRight,
-	FiDollarSign,
-	FiBookOpen,
-	FiPackage,
-	FiMessageCircle,
-	FiUsers,
-	FiBriefcase,
-	FiCpu,
-	FiInstagram,
-	FiLinkedin,
-	FiHelpCircle,
-	FiFileText,
-	FiPhoneCall,
-} from "react-icons/fi";
-import { FaMicrophoneAlt, FaTelegram } from "react-icons/fa";
+import { FiHome, FiGrid, FiChevronDown, FiChevronUp, FiChevronLeft, FiChevronRight, FiDollarSign, FiBookOpen, FiPackage, FiMessageCircle, FiBriefcase, FiCpu, FiInstagram, FiLinkedin, FiHelpCircle, FiFileText, FiPhoneCall, FiCode, FiKey } from "react-icons/fi";
 import ThemeToggle from "@/components/Themetoggle";
+import { useSession, signOut } from "@/lib/auth-client";
+
+function initialsFor(name, email) {
+	const src = (name || email || "").trim();
+	if (!src) return "U";
+	const parts = src.split(/\s+/);
+	const first = (parts[0]?.[0] || "").toUpperCase();
+	const last  = parts.length > 1 ? (parts[parts.length - 1]?.[0] || "").toUpperCase() : "";
+	return (first + last) || src[0].toUpperCase();
+}
 
 // Animation variants for sidebar elements
 const itemVariants = {
@@ -53,43 +42,32 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 	const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 	const [isRecruitmentDropdownOpen, setIsRecruitmentDropdownOpen] =
 		useState(false);
+	const { data: session } = useSession();
+	const user = session?.user;
+	const displayName = user?.name || user?.email || "Account";
+	const avatarLetters = initialsFor(user?.name, user?.email);
 
 	// Define sidebar items
 	const mainNavItems = [
-		{ name: "Home", icon: FiHome, href: "/dashboard" },
-		{ name: "Marketplace", icon: FiGrid, href: "/marketplace" },
+		{ name: "Workspace Home", icon: FiHome, href: "/voice-agents-dashboard" },
 	];
 
 	const agentToolItems = [
-		{
-			name: "Recruitment Agents",
-			icon: FiBriefcase,
-			isDropdown: true,
-			isOpen: isRecruitmentDropdownOpen,
-			toggle: () => setIsRecruitmentDropdownOpen(!isRecruitmentDropdownOpen),
-			subItems: [
-				{ name: "Recruiter", href: "/agents/recruiter" },
-				{ name: "Recruited", href: "/agents/recruited" },
-			],
-		},
-		{ name: "Audio Bookers", icon: FiBookOpen, href: "/agents/audiobookers" },
-		{ name: "Alan AI", icon: FiCpu, href: "/agents/alanai" },
-		{ name: "Character AI", icon: FiMessageCircle, href: "/characterai" },
-		{ name: "Meeting Leader", icon: FiUsers, href: "/agents/meetingleader" },
 		{ name: "Call Agents", icon: FiPhoneCall, href: "/callagents" },
-		{ name: "Tutor", icon: FaMicrophoneAlt, href: "/agents/tutor" },
+		{ name: "Web Assistants", icon: FiCode, href: "/callagents/embedded" }, // Replaced Alan AI
+		{ name: "Recruitment AI", icon: FiBriefcase, href: "/agents" },
+		{ name: "Character AI", icon: FiMessageCircle, href: "/characterai" },
 	];
 
 	const advancedOptionItems = [
+		{ name: "Integrations", icon: FiPackage, href: "callagents/Integrations" },
+		{ name: "API Keys", icon: FiKey, href: "callagents/Integrations/apikeys" },
 		{ name: "Premium Plans", icon: FiDollarSign, href: "/premium" },
-		{ name: "API Access", icon: FiPackage, href: "/api-access" },
-		{ name: "Docs", icon: FiFileText, href: "/docs" },
-		{ name: "FAQ and Help", icon: FiHelpCircle, href: "/help" },
+		{ name: "Docs & Help", icon: FiBookOpen, href: "/docs" },
 	];
 
 	const socialLinks = [
 		{ name: "Instagram", icon: FiInstagram, href: "YOUR_INSTAGRAM_LINK" },
-		{ name: "Telegram", icon: FaTelegram, href: "YOUR_TELEGRAM_LINK" },
 		{ name: "LinkedIn", icon: FiLinkedin, href: "YOUR_LINKEDIN_LINK" },
 	];
 
@@ -174,10 +152,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 					<div
 						className={`flex items-center ${isOpen ? "" : "justify-center w-full"}`}
 					>
-						{/* Avatar color uses solid accent */}
-						<div className="w-8 h-8 bg-cyan-500 dark:bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-2 flex-shrink-0">
-							P
-						</div>
+						{user?.image ? (
+							<img src={user.image} alt={displayName} className="w-8 h-8 rounded-full object-cover mr-2 flex-shrink-0" />
+						) : (
+							<div className="w-8 h-8 bg-cyan-500 dark:bg-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-2 flex-shrink-0">
+								{avatarLetters}
+							</div>
+						)}
 						<AnimatePresence>
 							{isOpen && (
 								<motion.span
@@ -186,9 +167,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 									animate="open"
 									exit="collapsed"
 									variants={itemVariants}
-									className="font-semibold whitespace-nowrap flex-grow text-gray-900 dark:text-white"
+									className="font-semibold whitespace-nowrap flex-grow text-gray-900 dark:text-white truncate"
 								>
-									Miheretab sam
+									{displayName}
 								</motion.span>
 							)}
 						</AnimatePresence>
@@ -237,13 +218,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 								</div>
 
 								<button
-									onClick={() => {
-										/* handle logout */
-									}}
+									onClick={() => signOut()}
 									className="w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
 								>
-									{" "}
-									{/* Subtle hover */}
 									Logout
 								</button>
 							</div>
