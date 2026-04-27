@@ -38,14 +38,14 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, 
             // Start with the data we already have
             setFreshCallData(callData);
 
-            // Now, try to fetch the latest version from Vapi to get the recordingUrl
+            // Try to fetch the latest version from Vapi (only for Vapi-backed calls).
+            // Gemini Live calls don't have a vapiCallId and shouldn't hit this proxy.
             const fetchLatestUrl = async () => {
                 const vapiCallId = callData.rawCallData?.vapiCallId;
-                if (!vapiCallId) {
-                    console.log("No vapiCallId found, cannot fetch latest data.");
-                    return;
-                }
-                
+                const provider = callData.rawCallData?.provider;
+                if (!vapiCallId || provider === 'gemini') return;
+                if (callData.audioUrl) return; // Already have a recording — don't bother.
+
                 setIsLoadingUrl(true);
                 try {
                     const response = await fetch(`/api/vapi/${vapiCallId}`);
@@ -53,18 +53,15 @@ function CallDetailModal({ isOpen, onClose, callData, onDeleteCall, isDeleting, 
                         throw new Error('Failed to fetch latest call details.');
                     }
                     const vapiData = await response.json();
-                    
-                    // Merge the fresh data with our existing data
-                    // The fresh `recordingUrl` from Vapi will overwrite the potentially null one from our DB.
-                    setFreshCallData(prevData => ({
-                        ...prevData,
-                        recordingUrl: vapiData.recordingUrl || prevData.recordingUrl,
-                        // You can update other fields here too if needed
-                    }));
-
+                    const liveAudioUrl = vapiData?.recordingUrl || vapiData?.call?.recordingUrl;
+                    if (liveAudioUrl) {
+                        setFreshCallData(prevData => ({
+                            ...prevData,
+                            audioUrl: liveAudioUrl,
+                        }));
+                    }
                 } catch (error) {
                     console.error(error);
-                    toast.error("Could not retrieve call recording.");
                 } finally {
                     setIsLoadingUrl(false);
                 }

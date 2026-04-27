@@ -31,34 +31,33 @@ function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) {
     const isDownloadButtonDisabled = isDeleting || isDownloadingTranscript || isDownloadingAudio || !callData;
 
 
+    const audioUrl = callData?.audioUrl || callData?.recordingUrl || null;
+
     const handleDownloadTranscript = async () => {
-        if (!callData || !callData.transcript || callData.transcript.length === 0) {
+        if (!callData || !Array.isArray(callData.transcript) || callData.transcript.length === 0) {
             alert("No transcript available to download.");
             return;
         }
         setIsDownloadingTranscript(true);
         await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // FIX: Updated to use the correct Vapi transcript format (`role`, `message`, `time`).
-        const transcriptText = (callData.transcript || []).map(entry =>
-            `[${entry.time.toFixed(2)}s] ${(entry.role || '').toUpperCase()}: ${entry.message || ''}`
-        ).join('\n');
+
+        const transcriptText = callData.transcript.map(entry => {
+            const t = typeof entry.time === 'number' ? `[${entry.time.toFixed(2)}s] ` : '';
+            return `${t}${(entry.role || '').toUpperCase()}: ${entry.message || ''}`;
+        }).join('\n');
 
         simulateDownload(`call_${callData.id}_transcript.txt`, transcriptText, 'text/plain');
         setIsDownloadingTranscript(false);
     };
 
     const handleDownloadAudio = async () => {
-         // FIX: Use `recordingUrl` instead of `audioUrl`.
-        if (!callData || !callData.recordingUrl) {
-             alert("No audio recording available to download.");
-             return;
-         }
-         setIsDownloadingAudio(true);
-         await new Promise(resolve => setTimeout(resolve, 1000));
-         alert(`Simulating download of audio from: ${callData.recordingUrl}`);
-         // Example of a real download link: window.open(callData.recordingUrl, '_blank');
-         setIsDownloadingAudio(false);
+        if (!audioUrl) {
+            alert("No audio recording available to download.");
+            return;
+        }
+        setIsDownloadingAudio(true);
+        window.open(audioUrl, '_blank');
+        setIsDownloadingAudio(false);
     };
 
     const handleDeleteCall = () => {
@@ -92,8 +91,7 @@ function DownloadDeleteTab({ callData, onDeleteCall, isDeleting }) {
                      </button>
                      <button
                          onClick={handleDownloadAudio}
-                          // FIX: Check `recordingUrl` for disabled state.
-                          disabled={isDownloadButtonDisabled || !callData?.recordingUrl}
+                          disabled={isDownloadButtonDisabled || !audioUrl}
                           className={`inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
                      >
                          {isDownloadingAudio ? (

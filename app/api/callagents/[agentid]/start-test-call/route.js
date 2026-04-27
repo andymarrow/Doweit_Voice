@@ -107,6 +107,12 @@ export async function POST(req, { params }) {
 				number: phoneNumber,
 				name: userName,
 			},
+			// Surfaces in the end-of-call-report webhook so the call row can be
+			// reconciled (or created) against the right agent.
+			metadata: {
+				agentId: String(agent.id),
+				userName,
+			},
 		};
 
 		console.log("Initiating phone call with VAPI...");

@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { callAgents, calls } from "@/lib/db/schemaCharacterAI";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 // --- GET function: Fetch calls for a specific agent ---
 export async function GET(req, { params }) {
@@ -116,9 +116,14 @@ export async function POST(req, { params }) {
 			);
 		}
 
-		// --- ADD THIS LOG ---
+		// Accept either `audioUrl` or `recordingUrl` from the client; the schema column is `audioUrl`.
+		const audioUrl =
+			callDetails.audioUrl || callDetails.recordingUrl || null;
+		const vapiCallId = callDetails.callId || callDetails.vapiCallId || null;
+		const provider = callDetails.provider || null;
+
 		console.log(
-			`[API CALLS POST] Received payload with recordingUrl: ${callDetails.recordingUrl}`,
+			`[API CALLS POST] Received payload (provider=${provider}, vapiCallId=${vapiCallId}, audioUrl=${audioUrl})`,
 		);
 
 		// Step 1: Verify ownership of the agent
@@ -134,37 +139,68 @@ export async function POST(req, { params }) {
 			);
 		}
 
-		// Step 2: Create a new call entry with the correct fields
-		const [newCall] = await db
-			.insert(calls)
-			.values({
-				agentId: agentId,
-				phoneNumber: callDetails.phoneNumber || "Web Call",
-				direction: callDetails.direction || "inbound",
-				status: callDetails.status || "Completed", // Use status from frontend
-				transcript: callDetails.transcript,
-				duration: callDetails.duration || 0,
-				startTime: new Date(callDetails.startTime || Date.now()),
-				endTime: new Date(callDetails.endTime || Date.now()),
+		const transcriptArray = Array.isArray(callDetails.transcript)
+			? callDetails.transcript
+			: [];
 
-				// --- FIX APPLIED HERE ---
-				// Add the recordingUrl from the payload to the database insert
-				recordingUrl: callDetails.recordingUrl || null,
+		const baseValues = {
+			agentId: agentId,
+			phoneNumber: callDetails.phoneNumber || "Web Call",
+			direction: callDetails.direction || "inbound",
+			status: callDetails.status || "Completed",
+			transcript: transcriptArray,
+			duration: callDetails.duration || 0,
+			startTime: new Date(callDetails.startTime || Date.now()),
+			endTime: new Date(callDetails.endTime || Date.now()),
+			audioUrl,
+			summary: callDetails.summary || null,
+			rawCallData: {
+				customerName: callDetails.customerName,
+				provider,
+				vapiCallId,
+			},
+		};
 
-				rawCallData: {
-					customerName: callDetails.customerName,
-					// You could also store the Vapi callId here if needed
-					vapiCallId: callDetails.callId,
-				},
-			})
-			.returning({ id: calls.id });
+		// If a vapiCallId was provided and a row already exists for that Vapi call (e.g. the
+		// webhook beat us to it), update that row instead of inserting a duplicate.
+		let resultCall = null;
+		if (vapiCallId) {
+			const existing = await db.query.calls.findFirst({
+				where: and(
+					eq(calls.agentId, agentId),
+					sql`${calls.rawCallData}->>'vapiCallId' = ${vapiCallId}`,
+				),
+				columns: { id: true, audioUrl: true, transcript: true },
+			});
+			if (existing) {
+				const [updated] = await db
+					.update(calls)
+					.set({
+						...baseValues,
+						// Don't drop a recording URL the webhook already saved.
+						audioUrl: audioUrl || existing.audioUrl || null,
+						updatedAt: new Date(),
+					})
+					.where(eq(calls.id, existing.id))
+					.returning({ id: calls.id });
+				resultCall = updated;
+				console.log(
+					`[API CALLS POST] Merged into existing call ${updated.id} (vapiCallId=${vapiCallId}).`,
+				);
+			}
+		}
 
-		console.log(
-			`[API CALLS POST] Successfully saved call ${newCall.id} with recording URL.`,
-		);
+		if (!resultCall) {
+			const [newCall] = await db
+				.insert(calls)
+				.values(baseValues)
+				.returning({ id: calls.id });
+			resultCall = newCall;
+			console.log(`[API CALLS POST] Inserted new call ${newCall.id}.`);
+		}
 
 		return NextResponse.json(
-			{ success: true, callId: newCall.id },
+			{ success: true, callId: resultCall.id },
 			{ status: 201 },
 		);
 	} catch (error) {

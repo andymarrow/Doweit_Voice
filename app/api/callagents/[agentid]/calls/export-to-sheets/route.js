@@ -57,18 +57,30 @@ export async function POST(req, { params }) {
 		console.log(
 			`[G-Sheets Export] Preparing to export ${callIds.length} calls for agent ${agentId}.`,
 		);
-		const { headers, rows } = await prepareCallDataForExport(callIds);
+		const { headers: requiredHeaders, rowsByHeader } =
+			await prepareCallDataForExport(callIds);
 
-		if (rows.length === 0) {
+		if (rowsByHeader.length === 0) {
 			return NextResponse.json({
 				message: "No valid call data found for the provided IDs.",
 			});
 		}
 
-		// 3. Authenticate with Google and send the data
+		// 3. Authenticate with Google and send the data. ensureHeaderRow returns the
+		// canonical column order present in the sheet (existing + newly-appended), which
+		// we use to lay out the row arrays so values land in the right columns.
 		const authClient = await getAuthenticatedClient(userId);
 
-		await ensureHeaderRow(authClient, spreadsheetId, headers);
+		const { headers: canonicalHeaders } = await ensureHeaderRow(
+			authClient,
+			spreadsheetId,
+			requiredHeaders,
+		);
+
+		const rows = rowsByHeader.map((row) =>
+			canonicalHeaders.map((h) => (row[h] !== undefined ? row[h] : "")),
+		);
+
 		await appendRows(authClient, spreadsheetId, rows);
 
 		// 4. Mark the exported calls as such in our database
@@ -85,7 +97,11 @@ export async function POST(req, { params }) {
 	} catch (error) {
 		console.error(`[G-Sheets Export] API Error for agent ${agentId}:`, error);
 		return NextResponse.json(
-			{ error: "Internal server error during export" },
+			{
+				error:
+					error?.message ||
+					"Internal server error during export",
+			},
 			{ status: 500 },
 		);
 	}

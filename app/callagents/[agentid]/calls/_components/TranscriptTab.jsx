@@ -8,9 +8,11 @@ import { uiColors } from '@/app/callagents/_constants/uiConstants';
 import AudioPlayer from './AudioPlayer'; // <-- Import our new player
 
 
-function TranscriptTab({ callData,agentId }) {
-    const transcript = callData?.transcript;
-    const recordingUrl = callData?.recordingUrl;
+function TranscriptTab({ callData, agentId, onAnalysisComplete }) {
+    const transcript = Array.isArray(callData?.transcript) ? callData.transcript : [];
+    // The DB column is `audioUrl`. `recordingUrl` is kept as a fallback because the
+    // CallDetailModal also merges live data from the Vapi proxy under that name.
+    const recordingUrl = callData?.audioUrl || callData?.recordingUrl;
     
     // State to manage the analysis button
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -18,7 +20,7 @@ function TranscriptTab({ callData,agentId }) {
     // Check if any action values already exist for this call
     const hasActionValues = callData?.callActionValues && callData.callActionValues.length > 0;
     // Check if the call has a transcript to analyze
-    const hasTranscript = transcript && transcript.length > 0;
+    const hasTranscript = transcript.length > 0;
 
     const handleAnalyzeClick = async () => {
         setIsAnalyzing(true);

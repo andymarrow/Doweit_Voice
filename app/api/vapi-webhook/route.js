@@ -26,8 +26,51 @@ export async function POST(req) {
 
             // Extract core data
             const vapiCallId = callData?.id;
-            const recordingUrl = body.message?.recordingUrl || callData?.recordingUrl;
-            const transcript = body.message?.transcript || callData?.transcript;
+            const recordingUrl =
+                body.message?.recordingUrl ||
+                body.message?.stereoRecordingUrl ||
+                callData?.recordingUrl ||
+                null;
+            const transcriptText = body.message?.transcript || callData?.transcript || null;
+            // Vapi delivers the structured role/message array under artifact.messages.
+            const artifactMessages =
+                body.message?.artifact?.messages ||
+                body.message?.messages ||
+                callData?.artifact?.messages ||
+                null;
+            const summary = body.message?.summary || callData?.summary || null;
+            const startedAt = body.message?.startedAt || callData?.startedAt || null;
+            const endedAt = body.message?.endedAt || callData?.endedAt || null;
+            const duration =
+                startedAt && endedAt
+                    ? Math.max(
+                          0,
+                          Math.floor(
+                              (new Date(endedAt).getTime() -
+                                  new Date(startedAt).getTime()) /
+                                  1000,
+                          ),
+                      )
+                    : null;
+
+            // Map Vapi's artifact messages into the shape the UI expects: { role, message, time }.
+            const transcriptArray = Array.isArray(artifactMessages)
+                ? artifactMessages
+                      .filter(
+                          (m) =>
+                              m && (m.role === "user" || m.role === "assistant" || m.role === "bot"),
+                      )
+                      .map((m, i) => ({
+                          role: m.role === "bot" ? "assistant" : m.role,
+                          message: m.message || m.content || "",
+                          time:
+                              typeof m.time === "number"
+                                  ? m.time
+                                  : typeof m.secondsFromStart === "number"
+                                    ? m.secondsFromStart
+                                    : i,
+                      }))
+                : null;
 
             // --- 1. NEW LOGIC: Check for Recruitment Interview Session ---
             // We pass 'sessionId' in the metadata when starting an interview via the Magic Link
@@ -47,19 +90,23 @@ export async function POST(req) {
                 if (session && session.agent) {
                     console.log(`[VAPI WEBHOOK] Running Analysis Engine for Session ${sessionId}...`);
 
-                    // Trigger the Gemini Analysis
+                    // Prefer the structured array for analysis; fall back to the flat transcript string.
+                    const transcriptForAnalysis =
+                        transcriptArray && transcriptArray.length > 0
+                            ? transcriptArray
+                            : transcriptText;
+
                     const analysisResult = await analyzeCandidateInterview(
-                        transcript,
+                        transcriptForAnalysis,
                         session.agent.recruitmentConfig
                     );
 
-                    // Update the Interview Record
                     await db.update(interviews).set({
                         status: 'completed',
-                        transcript: transcript, // Save raw transcript
+                        transcript: transcriptArray || transcriptText,
                         audioUrl: recordingUrl,
-                        fitScore: analysisResult.fitScore || 0, // Extract score
-                        analysisData: analysisResult, // Save the full JSON report from Gemini
+                        fitScore: analysisResult.fitScore || 0,
+                        analysisData: analysisResult,
                     }).where(eq(interviews.id, parseInt(sessionId)));
 
                     console.log(`[VAPI WEBHOOK] Interview ${sessionId} analysis complete. Score: ${analysisResult.fitScore}`);
@@ -75,33 +122,70 @@ export async function POST(req) {
             if (vapiCallId) {
                 if (!recordingUrl) {
                     console.warn(`[VAPI WEBHOOK] Call ${vapiCallId} ended, but no recordingUrl was provided.`);
-                    // We still proceed to try and update status if needed, or just log
                 }
 
                 console.log(`[VAPI WEBHOOK] Checking for Standard Call ID: ${vapiCallId}`);
 
-                // Find and update the call in the standard 'calls' table
-                // Drizzle's ->> operator is used to query inside a JSONB field.
+                // Build a partial update so we never overwrite with null/undefined what the
+                // browser already saved (status: in_progress fix from before).
+                const updatePayload = { updatedAt: new Date() };
+                if (recordingUrl) updatePayload.audioUrl = recordingUrl;
+                if (transcriptArray && transcriptArray.length > 0) {
+                    updatePayload.transcript = transcriptArray;
+                }
+                if (typeof duration === "number") updatePayload.duration = duration;
+                if (endedAt) updatePayload.endTime = new Date(endedAt);
+                if (summary) updatePayload.summary = summary;
+
                 const result = await db
                     .update(calls)
-                    .set({
-                        audioUrl: recordingUrl,
-                        // Optional: You might want to save the transcript to the standard calls table too if your schema has it
-                        transcript: transcript ? { role: 'assistant', message: transcript } : undefined, 
-                        updatedAt: new Date()
-                    })
+                    .set(updatePayload)
                     .where(sql`${calls.rawCallData}->>'vapiCallId' = ${vapiCallId}`)
                     .returning({ id: calls.id });
 
                 if (result.length > 0) {
                     console.log(
-                        `[VAPI WEBHOOK] Successfully updated standard call ${result[0].id} with recording URL.`,
+                        `[VAPI WEBHOOK] Updated standard call ${result[0].id} (audio=${!!recordingUrl}, transcript=${transcriptArray?.length || 0} entries).`,
                     );
-                } else {
-                    // Only warn if it wasn't handled by the Interview logic either
-                    if (!sessionId) {
+                } else if (!sessionId) {
+                    // No row exists yet — the browser save lost the race or never fired (e.g. phone call).
+                    // Insert a new call row so the agent's call history reflects this run.
+                    const agentId = callData?.assistantOverrides?.metadata?.agentId
+                        ? parseInt(callData.assistantOverrides.metadata.agentId, 10)
+                        : callData?.metadata?.agentId
+                          ? parseInt(callData.metadata.agentId, 10)
+                          : null;
+
+                    if (agentId && !Number.isNaN(agentId)) {
+                        const startTime = startedAt ? new Date(startedAt) : new Date();
+                        const endTime = endedAt ? new Date(endedAt) : new Date();
+                        const customer = callData?.customer || {};
+                        const [inserted] = await db
+                            .insert(calls)
+                            .values({
+                                agentId,
+                                phoneNumber: customer.number || "Phone Call",
+                                direction: callData?.type === "outboundPhoneCall" ? "outbound" : "inbound",
+                                status: "Completed",
+                                transcript: transcriptArray || [],
+                                duration: duration || 0,
+                                startTime,
+                                endTime,
+                                audioUrl: recordingUrl || null,
+                                summary: summary || null,
+                                rawCallData: {
+                                    customerName: customer.name || null,
+                                    provider: "vapi",
+                                    vapiCallId,
+                                },
+                            })
+                            .returning({ id: calls.id });
+                        console.log(
+                            `[VAPI WEBHOOK] No existing row matched; inserted call ${inserted.id} for agent ${agentId}.`,
+                        );
+                    } else {
                         console.warn(
-                            `[VAPI WEBHOOK] Could not find a matching call in 'calls' DB for Vapi Call ID: ${vapiCallId}`,
+                            `[VAPI WEBHOOK] Could not find a matching call in 'calls' DB for Vapi Call ID: ${vapiCallId}; agentId not in metadata so cannot insert.`,
                         );
                     }
                 }

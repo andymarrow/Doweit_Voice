@@ -92,6 +92,10 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     const processorRef = useRef(null);
     const nextPlayTimeRef = useRef(0); // Tracks when the next chunk should play
     const activeSourcesRef = useRef([]); // Scheduled audio sources we may need to cancel on interrupt
+    // Refs mirror state so the onclose callback (registered once at session start) sees current values.
+    const geminiAudioChunksRef = useRef([]);
+    const geminiTranscriptRef = useRef([]);
+    const geminiStartTimeRef = useRef(null);
 
     const agentId = agent?.id;
     const agentName = agent?.name || 'Unnamed Agent';
@@ -213,6 +217,11 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         }
     },[callStatus, isGoogleNative])
 
+    // Mirror Gemini chat/audio state into refs so the onclose callback (which captures the
+    // closure at session-start) can read the latest values when saving.
+    useEffect(() => { geminiAudioChunksRef.current = geminiAudioChunks; }, [geminiAudioChunks]);
+    useEffect(() => { geminiTranscriptRef.current = geminiTranscript; }, [geminiTranscript]);
+
     // ------------------------------------------------------------------
     // EXISTING VAPI CALL LOGIC
     // ------------------------------------------------------------------
@@ -224,13 +233,14 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
         const callDetails = {
             customerName: userName,
             direction: 'inbound',
-            status: 'Completed', 
+            status: 'Completed',
             duration: callStartTime ? Math.floor((Date.now() - new Date(callStartTime).getTime()) / 1000) : 0,
             startTime: callStartTime || new Date().toISOString(),
             endTime: new Date().toISOString(),
             transcript: transcriptBuffer,
-            callId: vapiCallData?.id || null, 
-            recordingUrl: vapiCallData?.recordingUrl || null,
+            callId: vapiCallData?.id || null,
+            audioUrl: vapiCallData?.recordingUrl || null,
+            provider: 'vapi',
         };
 
         try {
@@ -298,13 +308,20 @@ ${kbContent}
 everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
             const vapiPayload = {
-                model: { 
+                model: {
                     provider: "google",
-				    model: "gemini-2.5-flash", 
+				    model: "gemini-2.5-flash",
                     messages: [{ role: "system", content: everyContentPrompt }] },
                 voice: { provider: '', voiceId: agent.voiceConfig.voiceId },
                 firstMessage: agent.greetingMessage || "Hello!",
                 recordingEnabled: agent.callConfig?.enableRecordings || false,
+                // Surfaces in the end-of-call-report webhook so the call row can be reconciled
+                // even if the browser save fails (e.g. tab closed mid-utterance).
+                metadata: {
+                    agentId: String(agentId),
+                    userName,
+                    provider: 'vapi',
+                },
                 server: {
                     url: process.env.NEXT_PUBLIC_WEBHOOK_URL,
                 }
@@ -517,7 +534,10 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         setIsConnecting(true);
         setCallStatus('connecting');
         setGeminiTranscript([]);
-        setGeminiAudioChunks([]); 
+        setGeminiAudioChunks([]);
+        geminiAudioChunksRef.current = [];
+        geminiTranscriptRef.current = [];
+        geminiStartTimeRef.current = null;
         nextPlayTimeRef.current = 0;
         
         const ai = new GoogleGenAI({ apiKey: geminiApiKey });
@@ -541,8 +561,9 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                     onopen: () => {
                         setIsConnecting(false);
                         setCallStatus('in-progress');
+                        geminiStartTimeRef.current = new Date();
                         toast.success("Connected to Doweit Live.");
-                        startAudioInput(); 
+                        startAudioInput();
                     },
                     onmessage: (msg) => handleGeminiMessage(msg),
                     onclose: () => {
@@ -583,28 +604,38 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             for (const part of modelTurn.parts) {
                 if (part.inlineData) {
                     const chunk = part.inlineData.data;
+                    geminiAudioChunksRef.current = [
+                        ...geminiAudioChunksRef.current,
+                        chunk,
+                    ];
                     setGeminiAudioChunks(prev => [...prev, chunk]);
                     playStreamedAudio(chunk);
                 }
             }
         }
 
-        // 3. Model Text Transcription (Correct Location)
+        // 3. Model Text Transcription
         if (serverContent?.outputTranscription?.text) {
             const text = serverContent.outputTranscription.text;
-            setGeminiTranscript(prev => {
-                const last = prev[prev.length - 1];
-                if (last && last.role === 'model') {
-                    return [...prev.slice(0, -1), { ...last, text: last.text + text }];
-                }
-                return [...prev, { role: 'model', text: text, time: Date.now() }];
-            });
+            const prev = geminiTranscriptRef.current;
+            const last = prev[prev.length - 1];
+            // Convention here: model transcript role is 'model' but we map to 'assistant' on save.
+            const next = last && last.role === 'model'
+                ? [...prev.slice(0, -1), { ...last, text: last.text + text }]
+                : [...prev, { role: 'model', text, time: Date.now() }];
+            geminiTranscriptRef.current = next;
+            setGeminiTranscript(next);
         }
 
-        // 4. User Input Transcription (Correct Location)
+        // 4. User Input Transcription
         if (serverContent?.inputTranscription?.text) {
             const text = serverContent.inputTranscription.text;
-            setGeminiTranscript(prev => [...prev, { role: 'user', text: text, time: Date.now() }]);
+            const next = [
+                ...geminiTranscriptRef.current,
+                { role: 'user', text, time: Date.now() },
+            ];
+            geminiTranscriptRef.current = next;
+            setGeminiTranscript(next);
         }
     };
 
@@ -614,7 +645,12 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         const text = textInput.trim();
         if (!text) return;
 
-        setGeminiTranscript(prev => [...prev, { role: 'user', text, time: Date.now() }]);
+        const next = [
+            ...geminiTranscriptRef.current,
+            { role: 'user', text, time: Date.now() },
+        ];
+        geminiTranscriptRef.current = next;
+        setGeminiTranscript(next);
         geminiSessionRef.current.sendClientContent({
             turns: [{ role: 'user', parts: [{ text }] }]
         });
@@ -630,39 +666,54 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
-    // I. SAVE DATA
+    // I. SAVE DATA — reads from refs so it works when called from the (stale-closure) onclose callback.
     const saveGeminiCallData = async () => {
-        if (geminiAudioChunks.length === 0 && geminiTranscript.length === 0) return;
+        const chunks = geminiAudioChunksRef.current || [];
+        const transcript = geminiTranscriptRef.current || [];
+        const startedAt = geminiStartTimeRef.current || new Date();
 
-        let recordingUrl = null;
-        
-        if (geminiAudioChunks.length > 0) {
+        if (chunks.length === 0 && transcript.length === 0) return;
+
+        let audioUrl = null;
+
+        if (chunks.length > 0) {
             const uploadToast = toast.loading("Saving call recording...");
             try {
-                // Stitch all chunks
-                const wavBuffer = convertToWav(geminiAudioChunks, "audio/pcm;rate=24000");
+                const wavBuffer = convertToWav(chunks, "audio/pcm;rate=24000");
                 const blob = new Blob([wavBuffer], { type: 'audio/wav' });
                 const file = new File([blob], `gemini-${Date.now()}.wav`, { type: 'audio/wav' });
-                recordingUrl = await uploadFileToFirebase(file, `user-${agent?.creatorId || 'anon'}`, 'calls');
+                audioUrl = await uploadFileToFirebase(file, `user-${agent?.creatorId || 'anon'}`, 'calls');
+                toast.dismiss(uploadToast);
                 toast.success("Recording saved.");
             } catch (e) {
                 console.error("Upload failed", e);
-                toast.error("Failed to save recording.");
-            } finally {
                 toast.dismiss(uploadToast);
+                toast.error("Failed to save recording.");
             }
         }
+
+        const endedAt = new Date();
+        const duration = Math.max(
+            0,
+            Math.floor((endedAt.getTime() - new Date(startedAt).getTime()) / 1000),
+        );
 
         const payload = {
             customerName: userName,
             direction: 'inbound',
             status: 'Completed',
-            duration: 0, 
-            startTime: new Date().toISOString(),
-            endTime: new Date().toISOString(),
-            transcript: geminiTranscript.map(t => ({ role: t.role, message: t.text })),
+            duration,
+            startTime: new Date(startedAt).toISOString(),
+            endTime: endedAt.toISOString(),
+            transcript: transcript.map((t, i) => ({
+                // The TranscriptTab UI styles bubbles by role === 'assistant' vs anything else.
+                role: t.role === 'model' ? 'assistant' : t.role,
+                message: t.text || t.message || '',
+                time: i,
+            })),
             callId: `gemini-${Date.now()}`,
-            recordingUrl: recordingUrl
+            audioUrl,
+            provider: 'gemini',
         };
 
         try {
@@ -671,8 +722,17 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
-            if (res.ok) toast.success("Call log saved.");
-        } catch (e) { console.error(e); }
+            if (res.ok) {
+                toast.success("Call log saved.");
+            } else {
+                const text = await res.text();
+                console.error("Failed to save Gemini call:", text);
+                toast.error("Could not save call log.");
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Could not save call log.");
+        }
     };
     
     // ------------------------------------------------------------------
