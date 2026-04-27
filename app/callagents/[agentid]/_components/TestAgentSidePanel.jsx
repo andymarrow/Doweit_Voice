@@ -91,6 +91,7 @@ function TestAgentSidePanel({ isOpen, onClose, agent }) {
     const mediaStreamRef = useRef(null);
     const processorRef = useRef(null);
     const nextPlayTimeRef = useRef(0); // Tracks when the next chunk should play
+    const activeSourcesRef = useRef([]); // Scheduled audio sources we may need to cancel on interrupt
 
     const agentId = agent?.id;
     const agentName = agent?.name || 'Unnamed Agent';
@@ -403,8 +404,24 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
+    // Stops every currently scheduled/playing TTS source so a new turn doesn't overlap with the previous one.
+    const cancelScheduledPlayback = () => {
+        activeSourcesRef.current.forEach(source => {
+            try { source.onended = null; } catch (e) {}
+            try { source.stop(); } catch (e) {}
+            try { source.disconnect(); } catch (e) {}
+        });
+        activeSourcesRef.current = [];
+        if (audioOutputContextRef.current && audioOutputContextRef.current.state !== 'closed') {
+            nextPlayTimeRef.current = audioOutputContextRef.current.currentTime;
+        } else {
+            nextPlayTimeRef.current = 0;
+        }
+    };
+
     // B. STOP MICROPHONE & PLAYBACK
     const stopAudioInput = () => {
+        cancelScheduledPlayback();
         if (processorRef.current) {
             processorRef.current.disconnect();
             processorRef.current = null;
@@ -456,8 +473,14 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
             const currentTime = ctx.currentTime;
             const startTime = nextPlayTimeRef.current < currentTime ? currentTime : nextPlayTimeRef.current;
-            
+
+            source.onended = () => {
+                activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+                try { source.disconnect(); } catch (e) {}
+            };
+
             source.start(startTime);
+            activeSourcesRef.current.push(source);
             nextPlayTimeRef.current = startTime + buffer.duration;
 
         } catch (e) {
@@ -547,14 +570,11 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     const handleGeminiMessage = (message) => {
         const serverContent = message.serverContent;
 
-        // 1. Handle Interruption (VAD)
+        // 1. Handle Interruption (VAD) — stop all queued TTS audio so the next turn doesn't overlap
         if (serverContent?.interrupted) {
             console.log("Bot interrupted by user");
-            // We can't clear the buffer of a running context easily, but we can reset the pointer logic
-            if (audioOutputContextRef.current) {
-                 nextPlayTimeRef.current = audioOutputContextRef.current.currentTime;
-            }
-            return; 
+            cancelScheduledPlayback();
+            return;
         }
 
         // 2. Audio Chunks
