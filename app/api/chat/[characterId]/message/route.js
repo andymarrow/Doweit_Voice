@@ -7,16 +7,11 @@ import { db } from "@/lib/database"; // Your Drizzle DB config
 import { characters, chatMessages } from "@/lib/db/schemaCharacterAI"; // Your schema imports (users implicitly joined via relations)
 import { eq, asc } from "drizzle-orm"; // Import eq and asc for Drizzle
 // CORRECT IMPORT: Use the package name in the path
-import { GoogleGenerativeAI } from "@google/generative-ai"; // <-- Corrected path
-// Import Firebase Admin SDK parts needed
-import admin from "@/configs/firebaseAdmin"; // Assume this is your initialized admin instance
-import { getStorage } from "firebase-admin/storage"; // Import getStorage from admin SDK
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { uploadFile } from "@/lib/uploadthing/server";
 
-// Get API Keys from environment variables
-// CORRECTED TYPO: GEMNI_API_KEY -> GEMNI_API_KEY
-const geminiApiKey = process.env.GEMNI_API_KEY; // <-- Fixed typo
+const geminiApiKey = process.env.GEMNI_API_KEY;
 const vapiSecretKey = process.env.VAPI_SECRET_KEY;
-const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID; // Ensure this is set publicly
 
 // Initialize Gemini Client
 let geminiAi;
@@ -26,27 +21,10 @@ if (geminiApiKey) {
 		console.log("Gemini AI initialized.");
 	} catch (error) {
 		console.error("Error initializing GoogleGenerativeAI:", error);
-		geminiAi = null; // Ensure it's null if initialization fails
+		geminiAi = null;
 	}
 } else {
 	console.error("GEMNI_API_KEY is not set. LLM responses will fail.");
-}
-
-// Access Firebase Storage bucket from admin
-// Ensure admin is initialized *before* accessing storage
-let bucket;
-try {
-	if (admin && admin.apps && admin.apps.length) {
-		// Check if admin app and apps array are available/initialized
-		bucket = getStorage(admin.apps[0]).bucket(); // Get bucket from the default app
-		console.log("Firebase Storage bucket accessed.");
-	} else {
-		console.error(
-			"Firebase Admin not initialized. Audio uploads will likely fail.",
-		);
-	}
-} catch (e) {
-	console.error("Failed to get Firebase Storage bucket:", e);
 }
 
 // Vapi TTS API endpoint
@@ -299,60 +277,32 @@ export async function POST(req, { params }) {
 			audioBuffer = null; // Ensure no buffer
 		}
 
-		// 6. Upload Audio to Firebase Storage (if buffer exists)
-		// This step is only needed if Vapi TTS returns binary data.
-		// Requires Firebase Admin SDK.
-		if (
-			audioBuffer &&
-			bucket &&
-			firebaseProjectId &&
-			currentUserId &&
-			charIdInt
-		) {
-			// Added charIdInt check
+		// 6. Upload TTS Audio to UploadThing (if buffer exists).
+		if (audioBuffer && currentUserId && charIdInt) {
 			try {
 				const timestamp = Date.now();
-				// Use a consistent path structure based on user and character
-				const audioFilePath = `chat-audio/${charIdInt}/${currentUserId}/${timestamp}.mp3`; // e.g., chat-audio/123/user_abc/1678888888888.mp3
-
-				const file = bucket.file(audioFilePath);
-
-				// Convert ArrayBuffer received from fetch to Node.js Buffer for `file.save`
-				const bufferToUpload = Buffer.from(audioBuffer);
-
-				// Upload the buffer
-				await file.save(bufferToUpload, {
-					metadata: {
-						contentType: "audio/mp3", // Set content type
-						// Optional: add custom metadata like characterId, userId
-						metadata: {
-							characterId: charIdInt.toString(),
-							userId: currentUserId,
-						},
-					},
-					// Make the file publicly readable directly on upload for playback
-					predefinedAcl: "publicRead",
+				const audioBlob = new Blob([Buffer.from(audioBuffer)], {
+					type: "audio/mpeg",
 				});
-
-				// Construct the public download URL (standard format)
-				// Ensure bucket.name is correct (e.g., cinematechat-6040e.appspot.com)
-				audioUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(audioFilePath)}?alt=media`;
-
-				console.log("Audio uploaded to Firebase:", audioUrl);
-			} catch (firebaseUploadError) {
-				console.error(
-					"Error uploading audio to Firebase Storage:",
-					firebaseUploadError,
+				const audioFile = new File(
+					[audioBlob],
+					`chat-${charIdInt}-${currentUserId}-${timestamp}.mp3`,
+					{ type: "audio/mpeg" },
 				);
-				audioUrl = null; // Ensure audioUrl is null on failure
+
+				audioUrl = await uploadFile(audioFile, currentUserId, "chat-audio");
+
+				if (audioUrl) {
+					console.log("Audio uploaded to UploadThing:", audioUrl);
+				} else {
+					console.error("UploadThing returned no URL for chat audio.");
+				}
+			} catch (uploadError) {
+				console.error("Error uploading audio to UploadThing:", uploadError);
+				audioUrl = null;
 			}
 		} else if (!audioBuffer) {
 			console.log("No audio buffer to upload.");
-		} else {
-			console.warn(
-				"Firebase Storage bucket or required info not available or missing IDs for upload.",
-			);
-			audioUrl = null;
 		}
 
 		// 7. Save Messages to Database

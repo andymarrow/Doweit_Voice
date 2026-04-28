@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/database";
 import { interviews } from "@/lib/db/schemaCharacterAI";
-import { uploadFileToFirebase } from "@/lib/firebase/upload";
+import { uploadFile } from "@/lib/uploadthing/server";
 import { eq, sql } from "drizzle-orm";
 
 export const runtime = "nodejs";
@@ -19,13 +19,12 @@ export async function POST(req) {
             return NextResponse.json({ error: "Missing file or session ID" }, { status: 400 });
         }
 
-        // 1. Upload to Firebase
-        // Path: interviews/{agentId}/{sessionId}/{timestamp}.jpg
-        // Note: passing 'sessionId' as userId param to group folders
-        const downloadUrl = await uploadFileToFirebase(
-            file, 
-            `interview_proofs/${agentId}`, 
-            sessionId.toString()
+        // Upload anti-cheat snapshot to UploadThing.
+        // userId arg is used here as an attribution tag — the candidate has no auth session.
+        const downloadUrl = await uploadFile(
+            file,
+            `interview_proofs_${agentId}_${sessionId}`,
+            "interview-snapshots"
         );
 
         if (!downloadUrl) {

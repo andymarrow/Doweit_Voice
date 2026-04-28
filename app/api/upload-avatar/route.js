@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
-import { uploadFileToFirebase } from "@/lib/firebase/upload";
+import { uploadFile } from "@/lib/uploadthing/server";
 
 // App Router uses formData natively, so no bodyParser config needed
 export const dynamic = "force-dynamic"; // allow streaming requests
@@ -28,8 +28,8 @@ export async function POST(req) {
 			);
 		}
 
-		// Upload to Firebase
-		const downloadUrl = await uploadFileToFirebase(
+		// Upload to UploadThing
+		const downloadUrl = await uploadFile(
 			avatarFile,
 			userId,
 			"character-avatars",

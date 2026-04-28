@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
-import { uploadFileToFirebase } from "@/lib/firebase/upload";
+import { uploadFile } from "@/lib/uploadthing/server";
 import { callAgents } from "@/lib/db/schemaCharacterAI";
 import { db } from "@/lib/database";
 import { eq, desc } from "drizzle-orm";
@@ -112,7 +112,7 @@ export async function POST(req) {
 			let avatarUrl = null;
 			if (agentImageFile instanceof File) {
 				try {
-					avatarUrl = await uploadFileToFirebase(
+					avatarUrl = await uploadFile(
 						agentImageFile,
 						userId,
 						"agent-avatars",
@@ -128,7 +128,7 @@ export async function POST(req) {
 					}
 				} catch (uploadError) {
 					console.error(
-						`[API CREATE] Firebase upload error for user ${userId}:`,
+						`[API CREATE] UploadThing error for user ${userId}:`,
 						uploadError,
 					);
 					return NextResponse.json(

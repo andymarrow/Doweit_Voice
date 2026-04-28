@@ -42,8 +42,7 @@ The landing page is `/voice-agents`. After authentication, users land at `/voice
 - **@elevenlabs/elevenlabs-js `^2.17.0`** — ElevenLabs (third-party voice integration)
 
 ### File Storage
-- **firebase `^10.14.1`** — Firebase client SDK
-- **firebase-admin `^13.4.0`** — Firebase Admin SDK for server-side storage writes
+- **uploadthing `^7.7.2`** — All file uploads (avatars, TTS audio, anti-cheat snapshots, call recordings) go through `lib/uploadthing/server.js` (`uploadFile`, `deleteFileByUrl`). Firebase has been removed; legacy `firebasestorage.googleapis.com` URLs already in DB still resolve (hybrid state).
 
 ### UI & Styling
 - **Tailwind CSS `^3.4.1`** — Utility-first styling
@@ -116,9 +115,8 @@ Doweit_Voice/
 │   │   └── gemini-chat-stream.js # Gemini Live: streaming audio+text for character chat
 │   ├── recruitment/
 │   │   └── analysisEngine.js     # Gemini: score + analyze interview transcripts
-│   ├── firebase/
-│   │   ├── storage.js            # Firebase storage helpers
-│   │   └── upload.js             # File upload to Firebase Storage
+│   ├── uploadthing/
+│   │   └── server.js             # UploadThing server helpers (uploadFile, deleteFileByUrl)
 │   ├── google/
 │   │   ├── googleAuth.js         # Google OAuth helpers
 │   │   └── sheetsHelper.js       # Google Sheets write operations
@@ -136,9 +134,7 @@ Doweit_Voice/
 │
 ├── hooks/                        # Custom hooks (use-mobile, use-media-query)
 ├── configs/
-│   ├── constants.js              # Exports env vars (GEMINI_API_KEY, VAPI_PUBLIC_KEY)
-│   ├── firebaseConfig.js         # Firebase client config
-│   └── firebaseAdmin.js          # Firebase Admin SDK initialization
+│   └── constants.js              # Exports env vars (GEMINI_API_KEY, VAPI_PUBLIC_KEY)
 │
 ├── middleware.js                 # Route protection (cookie-based session check)
 ├── drizzle.config.js             # Drizzle Kit config (NeonDB URL)
@@ -181,7 +177,7 @@ Server (app/api/chat/[characterId]/message/route.js):
   4. Format history → Gemini contents array (user/model alternating roles)
   5. geminiAi.getGenerativeModel("gemini-2.5-flash").generateContent(...)
   6. POST https://api.vapi.ai/v1/audio/tts { text, voice: { provider, voiceId }, language, format: "mp3" }
-  7. Upload mp3 ArrayBuffer → Firebase Storage → public URL
+  7. Upload mp3 ArrayBuffer → UploadThing (`uploadFile`) → public URL
   8. db.insert(chatMessages) × 2 (user msg + AI msg)
   9. Return { aiMessage: { text, audioUrl, id, timestamp } }
 ```
@@ -194,7 +190,7 @@ Server (app/api/chat/[characterId]/message/route.js):
 User → /callagents → POST /api/callagents/create
   → FormData (standard agent): type = 'inbound'|'outbound'|'recruiter'|'trainee_clone'
   → JSON (recruitment agent): includes recruitmentConfig, systemPrompt
-  → Image → Firebase Storage (lib/firebase/upload.js)
+  → Image → UploadThing (lib/uploadthing/server.js → uploadFile)
   → db.insert(callAgents) → status: 'draft' or 'active'
   → Redirect to /callagents/[agentid]
 
@@ -334,16 +330,8 @@ GEMINI_API_KEY=                       # Also used in some files
 VAPI_SECRET_KEY=                      # Vapi server SDK secret
 NEXT_PUBLIC_VAPI_PUBLIC_KEY=          # Vapi web SDK public key
 
-# Firebase
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-NEXT_PUBLIC_FIREBASE_APP_ID=
-# Firebase Admin (server-side — service account JSON fields)
-FIREBASE_ADMIN_PROJECT_ID=
-FIREBASE_ADMIN_PRIVATE_KEY=
-FIREBASE_ADMIN_CLIENT_EMAIL=
+# File storage
+UPLOADTHING_TOKEN=                    # Single combined token from uploadthing.com dashboard (v7+)
 
 # Google Sheets
 GOOGLE_CLIENT_ID=                     # Google OAuth for Sheets integration

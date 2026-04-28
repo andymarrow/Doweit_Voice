@@ -5,6 +5,19 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'utfs.io',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.ufs.sh',
+        port: '',
+        pathname: '/**',
+      },
+      // Hybrid state: legacy assets still served from Firebase Storage.
+      {
+        protocol: 'https',
         hostname: 'firebasestorage.googleapis.com',
         port: '',
         pathname: '/**',

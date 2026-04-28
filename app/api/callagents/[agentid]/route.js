@@ -321,7 +321,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { callAgents } from "@/lib/db/schemaCharacterAI";
 import { and, eq, ne } from "drizzle-orm"; // Combined imports
-import { deleteFileFromFirebase } from "@/lib/firebase/storage";
+import { deleteFileByUrl } from "@/lib/uploadthing/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -518,14 +518,15 @@ export async function DELETE(req, { params }) {
 		// Delete from the database. Cascading deletes should handle related data.
 		await db.delete(callAgents).where(eq(callAgents.id, agentId));
 
-		// If an avatar exists, delete it from Firebase Storage.
+		// If an avatar exists, delete it from UploadThing.
+		// Legacy Firebase URLs are no-ops in deleteFileByUrl (hybrid state).
 		if (agentToDelete.avatarUrl) {
 			try {
-				await deleteFileFromFirebase(agentToDelete.avatarUrl);
+				await deleteFileByUrl(agentToDelete.avatarUrl);
 			} catch (storageError) {
 				// Log the error but don't fail the entire request.
 				console.warn(
-					`[API DELETE] Failed to delete Firebase asset for agent ${agentId}, but DB record was deleted. URL: ${agentToDelete.avatarUrl}`,
+					`[API DELETE] Failed to delete asset for agent ${agentId}, but DB record was deleted. URL: ${agentToDelete.avatarUrl}`,
 					storageError,
 				);
 			}

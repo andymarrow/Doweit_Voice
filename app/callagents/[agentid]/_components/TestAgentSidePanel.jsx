@@ -7,7 +7,6 @@ import { GoogleGenAI, Modality } from '@google/genai'; // Import Gemini SDK
 import { uiColors } from '../../_constants/uiConstants';
 import { toast } from 'react-hot-toast';
 import { convertToWav } from './audioUtils'; // Helper for audio stitching
-import { uploadFileToFirebase } from '@/lib/firebase/upload'; // Helper for uploading stitched audio
 
 // --- VAPI SDK Initialization ---
 const VAPI_PUBLIC_API_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
@@ -627,13 +626,18 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
             setGeminiTranscript(next);
         }
 
-        // 4. User Input Transcription
+        // 4. User Input Transcription — accumulate streaming chunks into the
+        //    last user bubble. A new user bubble is only opened after the
+        //    model has spoken (i.e. when role flips), mirroring the AI branch
+        //    above. Without this, every token from inputTranscription would
+        //    render as its own message bubble.
         if (serverContent?.inputTranscription?.text) {
             const text = serverContent.inputTranscription.text;
-            const next = [
-                ...geminiTranscriptRef.current,
-                { role: 'user', text, time: Date.now() },
-            ];
+            const prev = geminiTranscriptRef.current;
+            const last = prev[prev.length - 1];
+            const next = last && last.role === 'user'
+                ? [...prev.slice(0, -1), { ...last, text: last.text + text }]
+                : [...prev, { role: 'user', text, time: Date.now() }];
             geminiTranscriptRef.current = next;
             setGeminiTranscript(next);
         }
@@ -682,7 +686,17 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 const wavBuffer = convertToWav(chunks, "audio/pcm;rate=24000");
                 const blob = new Blob([wavBuffer], { type: 'audio/wav' });
                 const file = new File([blob], `gemini-${Date.now()}.wav`, { type: 'audio/wav' });
-                audioUrl = await uploadFileToFirebase(file, `user-${agent?.creatorId || 'anon'}`, 'calls');
+
+                const fd = new FormData();
+                fd.append('file', file);
+                const uploadRes = await fetch('/api/upload-call-recording', {
+                    method: 'POST',
+                    body: fd,
+                });
+                if (!uploadRes.ok) throw new Error(await uploadRes.text());
+                const uploadData = await uploadRes.json();
+                audioUrl = uploadData.url || null;
+
                 toast.dismiss(uploadToast);
                 toast.success("Recording saved.");
             } catch (e) {
