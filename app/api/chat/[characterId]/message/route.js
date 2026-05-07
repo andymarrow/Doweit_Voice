@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database"; // Your Drizzle DB config
 import { characters, chatMessages } from "@/lib/db/schemaCharacterAI"; // Your schema imports (users implicitly joined via relations)
 import { eq, asc } from "drizzle-orm"; // Import eq and asc for Drizzle
+import { resolveCharacterId } from "@/lib/utils/publicId";
 // CORRECT IMPORT: Use the package name in the path
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { uploadFile } from "@/lib/uploadthing/server";
@@ -80,11 +81,11 @@ export async function POST(req, { params }) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
 
-	const charIdInt = parseInt(characterId);
-	if (isNaN(charIdInt)) {
+	const charIdInt = await resolveCharacterId(characterId);
+	if (!charIdInt) {
 		return NextResponse.json(
-			{ error: "Invalid Character ID" },
-			{ status: 400 },
+			{ error: "Character not found" },
+			{ status: 404 },
 		);
 	}
 
