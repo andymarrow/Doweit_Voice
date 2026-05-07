@@ -322,30 +322,23 @@ import { db } from "@/lib/database";
 import { callAgents } from "@/lib/db/schemaCharacterAI";
 import { and, eq, ne } from "drizzle-orm"; // Combined imports
 import { deleteFileByUrl } from "@/lib/uploadthing/server";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// Helper utility to get agentId consistently
-function getAgentId(params) {
-	return params.agentid;
-}
 
 // --- GET /api/callagents/:agentid ---
 // Fetches a single agent's details.
 export async function GET(req, { params }) {
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = getAgentId(params);
+	const agentId = await resolveCallAgentId(params.agentid);
 
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
-	if (typeof agentId !== "string" || agentId.length === 0) {
-		return NextResponse.json(
-			{ error: "Invalid agent ID format" },
-			{ status: 400 },
-		);
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 
 	try {
@@ -375,16 +368,13 @@ export async function GET(req, { params }) {
 export async function PUT(req, { params }) {
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = getAgentId(params);
+	const agentId = await resolveCallAgentId(params.agentid);
 
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
-	if (typeof agentId !== "string" || agentId.length === 0) {
-		return NextResponse.json(
-			{ error: "Invalid agent ID format" },
-			{ status: 400 },
-		);
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 
 	try {
@@ -477,7 +467,7 @@ export async function PUT(req, { params }) {
 
 		return NextResponse.json(updatedAgents[0], { status: 200 });
 	} catch (error) {
-		console.error(`API Error /api/callagents/${getAgentId(params)} (PUT):`, error);
+		console.error(`API Error /api/callagents/${params.agentid} (PUT):`, error);
 		return NextResponse.json(
 			{ error: "Internal server error" },
 			{ status: 500 },
@@ -490,13 +480,13 @@ export async function PUT(req, { params }) {
 export async function DELETE(req, { params }) {
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = getAgentId(params);
+	const agentId = await resolveCallAgentId(params.agentid);
 
 	if (!userId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	if (!agentId) {
-		return NextResponse.json({ error: "Agent ID is required" }, { status: 400 });
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 
 	try {
