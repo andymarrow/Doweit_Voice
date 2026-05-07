@@ -7,6 +7,7 @@ import { db } from "@/lib/database"; // Your Drizzle DB instance
 // Import the combined schema file
 import { callAgents } from "@/lib/db/schemaCharacterAI";
 import { eq, and } from "drizzle-orm";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 // Define allowed fields that can be updated via this PATCH route
 // This is important for security to prevent unauthorized changes to other fields
@@ -33,14 +34,9 @@ export async function GET(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = parseInt(params.agentid, 10);
-
-	// Validate agentId
-	if (isNaN(agentId)) {
-		console.warn(
-			`[API CONFIG GET] Invalid agentId provided: ${params.agentid}`,
-		);
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	const agentId = await resolveCallAgentId(params.agentid);
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 
 	if (!userId) {
@@ -91,14 +87,9 @@ export async function PATCH(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = parseInt(params.agentid, 10);
-
-	// Validate agentId
-	if (isNaN(agentId)) {
-		console.warn(
-			`[API CONFIG PATCH] Invalid agentId provided: ${params.agentid}`,
-		);
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	const agentId = await resolveCallAgentId(params.agentid);
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 
 	if (!userId) {
