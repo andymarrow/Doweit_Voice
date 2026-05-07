@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { actions } from "@/lib/db/schemaCharacterAI"; // Import the actions schema
-import { eq, or, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 // --- GET function: Fetch available global actions ---
 export async function GET(req) {
@@ -27,14 +27,11 @@ export async function GET(req) {
 			`[API ACTIONS GET] Fetching available actions for user ${userId}`,
 		);
 
-		// Fetch actions that are either owned by the user OR are system/template actions
-		// Adjust the WHERE clause based on how you identify system/template actions in your `actions` table.
-		// Assuming `creatorId = null` for system/template actions:
+		// Only show the user's own actions in the agent action picker —
+		// system/template actions belong elsewhere (a marketplace) and are
+		// not relevant for "add an action I built to my agent".
 		const availableActions = await db.query.actions.findMany({
-			where: or(
-				isNull(actions.creatorId), // System/Template actions
-				eq(actions.creatorId, userId), // Actions created by the current user
-			),
+			where: eq(actions.creatorId, userId),
 			// Select relevant fields for displaying in the modal
 			columns: {
 				id: true,
