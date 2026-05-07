@@ -6,21 +6,19 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { agentActions } from "@/lib/db/schemaCharacterAI";
 import { eq } from "drizzle-orm";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 // --- DELETE function: Remove a specific action instance from an agent ---
 export async function DELETE(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = parseInt(params.agentid, 10);
+	const agentId = await resolveCallAgentId(params.agentid);
 	const agentActionId = parseInt(params.agentactionid, 10); // Get the specific agentAction ID
 
 	// Validate IDs
-	if (isNaN(agentId)) {
-		console.warn(
-			`[API AGENT ACTION DELETE] Invalid agentId provided: ${params.agentid}`,
-		);
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 	if (isNaN(agentActionId)) {
 		console.warn(
@@ -166,11 +164,8 @@ const ALLOWED_AGENT_ACTION_UPDATE_FIELDS = [
 	// Add configOverrides if you decide to add that field to agentActions schema later
 ];
 
-// Helper to parse IDs
-function parseAgentId(params) {
-	const id = parseInt(params.agentid, 10);
-	return isNaN(id) ? null : id;
-}
+// Helper to parse the action-instance id only — agentid now goes through
+// resolveCallAgentId so both UUIDs and legacy integers work.
 function parseAgentActionId(params) {
 	const id = parseInt(params.agentactionid, 10);
 	return isNaN(id) ? null : id;
@@ -182,7 +177,7 @@ export async function PATCH(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = parseAgentId(params);
+	const agentId = await resolveCallAgentId(params.agentid);
 	const agentActionId = parseAgentActionId(params);
 
 	if (agentId === null || agentActionId === null) {
