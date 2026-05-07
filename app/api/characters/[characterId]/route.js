@@ -6,16 +6,18 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { characters, characterLikes, users } from "@/lib/db/schemaCharacterAI";
 import { eq, and, sql, exists } from "drizzle-orm"; // Ensure sql and exists are imported
+import { resolveCharacterId } from "@/lib/utils/publicId";
 
 export async function GET(req, { params }) {
 	const { characterId } = params;
 	const { user } = await getSession(await headers());
 	const currentUserId = user?.id;
 
-	if (!characterId) {
+	const charIdInt = await resolveCharacterId(characterId);
+	if (!charIdInt) {
 		return NextResponse.json(
-			{ error: "Character ID is required" },
-			{ status: 400 },
+			{ error: "Character not found" },
+			{ status: 404 },
 		);
 	}
 
@@ -39,7 +41,6 @@ export async function GET(req, { params }) {
 				isPublic: characters.isPublic,
 				likes: characters.likes,
 				chats: characters.chats,
-				// *** THE FIX IS HERE: Select 'users.name' instead of 'users.username' ***
 				creatorName: users.name,
 				// Use the subquery for the liked status
 				isLikedByCurrentUser: currentUserId
@@ -58,7 +59,7 @@ export async function GET(req, { params }) {
 			})
 			.from(characters)
 			.leftJoin(users, eq(characters.creatorId, users.id)) // Join to get creator info
-			.where(eq(characters.id, parseInt(characterId))) // Filter by character ID
+			.where(eq(characters.id, charIdInt))
 			.limit(1);
 
 		const character = characterResult[0];
