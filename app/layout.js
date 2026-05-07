@@ -4,6 +4,10 @@ import { Toaster } from "react-hot-toast";
 
 // 1. Import your new ThemeProvider client component
 import { ThemeProvider } from "./theme-provider";
+// Global "site assistant" — the floating chat widget that lets users navigate
+// the app by voice. No-op when NEXT_PUBLIC_DOWEIT_SITE_PUBLIC_KEY is not set,
+// so the rest of the app keeps working without the one-time setup.
+import SiteAssistant from "./_components/SiteAssistant";
 
 const inter = Outfit({ subsets: ["latin"] });
 
@@ -25,6 +29,7 @@ export default function RootLayout({ children }) {
 				>
 					<Toaster position="top-right" />
 					{children}
+					<SiteAssistant />
 				</ThemeProvider>
 			</body>
 		</html>
