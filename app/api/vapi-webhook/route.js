@@ -5,10 +5,44 @@ import { calls, interviews, callAgents } from "@/lib/db/schemaCharacterAI";
 import { eq, sql } from "drizzle-orm";
 // Import the new analysis engine
 import { analyzeCandidateInterview } from "@/lib/recruitment/analysisEngine";
+// Auto-extract action values from the transcript as soon as it lands —
+// avoids the user having to open every call and press "Analyze".
+import { extractActionValuesFromTranscript } from "@/lib/gemini/actionExtractor";
 
 // Allow longer timeout for AI analysis if deployed on Vercel Pro/Edge
-export const maxDuration = 60; 
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
+
+// Look up the agent for a freshly-saved call and run the action extractor.
+// Skips silently when the call has no transcript yet, when the agent has no
+// actions configured, or when extraction has already populated values for
+// this call (idempotent: avoids dupes if Vapi re-delivers the webhook).
+async function triggerAutoExtraction(callId, transcriptArray) {
+    if (!callId) return;
+    if (!Array.isArray(transcriptArray) || transcriptArray.length === 0) {
+        console.log(`[AUTO-EXTRACT] Skipping call ${callId}: no transcript array.`);
+        return;
+    }
+
+    const callRow = await db.query.calls.findFirst({
+        where: eq(calls.id, callId),
+        columns: { id: true, agentId: true },
+    });
+    if (!callRow?.agentId) return;
+
+    const agent = await db.query.callAgents.findFirst({
+        where: eq(callAgents.id, callRow.agentId),
+        with: { agentActions: { with: { action: true } } },
+    });
+    const agentActions = agent?.agentActions || [];
+    if (agentActions.length === 0) {
+        console.log(`[AUTO-EXTRACT] Agent ${callRow.agentId} has no actions configured — skipping.`);
+        return;
+    }
+
+    console.log(`[AUTO-EXTRACT] Running extractor for call ${callId} (${agentActions.length} actions)…`);
+    await extractActionValuesFromTranscript(callId, agentActions, transcriptArray);
+}
 
 export async function POST(req) {
     try {
@@ -147,6 +181,12 @@ export async function POST(req) {
                     console.log(
                         `[VAPI WEBHOOK] Updated standard call ${result[0].id} (audio=${!!recordingUrl}, transcript=${transcriptArray?.length || 0} entries).`,
                     );
+                    // Kick off action extraction immediately — fire-and-forget so we
+                    // still respond to Vapi quickly. Skips silently if the agent has
+                    // no actions configured or no transcript landed.
+                    triggerAutoExtraction(result[0].id, transcriptArray).catch((e) =>
+                        console.error("[VAPI WEBHOOK] Auto-extraction failed:", e?.message),
+                    );
                 } else if (!sessionId) {
                     // No row exists yet — the browser save lost the race or never fired (e.g. phone call).
                     // Insert a new call row so the agent's call history reflects this run.
@@ -182,6 +222,9 @@ export async function POST(req) {
                             .returning({ id: calls.id });
                         console.log(
                             `[VAPI WEBHOOK] No existing row matched; inserted call ${inserted.id} for agent ${agentId}.`,
+                        );
+                        triggerAutoExtraction(inserted.id, transcriptArray).catch((e) =>
+                            console.error("[VAPI WEBHOOK] Auto-extraction failed:", e?.message),
                         );
                     } else {
                         console.warn(
