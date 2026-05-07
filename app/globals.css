@@ -123,3 +123,18 @@
 .animate-wave > div {
                      animation: wave 1.5s ease-in-out infinite;
                  }
+
+/* Custom subtle scrollbar for modals */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5); /* Tailwind gray-400 with opacity */
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5); /* Tailwind gray-600 with opacity */
+}
