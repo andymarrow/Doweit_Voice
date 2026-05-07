@@ -6,16 +6,17 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { callAgents, agentActions, actions } from "@/lib/db/schemaCharacterAI"; // Import necessary schemas
 import { eq, and, inArray, or, isNull } from "drizzle-orm";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 // --- GET function: Fetch agent's configured actions ---
 export async function GET(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = parseInt(params.agentid, 10);
+	const agentId = await resolveCallAgentId(params.agentid);
 
-	if (isNaN(agentId)) {
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 
 	if (!userId) {
@@ -107,13 +108,10 @@ export async function POST(req, { params }) {
 	// const { userId } = auth();
 	const { user } = await getSession(await headers());
 	const userId = user?.id;
-	const agentId = parseInt(params.agentid, 10);
+	const agentId = await resolveCallAgentId(params.agentid);
 
-	if (isNaN(agentId)) {
-		console.warn(
-			`[API AGENT ACTIONS POST] Invalid agentId provided: ${params.agentid}`,
-		);
-		return NextResponse.json({ error: "Invalid agent ID" }, { status: 400 });
+	if (!agentId) {
+		return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 	}
 
 	if (!userId) {
