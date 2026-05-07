@@ -10,8 +10,7 @@ import { eq } from "drizzle-orm";
 const vapiSecretKey = process.env.VAPI_SECRET_KEY;
 const vapiAssistantsApiUrl = "https://api.vapi.ai/assistant";
 
-export const dynamic = 'force-dynamic'; 
-// --- Function to fetch default voices from VAPI ---
+export const dynamic = 'force-dynamic';
 
 // --- Hardcoded Gemini Voices ---
 const GEMINI_VOICES = [
@@ -22,13 +21,13 @@ const GEMINI_VOICES = [
     'Zubenelgenubi', 'Vindemiatrix', 'Sadchibia', 'Sadaltager', 'Sulafat'
 ];
 
-
+// Fetch voices by reading the voice config from user-created Vapi assistants.
+// Each assistant represents a voice persona — the assistant name is the voice
+// name and assistant.voice contains the provider + voiceId to use.
 async function fetchVapiVoices() {
 	if (!vapiSecretKey) {
-		console.error(
-			"VAPI_SECRET_KEY is not set. Cannot fetch default VAPI voices.",
-		);
-		return []; // Return eempty array if not configured
+		console.error("VAPI_SECRET_KEY is not set. Cannot fetch Vapi voices.");
+		return [];
 	}
 	try {
 		const response = await fetch(vapiAssistantsApiUrl, {
@@ -41,11 +40,11 @@ async function fetchVapiVoices() {
 			console.error(
 				`Failed to fetch assistants from Vapi API. Status: ${response.status}, Body: ${errorBody}`,
 			);
-			return []; // Return empty on error
+			return [];
 		}
 
 		const assistants = await response.json();
-		const vapiVoices = {}; // Use a map to handle duplicates from VAPI
+		const vapiVoices = {};
 
 		assistants.forEach((assistant) => {
             if (assistant.voice?.provider && assistant.voice?.voiceId) {
@@ -55,10 +54,10 @@ async function fetchVapiVoices() {
                         id: voiceKey,
                         voiceId: assistant.voice.voiceId,
                         name: assistant.name || assistant.voice.voiceId,
-                        description: `VAPI Default (${assistant.voice.provider})`,
+                        description: `Vapi (${assistant.voice.provider})`,
                         sampleAudioUrl: null,
-                        platform: "vapi", // Map to general provider
-                        provider: assistant.voice.provider // Specific provider
+                        platform: "vapi",
+                        provider: assistant.voice.provider,
                     };
                 }
             }
@@ -66,21 +65,17 @@ async function fetchVapiVoices() {
 		return Object.values(vapiVoices);
 	} catch (error) {
 		console.error("Error fetching Vapi voices:", error);
-		return []; // Return empty on error
+		return [];
 	}
 }
 
 // --- Function to fetch user's custom voices from our DB ---
 async function fetchUserCustomVoices(userId) {
-	if (!userId) {
-		return [];
-	}
+	if (!userId) return [];
 	try {
 		const customVoices = await db.query.voices.findMany({
 			where: eq(voices.creatorId, userId),
 		});
-
-		// Map to the same format as VAPI voices for consistency
 		return customVoices.map((v) => ({
 			id: `${v.provider}-${v.providerVoiceId}`,
 			voiceId: v.providerVoiceId,
@@ -88,7 +83,7 @@ async function fetchUserCustomVoices(userId) {
 			description: v.description || `Custom (${v.provider})`,
 			sampleAudioUrl: v.sampleAudioUrl,
 			platform: v.provider,
-            provider: v.provider
+            provider: v.provider,
 		}));
 	} catch (error) {
 		console.error(`Error fetching custom voices for user ${userId}:`, error);
@@ -101,11 +96,11 @@ function getGeminiVoices() {
     return GEMINI_VOICES.map(voiceName => ({
         id: `google-${voiceName}`,
         voiceId: voiceName,
-        name: `${voiceName}`,
-        description: "Custom voices",
-        sampleAudioUrl: null, // Google doesn't provide public sample URLs easily yet
+        name: voiceName,
+        description: "Google Gemini voice",
+        sampleAudioUrl: null,
         platform: "google",
-        provider: "google"
+        provider: "google",
     }));
 }
 
@@ -113,40 +108,27 @@ function getGeminiVoices() {
 // --- MAIN GET HANDLER ---
 export async function GET(request) {
 	try {
-		// const { userId } = auth(); // Get the current user
 		const { user } = await getSession(await headers());
 		const userId = user?.id;
 
-		// --- 1. Fetch voices from all sources in parallel ---
+		// Fetch from all sources in parallel
 		const [vapiVoices, customVoices] = await Promise.all([
 			fetchVapiVoices(),
-			fetchUserCustomVoices(userId), // Pass the userId to get their specific voices
+			fetchUserCustomVoices(userId),
 		]);
 
-
 		const geminiVoices = getGeminiVoices();
-		// --- 2. Merge the lists ---
-		// We can use a Map to ensure that if a user's custom voice happens
-		// to have the same ID as a VAPI default, the custom one takes precedence.
+
+		// Merge — custom voices overwrite duplicates
 		const combinedVoicesMap = new Map();
-
-		// 1. Add Gemini Voices
-        geminiVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
-
-		// Add VAPI defaults first
+		geminiVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
 		vapiVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
-
-		// Add/overwrite with user's custom voices
 		customVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
 
 		const finalVoiceList = Array.from(combinedVoicesMap.values());
-
-		// Sort the final list alphabetically by name
 		finalVoiceList.sort((a, b) => a.name.localeCompare(b.name));
 
-		console.log(
-			`Returning a combined list of ${finalVoiceList.length} voices.`,
-		);
+		console.log(`Returning a combined list of ${finalVoiceList.length} voices.`);
 
 		return NextResponse.json(finalVoiceList, { status: 200 });
 	} catch (error) {
