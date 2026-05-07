@@ -7,6 +7,8 @@ import { headers } from "next/headers";
 import { db } from "@/lib/database";
 import { callAgents } from "@/lib/db/schemaCharacterAI";
 import { eq, and } from "drizzle-orm";
+import { getCalcomVapiAddons } from "@/lib/integrations/calcom/vapiTools";
+import { resolveCallAgentId } from "@/lib/utils/publicId";
 
 const VAPI_SECRET_KEY = process.env.VAPI_SECRET_KEY;
 
@@ -18,9 +20,9 @@ export async function POST(req, { params }) {
 		if (!userId)
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-		const agentId = parseInt(params.agentid, 10);
-		if (isNaN(agentId))
-			return NextResponse.json({ error: "Invalid Agent ID" }, { status: 400 });
+		const agentId = await resolveCallAgentId(params.agentid);
+		if (!agentId)
+			return NextResponse.json({ error: "Agent not found" }, { status: 404 });
 
 		const { phoneNumber, userName } = await req.json();
 		if (!phoneNumber || !userName)
@@ -38,18 +40,21 @@ export async function POST(req, { params }) {
 
 		// --- STEP 1: PREPARE THE VAPI ASSISTANT CONFIGURATION ---
 		// This is the object that will be used to create a temporary assistant for the call.
+		// If Cal.com is enabled for this agent, we inject function tools + a
+		// prompt suffix so the agent can check availability + create bookings live.
+		const calcomAddons = await getCalcomVapiAddons(agent.id);
+		const systemPrompt =
+			(agent.prompt || "You are a helpful assistant.") +
+			(calcomAddons?.promptSuffix || "");
+
 		const assistantConfig = {
 			// --- FIX #1: Create a shorter, unique name ---
 			name: `Test Agent ${agent.id}-${Date.now()}`.slice(0, 40),
 			model: {
 				provider: "google",
 				model: "gemini-2.5-flash",
-				messages: [
-					{
-						role: "system",
-						content: agent.prompt || "You are a helpful assistant.",
-					},
-				],
+				messages: [{ role: "system", content: systemPrompt }],
+				...(calcomAddons?.tools?.length ? { tools: calcomAddons.tools } : {}),
 			},
 			voice: {
 				// We simply pass the provider and voiceId. VAPI handles the rest.
