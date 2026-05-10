@@ -100,7 +100,15 @@ export default function SiteAssistant() {
             const { DoweitClient } = await import("@doweit/voice");
             if (cancelled) return;
 
-            const c = new DoweitClient({ publicKey, language: "en" });
+            const c = new DoweitClient({
+                publicKey,
+                language: "en",
+                // On localhost NEXT_PUBLIC_WS_SERVER_URL is unset → baseUrl is ""
+                // → SDK falls back to window.location.host → local Next.js handles WS.
+                // On Vercel set NEXT_PUBLIC_WS_SERVER_URL=https://<your-render-app>.onrender.com
+                // → SDK connects to the standalone Render server instead.
+                baseUrl: process.env.NEXT_PUBLIC_WS_SERVER_URL || "",
+            });
 
             // Live UI state pushed to Gemini before each turn. Including
             // currentAgentId here is what lets the model decide whether

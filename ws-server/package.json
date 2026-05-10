@@ -1,0 +1,22 @@
+{
+  "name": "doweit-ws-server",
+  "version": "1.0.0",
+  "description": "Standalone WebSocket proxy — Gemini Live ↔ Browser. Deployed on Render so Vercel (serverless) doesn't need to handle WebSocket upgrades.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

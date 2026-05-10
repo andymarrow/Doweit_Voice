@@ -21,7 +21,9 @@ export default function SdkTestEnvironment() {
     const client = useMemo(() => {
         const ai = new DoweitClient({
             publicKey: 'dw_pub_e1afb358b3807e775d791e1384ea2754e909325de10ead10',
-            baseUrl: 'http://localhost:3000'
+            // On localhost: env var is unset → falls back to http://localhost:3000 (local Next.js WS).
+            // On Vercel: env var points to the Render WS server.
+            baseUrl: process.env.NEXT_PUBLIC_WS_SERVER_URL || 'http://localhost:3000',
         });
 
         ai.bindState(() => ({
