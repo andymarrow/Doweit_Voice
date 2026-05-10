@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // app/api/trainee/generate/route.js
 // Single endpoint that generates BOTH the system prompt and the question list
 // for a trainee interview. The frontend calls this once on the user's "Generate"

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // app/api/candidate/[candidateid]/route.js
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/database';

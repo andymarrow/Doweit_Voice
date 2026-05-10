@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // app/api/trainee/quiz/generate/route.js
 // Generates a quiz tied to a trainee interview. The quiz reuses the
 // interview's description + system prompt + question list as context, so the

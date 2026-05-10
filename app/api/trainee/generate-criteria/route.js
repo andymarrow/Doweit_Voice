@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // app/api/trainee/generate-criteria/route.js
 // Generates evaluation criteria from the AI-prepared system prompt + questions.
 // Count of criteria = questionCount + 2 (per spec). Returns weights summing

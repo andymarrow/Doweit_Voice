@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // app/api/recruiter/voices/route.js
 
 import { NextResponse } from 'next/server';

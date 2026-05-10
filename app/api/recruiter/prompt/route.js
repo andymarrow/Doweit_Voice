@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GEMINI_API_KEY } from "@/configs/constants";
 

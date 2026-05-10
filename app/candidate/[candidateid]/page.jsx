@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import dynamic from 'next/dynamic';
 import {
   User,
   Mail,
@@ -15,15 +14,10 @@ import {
   MapPin,
   FileText,
   ChevronRight,
-  ChevronLeft,
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-
-// Dynamically import react-quill to avoid SSR issues
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
-import 'react-quill/dist/quill.snow.css';
 
 export default function CandidateRegistrationPage({ params }) {
     const { candidateid } = params;
@@ -103,10 +97,8 @@ export default function CandidateRegistrationPage({ params }) {
         if (!candidate.address.trim()) newErrors.address = 'Address is required';
         if (!candidate.experience) newErrors.experience = 'Experience level is required';
         
-        // Strip HTML tags from CV content for validation
-        const plainTextCv = candidate.cv.replace(/<[^>]*>/g, '').trim();
-        if (!plainTextCv) newErrors.cv = 'CV content is required';
-        else if (plainTextCv.length > 3000) newErrors.cv = 'CV content must be 3000 characters or less';
+        if (!candidate.cv.trim()) newErrors.cv = 'CV content is required';
+        else if (candidate.cv.length > 3000) newErrors.cv = 'CV content must be 3000 characters or less';
         
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -164,10 +156,9 @@ export default function CandidateRegistrationPage({ params }) {
         }
     };
 
-    const handleCvTextChange = (value) => {
-        // Strip HTML tags to check plain text length
-        const plainText = value.replace(/<[^>]*>/g, '');
-        if (plainText.length <= 3000) {
+    const handleCvTextChange = (e) => {
+        const value = e.target.value;
+        if (value.length <= 3000) {
             setCandidate(prev => ({ ...prev, cv: value }));
             if (errors.cv) {
                 setErrors(prev => ({ ...prev, cv: '' }));
@@ -447,62 +438,27 @@ export default function CandidateRegistrationPage({ params }) {
                                 </h2>
 
                                 <div className="space-y-6">
-                                    {/* CV Rich Text Editor */}
+                                    {/* CV Text Area */}
                                     <div className="space-y-2">
                                         <label className="text-sm font-semibold text-gray-700">
-                                            CV Content {candidate.cv.length > 0 && `(${candidate.cv.replace(/<[^>]*>/g, '').length}/3000 chars)`}
+                                            CV Content {candidate.cv.length > 0 && `(${candidate.cv.length}/3000 chars)`}
                                         </label>
-                                        <div className={`border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                            errors.cv ? 'border-red-300' : 'border-gray-200'
-                                        }`}>
-                                            <ReactQuill
-                                                value={candidate.cv}
-                                                onChange={handleCvTextChange}
-                                                placeholder="Please type or paste your CV content here (max 3000 characters)..."
-                                                theme="snow"
-                                                modules={{
-                                                    toolbar: [
-                                                        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-                                                        [{ 'font': [] }],
-                                                        [{ 'size': ['small', false, 'large', 'huge'] }],
-                                                        ['bold', 'italic', 'underline', 'strike'],
-                                                        [{ 'color': [] }, { 'background': [] }],
-                                                        [{ 'script': 'sub'}, { 'script': 'super' }],
-                                                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                                                        [{ 'indent': '-1'}, { 'indent': '+1' }],
-                                                        [{ 'direction': 'rtl' }],
-                                                        [{ 'align': [] }],
-                                                        ['blockquote', 'code-block'],
-                                                        ['link', 'image', 'video'],
-                                                        ['clean']
-                                                    ],
-                                                    clipboard: {
-                                                        matchVisual: false,
-                                                    }
-                                                }}
-                                                formats={[
-                                                    'header', 'font', 'size',
-                                                    'bold', 'italic', 'underline', 'strike',
-                                                    'color', 'background',
-                                                    'script',
-                                                    'list', 'bullet', 'ordered',
-                                                    'indent', 'direction', 'align',
-                                                    'blockquote', 'code-block',
-                                                    'link', 'image', 'video'
-                                                ]}
-                                                style={{
-                                                    minHeight: '250px',
-                                                    fontSize: '14px'
-                                                }}
-                                            />
-                                        </div>
+                                        <textarea
+                                            value={candidate.cv}
+                                            onChange={handleCvTextChange}
+                                            placeholder="Please type or paste your CV content here (max 3000 characters)..."
+                                            rows={12}
+                                            className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y ${
+                                                errors.cv ? 'border-red-300' : 'border-gray-200'
+                                            }`}
+                                        />
                                         <div className="flex justify-between items-center">
                                             <p className="text-xs text-gray-500">
-                                                Use the rich text editor to format your CV (max 3000 characters)
+                                                Type or paste your CV content (max 3000 characters)
                                             </p>
                                             {candidate.cv.length > 0 && (
-                                                <span className={`text-xs ${candidate.cv.replace(/<[^>]*>/g, '').length > 3000 ? 'text-red-500' : 'text-gray-500'}`}>
-                                                    {candidate.cv.replace(/<[^>]*>/g, '').length}/3000
+                                                <span className={`text-xs ${candidate.cv.length > 2800 ? 'text-red-500' : 'text-gray-500'}`}>
+                                                    {candidate.cv.length}/3000
                                                 </span>
                                             )}
                                         </div>

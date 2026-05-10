@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TraineeDashboard } from './modules/Dashboard';
 import { MySessions }       from './modules/MySessions';
@@ -31,7 +31,7 @@ const NAV = [
   { id: 'settings',    label: 'Settings',     icon: Settings },
 ];
 
-export default function TraineePage() {
+function TraineeContent() {
   const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
@@ -165,5 +165,13 @@ export default function TraineePage() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
+  );
+}
+
+export default function TraineePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" /></div>}>
+      <TraineeContent />
+    </Suspense>
   );
 }

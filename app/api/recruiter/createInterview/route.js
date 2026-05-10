@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
 import { jobPositions, interviewSessions, interviewQuestions, interviewLinks } from '@/lib/db/schemaCharacterAI';
