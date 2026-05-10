@@ -253,39 +253,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 })}
             </nav>
 
-            {/* Academy, Usage, and Upgrade sections remain unchanged */}
-            {/* ... your existing JSX for these sections ... */}
-            {/* Academy Card */}
-            <AnimatePresence>
-                {isOpen && (
-                     <motion.div
-                         key="academy-card"
-                         initial="collapsed"
-                         animate="open"
-                         exit="collapsed"
-                         variants={itemVariants} // Use itemVariants for fade/slide animation
-                         className={`relative bg-gray-100 dark:bg-gray-800 rounded-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300`} // Scheme colors, border, added relative for link
-                     >
-                         <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-white">Join our Academy <FiExternalLink className="inline-block ml-1" /></h4> {/* Scheme text, icon inline */}
-                         <p className="text-xs mb-3 text-gray-600 dark:text-gray-400">
-                             Join our courses and webinars to master AI and automation with expert guidance.
-                         </p>
-                         {/* Make the entire card area clickable with a transparent overlay link */}
-                         <div href="/join" legacyBehavior>
-                              <div className={` rounded-lg cursor-pointer ${accentClasses.hoverBg}`}>
-                                   {/* Screen reader text for accessibility */}
-                                  <span className="sr-only">Join our Academy</span>
-                              </div>
-                         </div>
-                         <Link href="/join" legacyBehavior>
-                                <a className={`block text-center text-sm font-semibold px-4 py-2.5 rounded-md transition-all shadow
-                                               ${accentClasses.buttonGradient}`}> {/* Full width, center text, applied gradient */}
-                                    Join
-                                </a>
-                           </Link>
-                     </motion.div>
-                 )}
-             </AnimatePresence>
 
 
             {/* Usage Status (Free / Minutes) */}
