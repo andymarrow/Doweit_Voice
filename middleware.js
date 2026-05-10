@@ -12,6 +12,8 @@ export async function middleware(request) {
 	if (
 		!validCookie &&
 		!["/", "/sign-in", "/sign-up"].includes(pathname) &&
+		!pathname.startsWith("/admin") &&
+		!pathname.startsWith("/api/admin") &&
 		!pathname.includes("/api/auth")
 	) {
 		console.log("redirecting to signin");
