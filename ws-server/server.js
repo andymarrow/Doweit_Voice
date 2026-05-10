@@ -137,10 +137,16 @@ async function handleWsConnection(ws, req) {
         }
     };
 
+    let audioFrameCount = 0;
     ws.on("message", (raw) => {
         let msg;
         try { msg = JSON.parse(raw); } catch { return; }
-        if (msg.type !== "audio_input") {
+        if (msg.type === "audio_input") {
+            audioFrameCount++;
+            if (audioFrameCount === 1 || audioFrameCount % 100 === 0) {
+                console.log("[WS] audio_input frames received:", audioFrameCount);
+            }
+        } else {
             console.log("[WS] Client message:", msg.type, msg.name || msg.text?.slice(0, 40) || "");
         }
         if (!geminiSession) {
@@ -206,12 +212,23 @@ async function handleWsConnection(ws, req) {
             callbacks: {
                 onopen: () => console.log("[WS] Gemini Live connected"),
                 onmessage: (message) => {
+                    const keys = Object.keys(message).filter(k => message[k] != null);
+                    console.log("[WS] Gemini msg keys:", keys.join(", "));
+
                     const serverContent = message.serverContent;
+                    if (serverContent) {
+                        const scKeys = Object.keys(serverContent).filter(k => serverContent[k] != null);
+                        console.log("[WS] serverContent keys:", scKeys.join(", "));
+                    }
+
                     if (serverContent?.interrupted) safeSend({ type: "interrupted" });
+
                     if (serverContent?.outputTranscription?.text) {
+                        console.log("[WS] AI transcript:", serverContent.outputTranscription.text.slice(0, 80));
                         safeSend({ type: "text", text: serverContent.outputTranscription.text });
                     }
                     if (serverContent?.inputTranscription?.text) {
+                        console.log("[WS] User transcript:", serverContent.inputTranscription.text.slice(0, 80));
                         safeSend({
                             type: "text_user",
                             text: serverContent.inputTranscription.text,
@@ -220,6 +237,7 @@ async function handleWsConnection(ws, req) {
                     }
                     const modelTurn = serverContent?.modelTurn;
                     if (modelTurn?.parts) {
+                        console.log("[WS] modelTurn parts:", modelTurn.parts.length, "types:", modelTurn.parts.map(p => p.inlineData ? "audio" : p.text ? "text" : "other").join(","));
                         for (const part of modelTurn.parts) {
                             if (part.inlineData?.data) {
                                 safeSend({ type: "audio", data: part.inlineData.data });
@@ -242,6 +260,9 @@ async function handleWsConnection(ws, req) {
                                 console.error("[WS] sendToolResponse error:", err.message);
                             }
                         }
+                    }
+                    if (message.setupComplete) {
+                        console.log("[WS] Gemini setup complete");
                     }
                 },
                 onerror: (err) => {
