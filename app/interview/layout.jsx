@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function InterviewLayout({ children }) {
   return (
-    <div className={`min-h-screen w-full ${uiColors.bgPage} text-gray-900 dark:text-white overflow-hidden`}>
+    <div className={`w-full ${uiColors.bgPage} text-gray-900 dark:text-white overflow-hidden`}>
       {/* Simple Header */}
       <header className={`h-16 flex items-center px-6 border-b ${uiColors.borderPrimary} bg-white dark:bg-gray-950 z-10 relative`}>
         <div className="flex items-center space-x-2">
@@ -20,7 +20,7 @@ export default function InterviewLayout({ children }) {
         </div>
       </header>
       
-      <main className="h-[calc(100vh-64px)] relative">
+      <main className="relative">
         {children}
       </main>
     </div>

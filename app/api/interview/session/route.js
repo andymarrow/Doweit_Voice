@@ -1,37 +1,77 @@
-export const dynamic = "force-dynamic";
-// app/api/interview/session/route.js
-import { NextResponse } from "next/server";
-import { db } from "@/lib/database";
-import { interviews } from "@/lib/db/schemaCharacterAI";
+import { NextResponse } from 'next/server';
+import { db } from '@/lib/database';
+import { eq } from 'drizzle-orm';
+import { candidateApplications } from '@/lib/db/schemaCharacterAI';
 
-export async function POST(req) {
-    try {
-        const body = await req.json();
-        const { agentId, candidateName, candidateEmail } = body;
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { 
+      candidateName, 
+      candidateEmail, 
+      candidatePhone, 
+      experience, 
+      country, 
+      portfolioUrl, 
+      linkedinUrl, 
+      resumeUrl,
+      linkId,
+      positionId,
+      agentId 
+    } = body;
 
-        if (!agentId || !candidateName || !candidateEmail) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-        }
+    console.log('Creating interview session:', { candidateName, candidateEmail, linkId, positionId });
 
-        // Create a new Interview record
-        const [newSession] = await db.insert(interviews).values({
-            agentId: parseInt(agentId),
-            candidateName: candidateName,
-            candidateEmail: candidateEmail,
-            type: 'real_application', // or 'mock_training' if configured
-            status: 'ongoing',
-            fitScore: 0, // Initial score
-            screenshots: [], // Start with empty array
-            analysisData: {},
-            createdAt: new Date()
-        }).returning({ id: interviews.id });
-
-        console.log(`[Interview Session] Started session ${newSession.id} for ${candidateEmail}`);
-
-        return NextResponse.json({ sessionId: newSession.id }, { status: 201 });
-
-    } catch (error) {
-        console.error("[Interview Session] Creation Failed:", error);
-        return NextResponse.json({ error: "Failed to start session" }, { status: 500 });
+    if (!candidateName || !candidateEmail) {
+      return NextResponse.json(
+        { error: 'Candidate name and email are required' },
+        { status: 400 }
+      );
     }
+
+    // Generate a unique session ID
+    const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+    // If we have a candidateId, update their record
+    let updatedCandidate = null;
+    if (agentId) {
+      // For magic link interviews, we might need to find the candidate by email or other means
+      // For now, we'll just return the session ID
+      console.log('Magic link session created:', sessionId);
+    } else if (linkId && positionId) {
+      // For position-based interviews, we could update the candidate record
+      // For now, we'll just return the session ID
+      console.log('Position-based session created:', sessionId);
+    }
+
+    return NextResponse.json({
+      success: true,
+      sessionId: sessionId,
+      message: 'Interview session created successfully',
+      candidateInfo: {
+        name: candidateName,
+        email: candidateEmail,
+        phone: candidatePhone,
+        experience: experience,
+        country: country,
+        portfolioUrl: portfolioUrl,
+        linkedinUrl: linkedinUrl,
+        resumeUrl: resumeUrl
+      }
+    });
+
+  } catch (error) {
+    console.error('Error creating interview session:', error);
+    return NextResponse.json(
+      { error: 'Failed to create interview session' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request) {
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405 }
+  );
 }

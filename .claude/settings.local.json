@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Bash(node --check lib/db/schemaCharacterAI.js)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

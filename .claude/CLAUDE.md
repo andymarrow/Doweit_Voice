@@ -1,6 +1,31 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Doweit Voice — Engineering Brain
 
 > This document is the operating manual for the Doweit Voice platform. Everything here is derived directly from the codebase. Do not treat this as a template.
+
+---
+
+## 0. Common Commands
+
+```bash
+npm run dev          # Start Next.js dev server (http://localhost:3000)
+npm run build        # Production build
+npm run start        # Run the built app
+npm run lint         # next lint
+
+npm run db:push      # Apply Drizzle schema changes to NeonDB (no migration files)
+npm run db:studio    # Open Drizzle Studio at https://local.drizzle.studio
+npm run migrate      # Run lib/scripts/migration-script.js (one-off data migrations)
+```
+
+There is **no test runner configured** — `package.json` has no `test` script and no Jest/Vitest/Playwright deps. Don't claim tests pass; verify behavior by exercising the UI or API directly.
+
+Drizzle uses `db:push` (schema sync), not generated migration files. The `drizzle/` directory holds historical SQL but the live workflow is push-based — edit `lib/db/schemaCharacterAI.js`, then `npm run db:push`.
+
+Convex (workspace feature only) is run separately via `npx convex dev` if you need to touch [convex/](convex/).
 
 ---
 
