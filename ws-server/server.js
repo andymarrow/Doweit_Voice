@@ -34,7 +34,6 @@ async function getAppWithAgent(publicKey) {
             sa.status,
             ca.name          AS agent_name,
             ca.prompt        AS agent_prompt,
-            ca.language      AS agent_language,
             ca.voice_config  AS agent_voice_config,
             ca.greeting_message AS agent_greeting
          FROM sdk_apps sa
@@ -173,7 +172,6 @@ async function handleWsConnection(ws, req) {
         const voiceName = app.agent_voice_config?.voiceId || "Aoede";
         const systemInstruction = buildSystemInstruction({
             agentPrompt: app.agent_prompt,
-            agentLanguage: app.agent_language,
             manifestActions: actions,
         });
 
