@@ -8,6 +8,7 @@ import { analyzeCandidateInterview } from "@/lib/recruitment/analysisEngine";
 // Auto-extract action values from the transcript as soon as it lands —
 // avoids the user having to open every call and press "Analyze".
 import { extractActionValuesFromTranscript } from "@/lib/gemini/actionExtractor";
+import { deductTokens } from "@/lib/tokens/deductTokens";
 
 // Allow longer timeout for AI analysis if deployed on Vercel Pro/Edge
 export const maxDuration = 60;
@@ -144,6 +145,22 @@ export async function POST(req) {
                     }).where(eq(interviews.id, parseInt(sessionId)));
 
                     console.log(`[VAPI WEBHOOK] Interview ${sessionId} analysis complete. Score: ${analysisResult.fitScore}`);
+
+                    // Deduct tokens from the recruiter who owns this agent (1 min = 10 tokens)
+                    try {
+                        const durationMinutes = duration
+                            ? Math.max(1, Math.ceil(duration / 60))
+                            : 1;
+                        await deductTokens({
+                            userId: session.agent.creatorId,
+                            durationMinutes,
+                            description: 'Recruitment Interview',
+                            interviewType: 'recruiter',
+                        });
+                        console.log(`[TOKEN] Deducted ${durationMinutes * 10} tokens from recruiter ${session.agent.creatorId}`);
+                    } catch (e) {
+                        console.error('[TOKEN] Failed to deduct recruiter tokens:', e?.message);
+                    }
                 } else {
                     console.warn(`[VAPI WEBHOOK] Session ${sessionId} found in metadata but not in DB.`);
                 }
