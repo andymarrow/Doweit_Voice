@@ -26,6 +26,7 @@ export async function POST(req) {
         let context = topic || "General Technical Interview";
         let title = topic || "Quiz";
         let resolvedQuestionCount;
+        let language = "English";
 
         if (interviewId) {
             const [iv] = await db
@@ -49,6 +50,7 @@ export async function POST(req) {
             ].join("\n\n");
             title = iv.title;
             resolvedQuestionCount = iv.questionCount || qList.length || 8;
+            language = iv.language || "English";
         } else if (agentId) {
             const agent = await db.query.callAgents.findFirst({
                 where: eq(callAgents.id, agentId),
@@ -68,6 +70,8 @@ export async function POST(req) {
 
         const prompt = `
 Create a written practice quiz based on this interview context.
+
+LANGUAGE: Write every question, option, and explanation in ${language}. Do not use any other language.
 
 CONTEXT:
 ${String(context).substring(0, 5000)}
