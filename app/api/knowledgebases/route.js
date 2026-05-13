@@ -40,6 +40,7 @@ export async function GET() {
 			// Select specific fields needed for the list view
 			columns: {
 				id: true,
+				publicId: true,
 				name: true,
 				description: true,
 				isPublic: true,
