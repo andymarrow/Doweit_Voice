@@ -52,7 +52,12 @@ export default function PlaygroundTab({ appData, manifest }) {
     // Build a mock client that mimics the developer's app — all handlers just log.
     const mockClient = useMemo(() => {
         if (!appData?.publicKey) return null;
-        const client = new DoweitClient({ publicKey: appData.publicKey });
+        const client = new DoweitClient({
+            publicKey: appData.publicKey,
+            // Same env-var routing as SiteAssistant: unset on localhost (uses local Next.js WS),
+            // set to the Render server URL on Vercel.
+            baseUrl: process.env.NEXT_PUBLIC_WS_SERVER_URL || "",
+        });
 
         if (manifest?.actions?.length) {
             const mockActions = {};
