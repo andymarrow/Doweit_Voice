@@ -55,7 +55,10 @@ export async function PATCH(req, { params }) {
 
     try {
         const body = await req.json();
-        const { name, domainWhitelist, status, agentId, regenerateKey } = body;
+        const {
+            name, domainWhitelist, status, agentId, regenerateKey,
+            mode, customPrompt, customVoiceId, customKnowledgeBaseId,
+        } = body;
 
         const existingApp = await db.query.sdkApps.findFirst({
             where: and(eq(sdkApps.id, appId), eq(sdkApps.creatorId, userId)),
@@ -68,6 +71,15 @@ export async function PATCH(req, { params }) {
         if (status !== undefined) updateData.status = status;
         if (agentId !== undefined) updateData.agentId = agentId === null ? null : Number(agentId);
         if (regenerateKey === true) updateData.publicKey = generatePublicKey();
+        if (mode !== undefined) updateData.mode = mode === "custom" ? "custom" : "agent";
+        if (customPrompt !== undefined) updateData.customPrompt = customPrompt;
+        if (customVoiceId !== undefined) updateData.customVoiceId = customVoiceId;
+        if (customKnowledgeBaseId !== undefined) {
+            updateData.customKnowledgeBaseId =
+                customKnowledgeBaseId === null || customKnowledgeBaseId === ""
+                    ? null
+                    : Number(customKnowledgeBaseId);
+        }
 
         const [updatedApp] = await db.update(sdkApps)
             .set(updateData)

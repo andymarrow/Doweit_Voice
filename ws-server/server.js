@@ -32,16 +32,39 @@ async function getAppWithAgent(publicKey) {
             sa.id,
             sa.name,
             sa.status,
+            sa.mode,
+            sa.custom_prompt,
+            sa.custom_voice_id,
+            sa.custom_knowledge_base_id,
             ca.name          AS agent_name,
             ca.prompt        AS agent_prompt,
             ca.voice_config  AS agent_voice_config,
-            ca.greeting_message AS agent_greeting
+            ca.greeting_message AS agent_greeting,
+            kb.name          AS custom_kb_name,
+            kb.content       AS custom_kb_content
          FROM sdk_apps sa
          LEFT JOIN call_agents ca ON sa.agent_id = ca.id
+         LEFT JOIN knowledge_bases kb ON sa.custom_knowledge_base_id = kb.id
          WHERE sa.public_key = $1`,
         [publicKey],
     );
     return rows[0] || null;
+}
+
+// Stringify a KB content JSONB array into one text block for the system prompt.
+// content rows look like { type: 'text'|'url', value: '...', metadata: {...} }
+function knowledgeBaseToText(kbName, content) {
+    if (!Array.isArray(content) || content.length === 0) return "";
+    const blocks = content
+        .map((item, i) => {
+            const val = typeof item?.value === "string" ? item.value : "";
+            if (!val) return null;
+            const label = item.metadata?.filename || item.type || `Item ${i + 1}`;
+            return `--- ${label} ---\n${val}`;
+        })
+        .filter(Boolean)
+        .join("\n\n");
+    return blocks ? `# Knowledge Base: ${kbName || "Reference"}\n\n${blocks}` : "";
 }
 
 async function getLatestManifest(appId) {
@@ -175,9 +198,23 @@ async function handleWsConnection(ws, req) {
         const actions = manifest?.actions || [];
         const tools = actions.length > 0 ? toolsForGemini(actions) : undefined;
 
-        const voiceName = app.agent_voice_config?.voiceId || "Aoede";
+        // Resolve prompt + voice based on the app's mode.
+        // mode === 'custom' → use sdk_apps.custom_* fields (+ optional KB injection)
+        // mode === 'agent' (default) → use the linked call_agents row
+        let promptForGemini;
+        let voiceName;
+        if (app.mode === "custom") {
+            const kbBlock = knowledgeBaseToText(app.custom_kb_name, app.custom_kb_content);
+            promptForGemini = [app.custom_prompt || "", kbBlock].filter(Boolean).join("\n\n");
+            voiceName = app.custom_voice_id || "Aoede";
+            console.log("[WS] Using CUSTOM mode. Voice:", voiceName, "KB attached:", !!kbBlock);
+        } else {
+            promptForGemini = app.agent_prompt;
+            voiceName = app.agent_voice_config?.voiceId || "Aoede";
+            console.log("[WS] Using AGENT mode. Voice:", voiceName);
+        }
         const systemInstruction = buildSystemInstruction({
-            agentPrompt: app.agent_prompt,
+            agentPrompt: promptForGemini,
             manifestActions: actions,
         });
 
