@@ -377,9 +377,13 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                     userName,
                     provider: 'vapi',
                 },
-                server: {
-                    url: process.env.NEXT_PUBLIC_WEBHOOK_URL,
-                }
+                // Only attach a server webhook when one is actually configured.
+                // Sending server: { url: undefined } serialises to server: {},
+                // which Vapi rejects as an invalid assistant — it then deletes
+                // the call room immediately ("Meeting has ended / no-room").
+                ...(process.env.NEXT_PUBLIC_WEBHOOK_URL
+                    ? { server: { url: process.env.NEXT_PUBLIC_WEBHOOK_URL } }
+                    : {}),
             };
 
             if (agent.voiceConfig.voiceProvider === 'elevenlabs') {
