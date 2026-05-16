@@ -51,6 +51,48 @@ const arrayBufferToBase64 = (buffer) => {
     return window.btoa(binary);
 };
 
+// --- GEMINI TOOL HELPERS ---
+
+// Gemini Live wants JSON-schema `type` values uppercased ("object" → "OBJECT").
+const upperCaseSchemaTypes = (schema) => {
+    if (Array.isArray(schema)) return schema.map(upperCaseSchemaTypes);
+    if (schema && typeof schema === 'object') {
+        const out = {};
+        for (const [k, v] of Object.entries(schema)) {
+            out[k] = k === 'type' && typeof v === 'string'
+                ? v.toUpperCase()
+                : upperCaseSchemaTypes(v);
+        }
+        return out;
+    }
+    return schema;
+};
+
+// Convert the Vapi-shaped function tools returned by the calcom runtime
+// endpoint into the functionDeclarations shape Gemini Live expects.
+const vapiToolsToGeminiTools = (vapiTools) => {
+    const functionDeclarations = (vapiTools || [])
+        .map((t) => t?.function)
+        .filter((fn) => fn && fn.name)
+        .map((fn) => ({
+            name: fn.name,
+            description: fn.description || '',
+            ...(fn.parameters ? { parameters: upperCaseSchemaTypes(fn.parameters) } : {}),
+        }));
+    return functionDeclarations.length ? [{ functionDeclarations }] : null;
+};
+
+// Hard guardrail appended to the system prompt when calendar tools are live —
+// native-audio models otherwise tend to *claim* they checked/booked.
+const CALCOM_TOOL_GUARD =
+    'CRITICAL: You have REAL calendar tools: check_availability, create_booking, ' +
+    'and list_upcoming_bookings. You MUST call check_availability before telling the ' +
+    'caller whether any date or time is free — never guess or assume. You MUST call ' +
+    'create_booking to actually book an appointment; saying "I booked it" or "you\'re ' +
+    'scheduled" without create_booking returning a confirmation is false and not allowed. ' +
+    'Only confirm a booking after the tool returns one. If you have not yet called the ' +
+    'tool, tell the caller you are checking and then call it.';
+
 // --- Component Definition ---
 const panelWidth = 'w-96'; // Slightly wider for chat/gemini controls
 
@@ -554,7 +596,25 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         nextPlayTimeRef.current = 0;
         
         const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-        const systemInstructionText = buildGeminiSystemPrompt().replace(/\n/g, " ");
+        let systemInstructionText = buildGeminiSystemPrompt().replace(/\n/g, " ");
+
+        // Pull this agent's Cal.com calendar tools so the test agent can REALLY
+        // check availability and book — instead of hallucinating it did.
+        let geminiTools = null;
+        try {
+            const r = await fetch(`/api/callagents/${agentId}/integrations/calcom/runtime`);
+            if (r.ok) {
+                const addons = await r.json();
+                geminiTools = vapiToolsToGeminiTools(addons?.tools);
+                if (geminiTools) {
+                    const suffix = (addons?.promptSuffix || '').replace(/\n/g, ' ').trim();
+                    systemInstructionText =
+                        `${systemInstructionText} ${suffix} ${CALCOM_TOOL_GUARD}`.trim();
+                }
+            }
+        } catch {
+            // Non-fatal — the agent just won't have calendar tools this session.
+        }
 
         try {
             const session = await ai.live.connect({
@@ -567,6 +627,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                     responseModalities: [Modality.AUDIO],
                     outputAudioTranscription: {},
                     inputAudioTranscription: {},
+                    ...(geminiTools ? { tools: geminiTools } : {}),
 
                     systemInstruction: { parts: [{ text: systemInstructionText }] },
                     speechConfig: {
@@ -612,9 +673,50 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         }
     };
 
+    // F0. EXECUTE A TOOL CALL — Gemini asked to run a calendar tool. We hit our
+    // server (the browser has no Cal.com credentials), then hand the real
+    // result back so the model speaks actual availability / booking facts.
+    const executeAgentTool = async (fc) => {
+        let resultText;
+        try {
+            const res = await fetch(
+                `/api/callagents/${agentId}/integrations/calcom/execute`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: fc.name, args: fc.args || {} }),
+                },
+            );
+            const data = await res.json().catch(() => ({}));
+            resultText = data?.result || data?.error || 'The tool returned nothing.';
+        } catch (e) {
+            resultText = `I couldn't reach the calendar service: ${e.message}`;
+        }
+        // The session can close while we await the fetch — guard before replying.
+        const session = geminiSessionRef.current;
+        if (!session) return;
+        try {
+            session.sendToolResponse({
+                functionResponses: [
+                    { id: fc.id, name: fc.name, response: { result: resultText } },
+                ],
+            });
+        } catch (e) {
+            console.error('[Gemini Tool] sendToolResponse failed:', e);
+        }
+    };
+
     // F. HANDLE INCOMING MESSAGES (UPDATED PARSING)
     const handleGeminiMessage = (message) => {
         const serverContent = message.serverContent;
+
+        // 0. Tool calls — run them and feed the real result back to Gemini.
+        if (message.toolCall?.functionCalls?.length) {
+            for (const fc of message.toolCall.functionCalls) {
+                executeAgentTool(fc);
+            }
+            return;
+        }
 
         // 1. Handle Interruption (VAD) — stop all queued TTS audio so the next turn doesn't overlap
         if (serverContent?.interrupted) {
