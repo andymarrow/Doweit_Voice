@@ -653,7 +653,16 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                         startAudioInput();
                     },
                     onmessage: (msg) => handleGeminiMessage(msg),
-                    onclose: () => {
+                    onclose: (e) => {
+                        // DIAGNOSTIC: the close code + reason tell us WHY Gemini
+                        // dropped the session (e.g. 1007 = we sent bad data,
+                        // 1011 = server error). Critical for the "call ends when
+                        // checking the calendar" bug.
+                        console.warn(
+                            '[Gemini] session CLOSED — code:', e?.code,
+                            '| reason:', e?.reason || '(none)',
+                            '| full event:', e,
+                        );
                         // Tear the mic down FIRST. Without this the ScriptProcessor
                         // keeps firing onaudioprocess and calling sendRealtimeInput
                         // on the dead socket forever ("WebSocket is already in
@@ -666,11 +675,11 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                         saveGeminiCallData();
                     },
                     onerror: (e) => {
-                        console.error(e);
+                        console.error('[Gemini] session ERROR:', e?.message || e, '| full:', e);
                         stopAudioInput();
                         geminiSessionRef.current = null;
                         setCallStatus('error');
-                        setCallError(e.message);
+                        setCallError(e?.message || 'Gemini connection error');
                         setIsConnecting(false);
                     }
                 }
@@ -687,6 +696,11 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
     // server (the browser has no Cal.com credentials), then hand the real
     // result back so the model speaks actual availability / booking facts.
     const executeAgentTool = async (fc) => {
+        console.log(
+            '[Gemini Tool] call received — name:', fc?.name,
+            '| id:', fc?.id,
+            '| args:', JSON.stringify(fc?.args || {}),
+        );
         let resultText;
         try {
             const res = await fetch(
@@ -698,19 +712,25 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                 },
             );
             const data = await res.json().catch(() => ({}));
+            console.log('[Gemini Tool] execute endpoint →', res.status, JSON.stringify(data));
             resultText = data?.result || data?.error || 'The tool returned nothing.';
         } catch (e) {
+            console.error('[Gemini Tool] execute fetch failed:', e);
             resultText = `I couldn't reach the calendar service: ${e.message}`;
         }
         // The session can close while we await the fetch — guard before replying.
         const session = geminiSessionRef.current;
-        if (!session) return;
+        if (!session) {
+            console.warn('[Gemini Tool] session already gone — cannot send result for', fc?.name);
+            return;
+        }
         try {
             session.sendToolResponse({
                 functionResponses: [
                     { id: fc.id, name: fc.name, response: { result: resultText } },
                 ],
             });
+            console.log('[Gemini Tool] sendToolResponse OK for', fc?.name);
         } catch (e) {
             console.error('[Gemini Tool] sendToolResponse failed:', e);
         }
@@ -722,6 +742,7 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
         // 0. Tool calls — run them and feed the real result back to Gemini.
         if (message.toolCall?.functionCalls?.length) {
+            console.log('[Gemini] toolCall message — function count:', message.toolCall.functionCalls.length);
             for (const fc of message.toolCall.functionCalls) {
                 executeAgentTool(fc);
             }
