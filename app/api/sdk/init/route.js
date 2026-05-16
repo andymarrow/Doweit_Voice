@@ -4,8 +4,33 @@ import { db } from "@/lib/database";
 import { sdkApps, sdkManifests, callAgents } from "@/lib/db/schemaCharacterAI";
 import { eq, and, desc } from "drizzle-orm";
 
-// GET: The SDK calls this on page load to securely fetch configuration
+// The SDK runs in third-party browsers, so this endpoint is hit cross-origin.
+// Without these headers the browser blocks the response before our handler's
+// domain-whitelist check ever runs. ACAO:* is safe here — the publishable key
+// plus the domainWhitelist check below are the actual access controls.
+const CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Max-Age": "86400",
+};
+
+function withCors(res) {
+    for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v);
+    return res;
+}
+
+// Preflight: browsers send OPTIONS before a cross-origin GET with an Authorization header.
+export async function OPTIONS() {
+    return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function GET(req) {
+    return withCors(await handleGet(req));
+}
+
+// GET: The SDK calls this on page load to securely fetch configuration
+async function handleGet(req) {
     try {
         // 1. Extract and validate the Public Key
         const authHeader = req.headers.get("authorization");

@@ -4,8 +4,32 @@ import { db } from "@/lib/database";
 import { sdkApps, sdkManifests } from "@/lib/db/schemaCharacterAI";
 import { eq, max } from "drizzle-orm";
 
-// POST: The SDK sends its capabilities to this endpoint on initialization
+// The SDK posts here cross-origin from third-party sites. The browser sends a
+// preflight OPTIONS first (POST + JSON body), which must be answered with CORS
+// headers or the real request is blocked. The publishable key + domainWhitelist
+// check below remain the real access controls.
+const CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Max-Age": "86400",
+};
+
+function withCors(res) {
+    for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v);
+    return res;
+}
+
+export async function OPTIONS() {
+    return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function POST(req) {
+    return withCors(await handlePost(req));
+}
+
+// POST: The SDK sends its capabilities to this endpoint on initialization
+async function handlePost(req) {
     try {
         // 1. Extract the public key from the Authorization header
         const authHeader = req.headers.get("authorization");
