@@ -558,13 +558,16 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
 
         try {
             const session = await ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.5-flash-native-audio-preview-12-2025',
                 config: {
-                    // Set both Audio response AND Transcriptions enabled
-                    responseModalities: [Modality.AUDIO], 
-                    outputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
-                    inputAudioTranscription: { model: "gemini-2.5-flash-native-audio-preview-09-2025" },
-                    
+                    // Audio response + input/output transcription. The transcription
+                    // configs must be empty objects ({} = "enabled"); passing a
+                    // `model` field is not valid and can make Gemini reject setup
+                    // and close the session immediately.
+                    responseModalities: [Modality.AUDIO],
+                    outputAudioTranscription: {},
+                    inputAudioTranscription: {},
+
                     systemInstruction: { parts: [{ text: systemInstructionText }] },
                     speechConfig: {
                         voiceConfig: { prebuiltVoiceConfig: { voiceName: agent.voiceConfig.voiceId || "Kore" } }
@@ -580,15 +583,24 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
                     },
                     onmessage: (msg) => handleGeminiMessage(msg),
                     onclose: () => {
+                        // Tear the mic down FIRST. Without this the ScriptProcessor
+                        // keeps firing onaudioprocess and calling sendRealtimeInput
+                        // on the dead socket forever ("WebSocket is already in
+                        // CLOSING or CLOSED state" spam). Nulling the session ref
+                        // also makes the onaudioprocess guard short-circuit.
+                        stopAudioInput();
+                        geminiSessionRef.current = null;
+                        setIsConnecting(false);
                         setCallStatus('ended');
-                        saveGeminiCallData(); 
+                        saveGeminiCallData();
                     },
                     onerror: (e) => {
                         console.error(e);
+                        stopAudioInput();
+                        geminiSessionRef.current = null;
                         setCallStatus('error');
                         setCallError(e.message);
                         setIsConnecting(false);
-                        stopAudioInput();
                     }
                 }
             });
