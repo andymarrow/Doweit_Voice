@@ -595,7 +595,13 @@ everyContentPrompt = everyContentPrompt.replace(/\s+/g, ' ').trim();
         geminiStartTimeRef.current = null;
         nextPlayTimeRef.current = 0;
         
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        // apiVersion v1alpha is required for Live API function calling on the
+        // native-audio preview model — without it the session drops the moment
+        // the model invokes a tool. (Matches the site-assistant WS proxy.)
+        const ai = new GoogleGenAI({
+            apiKey: geminiApiKey,
+            httpOptions: { apiVersion: "v1alpha" },
+        });
         let systemInstructionText = buildGeminiSystemPrompt().replace(/\n/g, " ");
 
         // Pull this agent's Cal.com calendar tools so the test agent can REALLY
