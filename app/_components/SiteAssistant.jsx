@@ -65,6 +65,51 @@ function resolveDestination(input) {
     return null;
 }
 
+// Sub-page suffixes inside a single agent's detail view. Kept in sync with
+// AGENT_SECTIONS in lib/siteAssistant/manifest.js.
+const AGENT_SECTION_SUFFIX = {
+    overview: "",
+    configure: "/configure",
+    voice: "/configure",
+    "call settings": "/configure",
+    "call config": "/configure",
+    prompt: "/prompt",
+    actions: "/actions",
+    calls: "/calls",
+    "call history": "/calls",
+    deployment: "/deployment",
+    deploy: "/deployment",
+    integrations: "/integrations",
+};
+
+function resolveAgentSection(input) {
+    if (!input || typeof input !== "string") return null;
+    const s = input.trim().toLowerCase();
+    if (s in AGENT_SECTION_SUFFIX) return AGENT_SECTION_SUFFIX[s];
+    for (const [key, suffix] of Object.entries(AGENT_SECTION_SUFFIX)) {
+        if (s.includes(key)) return suffix;
+    }
+    return null;
+}
+
+// Find one of the user's agents by spoken name. Returns the URL-safe id
+// (publicId when present) or null.
+async function lookupAgentIdByName(agentName) {
+    try {
+        const res = await fetch("/api/callagents");
+        if (!res.ok) return null;
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : data?.agents || [];
+        const needle = String(agentName).toLowerCase().trim();
+        const match =
+            list.find((a) => a?.name && String(a.name).toLowerCase() === needle) ||
+            list.find((a) => a?.name && String(a.name).toLowerCase().includes(needle));
+        return match ? match.publicId || match.id : null;
+    } catch {
+        return null;
+    }
+}
+
 // Pull the agent id out of the current pathname when we're on a
 // /callagents/<id>/... page. Used to scope `update_agent`. Matches both the
 // new publicId (UUID) format and the legacy integer id form.
@@ -146,36 +191,219 @@ export default function SiteAssistant() {
                         agentName: { type: "string", required: false },
                     },
                     handler: async ({ agentId, agentName }) => {
-                        // If the user said something that already looks like an id,
-                        // pass it through — the page-level layout will redirect
-                        // numeric ids to the publicId variant.
-                        if (agentId) {
+                        // Always resolve through the agents API so we navigate
+                        // straight to the publicId URL. (A bare integer id like
+                        // /callagents/27 is not a valid route — it must be the
+                        // UUID publicId.)
+                        if (agentName) {
+                            const id = await lookupAgentIdByName(agentName);
+                            if (id) {
+                                routerRef.current.push(`/callagents/${id}`);
+                                return { status: "navigated", agentId: id };
+                            }
+                        }
+                        // The model passed an id with no name — only trust it if
+                        // it already looks like a UUID publicId.
+                        if (agentId && /^[0-9a-f-]{36}$/i.test(String(agentId))) {
                             routerRef.current.push(`/callagents/${agentId}`);
                             return { status: "navigated", agentId };
-                        }
-                        if (agentName) {
-                            try {
-                                const res = await fetch("/api/callagents");
-                                if (res.ok) {
-                                    const data = await res.json();
-                                    const list = Array.isArray(data) ? data : data?.agents || [];
-                                    const needle = String(agentName).toLowerCase().trim();
-                                    const match = list.find(
-                                        (a) => a?.name && String(a.name).toLowerCase().includes(needle),
-                                    );
-                                    if (match) {
-                                        const id = match.publicId || match.id;
-                                        routerRef.current.push(`/callagents/${id}`);
-                                        return { status: "navigated", agentId: id };
-                                    }
-                                }
-                            } catch { /* fall through */ }
                         }
                         routerRef.current.push("/callagents");
                         return {
                             status: "ambiguous",
-                            hint: "Showed the agents list — please tell me which one.",
+                            hint: "Showed the agents list — ask the user which agent by name.",
                         };
+                    },
+                },
+
+                open_agent_section: {
+                    description: "Open a section/tab of a call agent's detail page.",
+                    params: {
+                        section: { type: "string", required: true },
+                        agentName: { type: "string", required: false },
+                    },
+                    handler: async ({ section, agentName }) => {
+                        const suffix = resolveAgentSection(section);
+                        if (suffix === null) {
+                            return {
+                                status: "unknown_section",
+                                hint: "Valid sections: overview, configure, voice, call settings, prompt, actions, calls, deployment, integrations.",
+                            };
+                        }
+                        let id = agentName
+                            ? await lookupAgentIdByName(agentName)
+                            : agentIdFromPath(pathnameRef.current);
+                        if (!id) id = agentIdFromPath(pathnameRef.current);
+                        if (!id) {
+                            return {
+                                status: "no_agent_in_view",
+                                hint: "Ask the user which agent — none is currently open.",
+                            };
+                        }
+                        routerRef.current.push(`/callagents/${id}${suffix}`);
+                        return { status: "navigated", to: `${section}`, agentId: id };
+                    },
+                },
+
+                get_agent_info: {
+                    description: "Report the current agent's settings.",
+                    params: {},
+                    handler: async () => {
+                        const id = agentIdFromPath(pathnameRef.current);
+                        if (!id) {
+                            return {
+                                status: "no_agent_in_view",
+                                hint: "Ask the user to open an agent first.",
+                            };
+                        }
+                        try {
+                            const res = await fetch(`/api/callagents/${id}/config`);
+                            if (!res.ok) throw new Error(`Failed (${res.status})`);
+                            const a = await res.json();
+                            return {
+                                status: "ok",
+                                info: {
+                                    name: a?.name ?? null,
+                                    status: a?.status ?? null,
+                                    type: a?.type ?? null,
+                                    aiModel: a?.aiModel ?? null,
+                                    voice: a?.voiceConfig?.voiceId ?? null,
+                                    recordingEnabled: !!a?.callConfig?.recordingEnabled,
+                                    useFillerWords: !!a?.useFillerWords,
+                                    greeting: a?.greetingMessage ?? null,
+                                    timezone: a?.timezone ?? null,
+                                },
+                            };
+                        } catch (e) {
+                            return { status: "error", message: e.message };
+                        }
+                    },
+                },
+
+                list_integrations: {
+                    description: "Report which integrations the user has connected.",
+                    params: {},
+                    handler: async () => {
+                        try {
+                            const res = await fetch("/api/integrations/connections");
+                            if (!res.ok) throw new Error(`Failed (${res.status})`);
+                            const providers = await res.json();
+                            const connected = Array.isArray(providers) ? providers : [];
+                            return {
+                                status: "ok",
+                                count: connected.length,
+                                connected,
+                            };
+                        } catch (e) {
+                            return { status: "error", message: e.message };
+                        }
+                    },
+                },
+
+                add_action: {
+                    description: "Attach a reusable action to the current agent.",
+                    params: {
+                        actionName: { type: "string", required: true },
+                        timing: { type: "string", required: false },
+                    },
+                    handler: async ({ actionName, timing }) => {
+                        const id = agentIdFromPath(pathnameRef.current);
+                        if (!id) {
+                            return {
+                                status: "no_agent_in_view",
+                                hint: "Ask the user to open an agent first.",
+                            };
+                        }
+                        const when = ["before", "during", "after"].includes(
+                            String(timing || "").trim().toLowerCase(),
+                        )
+                            ? String(timing).trim().toLowerCase()
+                            : "during";
+                        try {
+                            const listRes = await fetch("/api/actions");
+                            if (!listRes.ok) throw new Error(`Failed to load actions (${listRes.status})`);
+                            const library = await listRes.json();
+                            const actionList = Array.isArray(library) ? library : [];
+                            const needle = String(actionName).toLowerCase().trim();
+                            const match =
+                                actionList.find((a) => a?.name && String(a.name).toLowerCase() === needle) ||
+                                actionList.find((a) => a?.name && String(a.name).toLowerCase().includes(needle));
+                            if (!match) {
+                                return {
+                                    status: "not_found",
+                                    available: actionList.map((a) => a?.name).filter(Boolean),
+                                    hint: "Action name didn't match — read the available names and ask which one.",
+                                };
+                            }
+                            const res = await fetch(`/api/callagents/${id}/actions`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ timing: when, actionIds: [match.id] }),
+                            });
+                            if (!res.ok) {
+                                const err = await res.json().catch(() => ({}));
+                                throw new Error(err?.error || `Failed (${res.status})`);
+                            }
+                            const added = await res.json();
+                            const alreadyThere = Array.isArray(added) && added.length === 0;
+                            toast.success(
+                                alreadyThere
+                                    ? `"${match.name}" is already on this agent`
+                                    : `Added "${match.name}" (${when})`,
+                            );
+                            try { routerRef.current.refresh(); } catch { /* noop */ }
+                            return {
+                                status: alreadyThere ? "already_added" : "added",
+                                action: match.name,
+                                timing: when,
+                            };
+                        } catch (e) {
+                            toast.error(e.message || "Could not add action");
+                            return { status: "error", message: e.message };
+                        }
+                    },
+                },
+
+                open_call: {
+                    description: "Open the detail modal for one of the current agent's calls.",
+                    params: {
+                        which: { type: "string", required: false },
+                    },
+                    handler: async ({ which }) => {
+                        const id = agentIdFromPath(pathnameRef.current);
+                        if (!id) {
+                            return {
+                                status: "no_agent_in_view",
+                                hint: "Ask the user to open an agent first.",
+                            };
+                        }
+                        try {
+                            const res = await fetch(`/api/callagents/${id}/calls`);
+                            if (!res.ok) throw new Error(`Failed to load calls (${res.status})`);
+                            const calls = await res.json();
+                            const list = Array.isArray(calls) ? calls : [];
+                            if (list.length === 0) {
+                                return { status: "no_calls", message: "This agent has no calls yet." };
+                            }
+                            // Calls come back newest-first. `which` is either
+                            // "latest"/blank or an ordinal (1 = most recent).
+                            let idx = 0;
+                            const n = parseInt(String(which || "").replace(/[^0-9]/g, ""), 10);
+                            if (Number.isFinite(n) && n >= 1) idx = Math.min(n - 1, list.length - 1);
+                            const call = list[idx];
+                            // The calls page reads ?call=<id> on load and opens the modal.
+                            routerRef.current.push(`/callagents/${id}/calls?call=${call.id}`);
+                            return {
+                                status: "opened",
+                                call: {
+                                    id: call.id,
+                                    caller: call.customerName || call.phoneNumber || "Unknown caller",
+                                    when: call.startTime || null,
+                                },
+                            };
+                        } catch (e) {
+                            return { status: "error", message: e.message };
+                        }
                     },
                 },
 

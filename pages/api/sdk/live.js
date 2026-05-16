@@ -105,6 +105,10 @@ export default async function handler(req, res) {
         wss.on("connection", async (ws, req) => {
             let geminiSession = null;
             let messageQueue = [];   // holds msgs that arrive before Gemini is ready
+            // Tool calls awaiting the client's real result. Keyed by function-call id.
+            // Lets the model use data the client handler returns (e.g. a list of
+            // connected integrations) instead of a blind "success" ack.
+            const pendingTools = new Map();
 
             const url = new URL(req.url, `http://${req.headers.host}`);
             const publicKey = url.searchParams.get("key");
@@ -125,8 +129,15 @@ export default async function handler(req, res) {
                     console.log("[WS Proxy] Sending text to Gemini:", fullText);
                     geminiSession.sendRealtimeInput({ text: fullText });
                 } else if (msg.type === "tool_result") {
-                    // Client sent a result — log it but Gemini was already answered.
-                    console.log("[WS Proxy] Client tool_result (already handled):", msg.name, JSON.stringify(msg.result));
+                    // The client finished running the handler. Forward its real
+                    // result to Gemini so the model can answer with actual data.
+                    const pending = pendingTools.get(msg.id);
+                    if (pending) {
+                        console.log("[WS Proxy] Forwarding client tool_result to Gemini:", msg.name);
+                        pending.ack(msg.result || { status: "success" });
+                    } else {
+                        console.log("[WS Proxy] tool_result with no pending call (timed out?):", msg.name);
+                    }
                 }
             };
 
@@ -146,6 +157,8 @@ export default async function handler(req, res) {
             });
 
             ws.on("close", () => {
+                for (const { timer } of pendingTools.values()) clearTimeout(timer);
+                pendingTools.clear();
                 if (geminiSession?.close) geminiSession.close();
             });
 
@@ -265,22 +278,32 @@ export default async function handler(req, res) {
                             if (message.toolCall?.functionCalls) {
                                 for (const fc of message.toolCall.functionCalls) {
                                     console.log("[WS Proxy] Tool call:", fc.name, fc.args);
-                                    // Notify the client so it can execute the action (fire-and-forget).
+                                    // Notify the client so it can execute the action.
                                     safeSend({ type: "tool_call", id: fc.id, name: fc.name, args: fc.args || {} });
-                                    // Respond to Gemini immediately — the client's tool_result
-                                    // round-trip is unreliable (async onmessage swallows errors).
-                                    try {
-                                        geminiSession.sendToolResponse({
-                                            functionResponses: [{
-                                                id: fc.id,
-                                                name: fc.name,
-                                                response: { status: "success" },
-                                            }],
-                                        });
-                                        console.log("[WS Proxy] Auto tool response sent for:", fc.name);
-                                    } catch (err) {
-                                        console.error("[WS Proxy] sendToolResponse error:", err.message);
-                                    }
+
+                                    // Answer Gemini exactly once — either with the client's
+                                    // real result (via the tool_result branch above) or, if
+                                    // the client is slow/silent, with a generic ack so the
+                                    // model never hangs waiting for a function response.
+                                    const ack = (response) => {
+                                        const entry = pendingTools.get(fc.id);
+                                        if (!entry) return; // already answered
+                                        clearTimeout(entry.timer);
+                                        pendingTools.delete(fc.id);
+                                        try {
+                                            geminiSession.sendToolResponse({
+                                                functionResponses: [{ id: fc.id, name: fc.name, response }],
+                                            });
+                                            console.log("[WS Proxy] Tool response sent for:", fc.name);
+                                        } catch (err) {
+                                            console.error("[WS Proxy] sendToolResponse error:", err.message);
+                                        }
+                                    };
+                                    const timer = setTimeout(() => {
+                                        console.warn("[WS Proxy] Tool result timed out, acking:", fc.name);
+                                        ack({ status: "success" });
+                                    }, 12000);
+                                    pendingTools.set(fc.id, { timer, ack });
                                 }
                             }
                             if (message.setupComplete) {

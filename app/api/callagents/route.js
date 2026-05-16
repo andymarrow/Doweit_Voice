@@ -29,6 +29,7 @@ export async function GET() {
 			// Select specific fields needed for the agent selector dropdown/list
 			columns: {
 				id: true,
+				publicId: true, // UUID used in URLs — needed so callers link to /callagents/<publicId>
 				name: true,
 				type: true, // inbound/outbound
 				status: true, // active/paused etc.

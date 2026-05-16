@@ -2,9 +2,8 @@
 // voice-agents-CallAgents/[agentid]/calls/page.jsx
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-// Remove useParams
-// import { useParams } from 'next/navigation';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiSearch, FiFilter, FiCheck, FiLoader } from 'react-icons/fi'; // Added FiLoader
 import { toast } from 'react-hot-toast'; // Assuming toast is available
@@ -61,6 +60,10 @@ export default function CallsPage() {
     const agent = useCallAgent();
     const agentId = agent?.publicId;
 
+    // The site assistant opens a call by navigating here with ?call=<id>.
+    const searchParams = useSearchParams();
+    const handledCallParamRef = useRef(null);
+
     const [allCalls, setAllCalls] = useState([]); // State for all calls fetched from API
     const [isLoading, setIsLoading] = useState(true); // Loading state for initial fetch
     const [fetchError, setFetchError] = useState(null); // State for fetch errors
@@ -107,6 +110,21 @@ export default function CallsPage() {
              setFetchError('Agent ID not available.'); // Or handle differently
         }
     }, [agentId,loadCalls]); // Dependency on agentId ensures refetch if agent changes
+
+    // When the site assistant sends us here with ?call=<id>, open that call's
+    // detail modal once the calls have loaded. The ref guards against
+    // re-opening it after the user manually closes the modal.
+    useEffect(() => {
+        const callParam = searchParams.get('call');
+        if (!callParam || allCalls.length === 0) return;
+        if (handledCallParamRef.current === callParam) return;
+        const match = allCalls.find((c) => String(c.id) === String(callParam));
+        if (match) {
+            handledCallParamRef.current = callParam;
+            setSelectedCall(match);
+            setIsDetailModalOpen(true);
+        }
+    }, [searchParams, allCalls]);
 
     // Filtering logic using useMemo
     const filteredCalls = useMemo(() => {
