@@ -14,7 +14,14 @@ export async function middleware(request) {
 		!["/", "/sign-in", "/sign-up"].includes(pathname) &&
 		!pathname.startsWith("/admin") &&
 		!pathname.startsWith("/api/admin") &&
-		!pathname.includes("/api/auth")
+		!pathname.includes("/api/auth") &&
+		// The SDK endpoints are public by design — they authenticate via the
+		// publishable key + per-app domain whitelist inside the route itself.
+		// They are called cross-origin from third-party sites with no session
+		// cookie; redirecting them to /sign-in turns the CORS preflight into a
+		// redirect, which browsers reject ("Redirect is not allowed for a
+		// preflight request") — breaking the SDK for every external developer.
+		!pathname.startsWith("/api/sdk")
 	) {
 		console.log("redirecting to signin");
 		return NextResponse.redirect(new URL("/sign-in", request.url));
