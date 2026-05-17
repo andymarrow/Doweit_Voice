@@ -339,13 +339,104 @@ app.use(cors({
     origin: (origin, cb) => {
         // Allow requests with no origin (curl, Render health checks) and any
         // origin listed in ALLOWED_ORIGINS, or any localhost origin for dev.
-        if (!origin || allowedOrigins.includes(origin) || /^https?:\/\/localhost/.test(origin)) {
+        if (!origin || allowedOrigins.includes(origin) || /^https?:\/\/localhost/.test(origin) || /^https?:\/\/127\.0\.0\.1/.test(origin)) {
             return cb(null, true);
         }
         cb(new Error(`Origin ${origin} not allowed`));
     },
-    methods: ["GET", "OPTIONS"],
+    methods: ["GET", "POST", "OPTIONS"],
 }));
+
+app.use(express.json({ limit: "1mb" }));
+
+// ---------------------------------------------------------------------------
+//  SDK HTTP API
+//  This standalone server is the COMPLETE SDK backend: init + manifest (HTTP)
+//  AND live (WebSocket). Keeping all three on one origin means the SDK only
+//  ever talks to one host — and that host is a persistent server that can hold
+//  WebSockets (unlike Vercel's serverless functions).
+// ---------------------------------------------------------------------------
+
+function getPublicKey(req) {
+    const auth = req.headers.authorization || "";
+    return auth.startsWith("Bearer dw_pub_") ? auth.slice(7).trim() : null;
+}
+
+// GET /api/sdk/init — the SDK calls this on load to fetch the agent config.
+app.get("/api/sdk/init", async (req, res) => {
+    const publicKey = getPublicKey(req);
+    if (!publicKey) {
+        return res.status(401).json({ error: "Missing or invalid Publishable Key" });
+    }
+    try {
+        const appRow = await getAppWithAgent(publicKey);
+        if (!appRow) {
+            return res.status(404).json({ error: "App not found or invalid key" });
+        }
+        if (appRow.status !== "active") {
+            return res.status(403).json({ error: "This app is currently paused." });
+        }
+        const manifest = await getLatestManifest(appRow.id);
+        const isCustom = appRow.mode === "custom";
+        res.json({
+            success: true,
+            config: {
+                appName: appRow.name,
+                agent: {
+                    name: appRow.agent_name || appRow.name || "Assistant",
+                    voiceId: isCustom
+                        ? appRow.custom_voice_id || "Aoede"
+                        : appRow.agent_voice_config?.voiceId || "Aoede",
+                    language: "en",
+                    greeting: appRow.agent_greeting || "Hello! How can I help you today?",
+                },
+                tools: manifest?.actions || [],
+            },
+        });
+    } catch (e) {
+        console.error("[SDK init]", e);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// POST /api/sdk/manifest — the SDK uploads its registered actions on init.
+app.post("/api/sdk/manifest", async (req, res) => {
+    const publicKey = getPublicKey(req);
+    if (!publicKey) {
+        return res.status(401).json({ error: "Missing or invalid Publishable Key" });
+    }
+    try {
+        const appRow = await getAppWithAgent(publicKey);
+        if (!appRow) {
+            return res.status(401).json({ error: "Invalid Publishable Key" });
+        }
+        const { actions, stateSchema, environment } = req.body || {};
+        if (!Array.isArray(actions)) {
+            return res.status(400).json({ error: "Manifest must contain an 'actions' array." });
+        }
+        const { rows } = await pool.query(
+            `SELECT COALESCE(MAX(version), 0) AS max FROM sdk_manifests WHERE app_id = $1`,
+            [appRow.id],
+        );
+        const nextVersion = Number(rows[0]?.max || 0) + 1;
+        await pool.query(
+            `INSERT INTO sdk_manifests
+                (app_id, version, environment, actions, state_schema, published_at, created_at)
+             VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, NOW(), NOW())`,
+            [
+                appRow.id,
+                nextVersion,
+                environment || "production",
+                JSON.stringify(actions),
+                JSON.stringify(stateSchema || {}),
+            ],
+        );
+        res.json({ success: true, version: nextVersion });
+    } catch (e) {
+        console.error("[SDK manifest]", e);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 
 // Warm-up endpoint — the SDK fetches this before opening the WebSocket so
 // the server is definitely awake and the upgrade listener is attached.
