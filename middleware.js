@@ -9,20 +9,27 @@ export async function middleware(request) {
 	const validCookie = cookie && cookie.value;
 	const { pathname } = request.nextUrl;
 
-	if (
-		!validCookie &&
-		!["/", "/sign-in", "/sign-up"].includes(pathname) &&
-		!pathname.startsWith("/admin") &&
-		!pathname.startsWith("/api/admin") &&
-		!pathname.includes("/api/auth") &&
-		// The SDK endpoints are public by design — they authenticate via the
-		// publishable key + per-app domain whitelist inside the route itself.
-		// They are called cross-origin from third-party sites with no session
-		// cookie; redirecting them to /sign-in turns the CORS preflight into a
-		// redirect, which browsers reject ("Redirect is not allowed for a
-		// preflight request") — breaking the SDK for every external developer.
-		!pathname.startsWith("/api/sdk")
-	) {
+	// Path prefixes that must stay reachable WITHOUT a dashboard session.
+	// The middleware matcher covers all of /api/*, so anything called by an
+	// outside party (no session cookie) would otherwise be redirected to
+	// /sign-in — which silently breaks webhooks and, for CORS preflights,
+	// fails outright ("Redirect is not allowed for a preflight request").
+	const PUBLIC_PREFIXES = [
+		"/admin", // admin pages handle their own gating
+		"/api/admin",
+		"/api/auth", // better-auth handler
+		"/api/sdk", // SDK endpoints — auth via publishable key + domain whitelist
+		"/api/vapi-webhook", // Vapi end-of-call reports
+		"/api/integrations/calcom/tool", // Vapi Cal.com tool webhook
+		"/api/interview", // candidate interview APIs (session, snapshot, transcript)
+		"/interview", // public candidate interview page
+	];
+
+	const isPublicPath =
+		["/", "/sign-in", "/sign-up"].includes(pathname) ||
+		PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+	if (!validCookie && !isPublicPath) {
 		console.log("redirecting to signin");
 		return NextResponse.redirect(new URL("/sign-in", request.url));
 	} else if (validCookie && ["/sign-in", "/sign-up"].includes(pathname)) {
