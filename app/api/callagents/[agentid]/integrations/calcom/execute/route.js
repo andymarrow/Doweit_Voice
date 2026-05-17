@@ -38,7 +38,8 @@ export async function POST(req, { params }) {
     }
 
     // runCalcomToolForAgent verifies ownership against userId and always
-    // resolves to a readable string (it never throws).
-    const result = await runCalcomToolForAgent(agentId, name, args || {}, userId);
-    return NextResponse.json({ result });
+    // resolves to { result, debug } (it never throws). `debug` is returned so
+    // the diagnostic is visible in the browser console.
+    const { result, debug } = await runCalcomToolForAgent(agentId, name, args || {}, userId);
+    return NextResponse.json({ result, debug });
 }
