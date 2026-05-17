@@ -33,6 +33,7 @@ async function getAppWithAgent(publicKey) {
             sa.name,
             sa.status,
             sa.mode,
+            sa.domain_whitelist,
             sa.custom_prompt,
             sa.custom_voice_id,
             sa.custom_knowledge_base_id,
@@ -193,6 +194,10 @@ async function handleWsConnection(ws, req) {
         if (!app || app.status !== "active") {
             throw new Error("Invalid or inactive App Key");
         }
+        // WebSockets bypass CORS, so enforce the per-app domain whitelist here too.
+        if (!originAllowed(req.headers.origin, app.domain_whitelist)) {
+            throw new Error("Domain not authorized for this app");
+        }
 
         const manifest = await getLatestManifest(app.id);
         const actions = manifest?.actions || [];
@@ -330,22 +335,36 @@ async function handleWsConnection(ws, req) {
 // ---------------------------------------------------------------------------
 const app = express();
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
-
+// CORS is intentionally permissive: a browser CORS *preflight* carries no
+// Authorization header, so the server can't know which app (and which domain
+// whitelist) the request belongs to until the real request arrives. So we let
+// the browser through at the CORS layer and enforce the per-app domain
+// whitelist INSIDE each handler (originAllowed below) — returning 403 for a
+// domain the developer hasn't authorised in their dashboard.
 app.use(cors({
-    origin: (origin, cb) => {
-        // Allow requests with no origin (curl, Render health checks) and any
-        // origin listed in ALLOWED_ORIGINS, or any localhost origin for dev.
-        if (!origin || allowedOrigins.includes(origin) || /^https?:\/\/localhost/.test(origin) || /^https?:\/\/127\.0\.0\.1/.test(origin)) {
-            return cb(null, true);
-        }
-        cb(new Error(`Origin ${origin} not allowed`));
-    },
+    origin: true, // reflect any origin
     methods: ["GET", "POST", "OPTIONS"],
 }));
+
+// Is `origin` permitted for an app with this `domainWhitelist`?
+// localhost is always allowed (local dev). An empty/missing whitelist is
+// treated as "allow all" so a developer isn't locked out before configuring.
+function originAllowed(origin, domainWhitelist) {
+    if (!origin) return true; // non-browser caller (curl, health check)
+    let hostname;
+    try {
+        hostname = new URL(origin).hostname;
+    } catch {
+        return false;
+    }
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+        return true;
+    }
+    if (!Array.isArray(domainWhitelist) || domainWhitelist.length === 0) {
+        return true;
+    }
+    return domainWhitelist.includes(hostname);
+}
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -372,6 +391,11 @@ app.get("/api/sdk/init", async (req, res) => {
         const appRow = await getAppWithAgent(publicKey);
         if (!appRow) {
             return res.status(404).json({ error: "App not found or invalid key" });
+        }
+        if (!originAllowed(req.headers.origin, appRow.domain_whitelist)) {
+            return res.status(403).json({
+                error: `Domain '${req.headers.origin || "unknown"}' is not authorized for this app. Add it to the domain whitelist in your Doweit dashboard.`,
+            });
         }
         if (appRow.status !== "active") {
             return res.status(403).json({ error: "This app is currently paused." });
@@ -409,6 +433,11 @@ app.post("/api/sdk/manifest", async (req, res) => {
         const appRow = await getAppWithAgent(publicKey);
         if (!appRow) {
             return res.status(401).json({ error: "Invalid Publishable Key" });
+        }
+        if (!originAllowed(req.headers.origin, appRow.domain_whitelist)) {
+            return res.status(403).json({
+                error: `Domain '${req.headers.origin || "unknown"}' is not authorized for this app.`,
+            });
         }
         const { actions, stateSchema, environment } = req.body || {};
         if (!Array.isArray(actions)) {
