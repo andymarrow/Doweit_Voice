@@ -346,6 +346,16 @@ app.use(cors({
     methods: ["GET", "POST", "OPTIONS"],
 }));
 
+// Normalize a whitelist entry (stored as full URL OR bare hostname) to hostname.
+// Handles entries like "https://foo.com/", "foo.com", "http://localhost:5173/".
+function normalizeToHostname(entry) {
+    const s = (entry || "").trim();
+    if (s.includes("://")) {
+        try { return new URL(s).hostname; } catch { /* fall through */ }
+    }
+    return s.replace(/\/+$/, "");
+}
+
 // Is `origin` permitted for an app with this `domainWhitelist`?
 // localhost is always allowed (local dev). An empty/missing whitelist is
 // treated as "allow all" so a developer isn't locked out before configuring.
@@ -363,7 +373,7 @@ function originAllowed(origin, domainWhitelist) {
     if (!Array.isArray(domainWhitelist) || domainWhitelist.length === 0) {
         return true;
     }
-    return domainWhitelist.includes(hostname);
+    return domainWhitelist.some(entry => normalizeToHostname(entry) === hostname);
 }
 
 app.use(express.json({ limit: "1mb" }));

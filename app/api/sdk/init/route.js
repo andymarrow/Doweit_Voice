@@ -29,6 +29,20 @@ export async function GET(req) {
     return withCors(await handleGet(req));
 }
 
+// Normalize a whitelist entry (stored as full URL OR bare hostname) to just the hostname.
+// Handles entries like "https://foo.com/", "foo.com", "http://localhost:5173/".
+function normalizeToHostname(entry) {
+    const s = (entry || "").trim();
+    if (s.includes("://")) {
+        try { return new URL(s).hostname; } catch { /* fall through */ }
+    }
+    return s.replace(/\/+$/, "");
+}
+
+function isHostnameAllowed(hostname, whitelist) {
+    return whitelist.some(entry => normalizeToHostname(entry) === hostname);
+}
+
 // GET: The SDK calls this on page load to securely fetch configuration
 async function handleGet(req) {
     try {
@@ -67,9 +81,11 @@ async function handleGet(req) {
 
                 // Always allow localhost for local development
                 if (!isLocalhost && app.domainWhitelist && app.domainWhitelist.length > 0) {
-                    if (!app.domainWhitelist.includes(hostname)) {
+                    if (!isHostnameAllowed(hostname, app.domainWhitelist)) {
                         console.warn(`[SDK Init] Blocked unauthorized domain: ${hostname}`);
-                        return NextResponse.json({ error: "Domain not authorized" }, { status: 403 });
+                        return NextResponse.json({
+                            error: `Domain '${req.headers.get("origin")}' is not authorized for this app. Add it to the domain whitelist in your Doweit dashboard.`,
+                        }, { status: 403 });
                     }
                 }
             } catch (e) {
