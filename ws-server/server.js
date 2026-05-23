@@ -33,6 +33,7 @@ async function getAppWithAgent(publicKey) {
             sa.name,
             sa.status,
             sa.mode,
+            sa.domain_whitelist,
             sa.custom_prompt,
             sa.custom_voice_id,
             sa.custom_knowledge_base_id,
@@ -193,6 +194,10 @@ async function handleWsConnection(ws, req) {
         if (!app || app.status !== "active") {
             throw new Error("Invalid or inactive App Key");
         }
+        // WebSockets bypass CORS, so enforce the per-app domain whitelist here too.
+        if (!originAllowed(req.headers.origin, app.domain_whitelist)) {
+            throw new Error("Domain not authorized for this app");
+        }
 
         const manifest = await getLatestManifest(app.id);
         const actions = manifest?.actions || [];
@@ -330,22 +335,147 @@ async function handleWsConnection(ws, req) {
 // ---------------------------------------------------------------------------
 const app = express();
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
-
+// CORS is intentionally permissive: a browser CORS *preflight* carries no
+// Authorization header, so the server can't know which app (and which domain
+// whitelist) the request belongs to until the real request arrives. So we let
+// the browser through at the CORS layer and enforce the per-app domain
+// whitelist INSIDE each handler (originAllowed below) — returning 403 for a
+// domain the developer hasn't authorised in their dashboard.
 app.use(cors({
-    origin: (origin, cb) => {
-        // Allow requests with no origin (curl, Render health checks) and any
-        // origin listed in ALLOWED_ORIGINS, or any localhost origin for dev.
-        if (!origin || allowedOrigins.includes(origin) || /^https?:\/\/localhost/.test(origin)) {
-            return cb(null, true);
-        }
-        cb(new Error(`Origin ${origin} not allowed`));
-    },
-    methods: ["GET", "OPTIONS"],
+    origin: true, // reflect any origin
+    methods: ["GET", "POST", "OPTIONS"],
 }));
+
+// Normalize a whitelist entry (stored as full URL OR bare hostname) to hostname.
+// Handles entries like "https://foo.com/", "foo.com", "http://localhost:5173/".
+function normalizeToHostname(entry) {
+    const s = (entry || "").trim();
+    if (s.includes("://")) {
+        try { return new URL(s).hostname; } catch { /* fall through */ }
+    }
+    return s.replace(/\/+$/, "");
+}
+
+// Is `origin` permitted for an app with this `domainWhitelist`?
+// localhost is always allowed (local dev). An empty/missing whitelist is
+// treated as "allow all" so a developer isn't locked out before configuring.
+function originAllowed(origin, domainWhitelist) {
+    if (!origin) return true; // non-browser caller (curl, health check)
+    let hostname;
+    try {
+        hostname = new URL(origin).hostname;
+    } catch {
+        return false;
+    }
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+        return true;
+    }
+    if (!Array.isArray(domainWhitelist) || domainWhitelist.length === 0) {
+        return true;
+    }
+    return domainWhitelist.some(entry => normalizeToHostname(entry) === hostname);
+}
+
+app.use(express.json({ limit: "1mb" }));
+
+// ---------------------------------------------------------------------------
+//  SDK HTTP API
+//  This standalone server is the COMPLETE SDK backend: init + manifest (HTTP)
+//  AND live (WebSocket). Keeping all three on one origin means the SDK only
+//  ever talks to one host — and that host is a persistent server that can hold
+//  WebSockets (unlike Vercel's serverless functions).
+// ---------------------------------------------------------------------------
+
+function getPublicKey(req) {
+    const auth = req.headers.authorization || "";
+    return auth.startsWith("Bearer dw_pub_") ? auth.slice(7).trim() : null;
+}
+
+// GET /api/sdk/init — the SDK calls this on load to fetch the agent config.
+app.get("/api/sdk/init", async (req, res) => {
+    const publicKey = getPublicKey(req);
+    if (!publicKey) {
+        return res.status(401).json({ error: "Missing or invalid Publishable Key" });
+    }
+    try {
+        const appRow = await getAppWithAgent(publicKey);
+        if (!appRow) {
+            return res.status(404).json({ error: "App not found or invalid key" });
+        }
+        if (!originAllowed(req.headers.origin, appRow.domain_whitelist)) {
+            return res.status(403).json({
+                error: `Domain '${req.headers.origin || "unknown"}' is not authorized for this app. Add it to the domain whitelist in your Doweit dashboard.`,
+            });
+        }
+        if (appRow.status !== "active") {
+            return res.status(403).json({ error: "This app is currently paused." });
+        }
+        const manifest = await getLatestManifest(appRow.id);
+        const isCustom = appRow.mode === "custom";
+        res.json({
+            success: true,
+            config: {
+                appName: appRow.name,
+                agent: {
+                    name: appRow.agent_name || appRow.name || "Assistant",
+                    voiceId: isCustom
+                        ? appRow.custom_voice_id || "Aoede"
+                        : appRow.agent_voice_config?.voiceId || "Aoede",
+                    language: "en",
+                    greeting: appRow.agent_greeting || "Hello! How can I help you today?",
+                },
+                tools: manifest?.actions || [],
+            },
+        });
+    } catch (e) {
+        console.error("[SDK init]", e);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+// POST /api/sdk/manifest — the SDK uploads its registered actions on init.
+app.post("/api/sdk/manifest", async (req, res) => {
+    const publicKey = getPublicKey(req);
+    if (!publicKey) {
+        return res.status(401).json({ error: "Missing or invalid Publishable Key" });
+    }
+    try {
+        const appRow = await getAppWithAgent(publicKey);
+        if (!appRow) {
+            return res.status(401).json({ error: "Invalid Publishable Key" });
+        }
+        if (!originAllowed(req.headers.origin, appRow.domain_whitelist)) {
+            return res.status(403).json({
+                error: `Domain '${req.headers.origin || "unknown"}' is not authorized for this app.`,
+            });
+        }
+        const { actions, stateSchema, environment } = req.body || {};
+        if (!Array.isArray(actions)) {
+            return res.status(400).json({ error: "Manifest must contain an 'actions' array." });
+        }
+        const { rows } = await pool.query(
+            `SELECT COALESCE(MAX(version), 0) AS max FROM sdk_manifests WHERE app_id = $1`,
+            [appRow.id],
+        );
+        const nextVersion = Number(rows[0]?.max || 0) + 1;
+        await pool.query(
+            `INSERT INTO sdk_manifests
+                (app_id, version, environment, actions, state_schema, published_at, created_at)
+             VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, NOW(), NOW())`,
+            [
+                appRow.id,
+                nextVersion,
+                environment || "production",
+                JSON.stringify(actions),
+                JSON.stringify(stateSchema || {}),
+            ],
+        );
+        res.json({ success: true, version: nextVersion });
+    } catch (e) {
+        console.error("[SDK manifest]", e);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 
 // Warm-up endpoint — the SDK fetches this before opening the WebSocket so
 // the server is definitely awake and the upgrade listener is attached.
