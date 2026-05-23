@@ -19,8 +19,10 @@ export async function GET(request) {
       return NextResponse.json({ error: 'positionId is required' }, { status: 400 });
     }
 
+    // NOTE: must project 2+ columns. Drizzle's neon-http driver silently
+    // returns [] for single-column projections.
     const [position] = await db
-      .select({ id: jobPositions.id })
+      .select({ id: jobPositions.id, userId: jobPositions.userId })
       .from(jobPositions)
       .where(and(eq(jobPositions.id, positionId), eq(jobPositions.userId, userId)));
 
@@ -28,28 +30,11 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Position not found' }, { status: 404 });
     }
 
+    // NOTE: must use db.select() (no projection) here. Drizzle's neon-http
+    // driver has a bug where a many-column projection + .orderBy() + .where()
+    // silently returns []. Using select-all sidesteps that.
     const candidates = await db
-      .select({
-        id: candidateApplications.id,
-        publicId: candidateApplications.publicId,
-        candidateName: candidateApplications.candidateName,
-        candidateEmail: candidateApplications.candidateEmail,
-        candidatePhone: candidateApplications.candidatePhone,
-        portfolioUrl: candidateApplications.portfolioUrl,
-        linkedinUrl: candidateApplications.linkedinUrl,
-        experience: candidateApplications.experience,
-        country: candidateApplications.country,
-        address: candidateApplications.address,
-        cv: candidateApplications.cv,
-        isRejected: candidateApplications.isRejected,
-        rejectReason: candidateApplications.rejectReason,
-        status: candidateApplications.status,
-        result: candidateApplications.result,
-        reasonResult: candidateApplications.reasonResult,
-        interviewTaken: candidateApplications.interviewTaken,
-        createdAt: candidateApplications.createdAt,
-        positionId: candidateApplications.positionId,
-      })
+      .select()
       .from(candidateApplications)
       .where(eq(candidateApplications.positionId, positionId))
       .orderBy(desc(candidateApplications.createdAt));

@@ -1,28 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import {
   Users,
-  CheckCircle2,
-  Clock,
   TrendingUp,
   AlertCircle,
   Briefcase,
-  ShoppingBag,
   Plus,
   Target,
-  Coins,
   Zap,
   Loader2,
-  ArrowUpRight,
-  ArrowDownRight,
   UserPlus,
   Mic,
   Activity,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -30,121 +23,7 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  LineChart,
-  Line,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
 } from "recharts";
-
-// Demo data for analysis section
-const radarData = [
-  { subject: "Technical", A: 120, fullMark: 150 },
-  { subject: "Communication", A: 98, fullMark: 150 },
-  { subject: "Problem Solving", A: 86, fullMark: 150 },
-  { subject: "Culture Fit", A: 99, fullMark: 150 },
-  { subject: "Confidence", A: 85, fullMark: 150 },
-];
-
-const questionPerformanceData = [
-  {
-    q: "Explain REST vs GraphQL",
-    type: "Technical",
-    score: "72%",
-    diff: "Medium",
-    fail: "12%",
-  },
-  {
-    q: "Conflict resolution story",
-    type: "Behavioral",
-    score: "85%",
-    diff: "Medium",
-    fail: "5%",
-  },
-  {
-    q: "System design for notifications",
-    type: "Scenario",
-    score: "58%",
-    diff: "Hard",
-    fail: "24%",
-  },
-  {
-    q: "Why do you want to join us?",
-    type: "Culture",
-    score: "92%",
-    diff: "Low",
-    fail: "2%",
-  },
-];
-
-const progressData = [
-  { name: "W1", score: 65 },
-  { name: "W2", score: 72 },
-  { name: "W3", score: 68 },
-  { name: "W4", score: 85 },
-  { name: "W5", score: 78 },
-  { name: "W6", score: 82 },
-];
-
-// Demo candidate data
-const candidateData = [
-  {
-    id: 1,
-    name: "Sarah Johnson",
-    email: "sarah.j@email.com",
-    position: "Frontend Developer",
-    score: 85,
-    status: "Interviewing",
-    applied: "2024-01-15",
-  },
-  {
-    id: 2,
-    name: "Michael Chen",
-    email: "michael.c@email.com",
-    position: "Backend Engineer",
-    score: 78,
-    status: "Screening",
-    applied: "2024-01-14",
-  },
-  {
-    id: 3,
-    name: "Emily Davis",
-    email: "emily.d@email.com",
-    position: "Full Stack Developer",
-    score: 92,
-    status: "Shortlisted",
-    applied: "2024-01-13",
-  },
-  {
-    id: 4,
-    name: "James Wilson",
-    email: "james.w@email.com",
-    position: "DevOps Engineer",
-    score: 71,
-    status: "Rejected",
-    applied: "2024-01-12",
-  },
-  {
-    id: 5,
-    name: "Lisa Anderson",
-    email: "lisa.a@email.com",
-    position: "UI/UX Designer",
-    score: 88,
-    status: "Interviewing",
-    applied: "2024-01-11",
-  },
-  {
-    id: 6,
-    name: "Robert Taylor",
-    email: "robert.t@email.com",
-    position: "Product Manager",
-    score: 76,
-    status: "Screening",
-    applied: "2024-01-10",
-  },
-];
 
 export const RecruiterDashboard = ({ onNavigate }) => {
   const { data: session, isPending: sessionLoading } = useSession();
@@ -152,45 +31,65 @@ export const RecruiterDashboard = ({ onNavigate }) => {
   const [candidateData, setCandidateData] = useState([]);
   const [activities, setActivities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (sessionLoading) return;
+  const fetchDashboardData = useCallback(
+    async ({ silent = false } = {}) => {
+      if (silent) setIsRefreshing(true);
+      else setIsLoading(true);
+      setError(null);
 
-    const fetchDashboardData = async () => {
-      setIsLoading(true);
-      try {
-        const userId = session?.user?.id;
-        if (!userId) {
-          setError("Not authenticated");
-          return;
+      const userId = session?.user?.id;
+      if (!userId) {
+        setError("Not authenticated");
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      // Each fetch is independent — one failure doesn't kill the rest.
+      const [dashboardRes, candidatesRes, activitiesRes] =
+        await Promise.allSettled([
+          fetch(`/api/recruiter/dashboard?userId=${encodeURIComponent(userId)}`),
+          fetch(`/api/recruiter/applications`),
+          fetch(`/api/recruiter/activities?limit=15`),
+        ]);
+
+      if (dashboardRes.status === "fulfilled" && dashboardRes.value.ok) {
+        try {
+          setAnalytics(await dashboardRes.value.json());
+        } catch (e) {
+          console.error("dashboard json parse failed:", e);
         }
+      } else {
+        console.error("dashboard fetch failed", dashboardRes);
+      }
 
-        const dashboardResponse = await fetch(
-          `/api/recruiter/dashboard?userId=${userId}`,
-        );
-        if (!dashboardResponse.ok) {
-          throw new Error("Failed to fetch dashboard data");
-        }
-
-        const dashboardData = await dashboardResponse.json();
-        setAnalytics(dashboardData);
-
-        const candidatesResponse = await fetch(`/api/recruiter/applications`);
-        if (candidatesResponse.ok) {
-          const candidatesData = await candidatesResponse.json();
-          const transformedCandidates = (Array.isArray(candidatesData) ? candidatesData : [])
+      if (candidatesRes.status === "fulfilled" && candidatesRes.value.ok) {
+        try {
+          const candidatesJson = await candidatesRes.value.json();
+          const transformed = (
+            Array.isArray(candidatesJson) ? candidatesJson : []
+          )
             .slice(0, 6)
             .map((candidate) => {
-              const resultArr = Array.isArray(candidate.result) ? candidate.result : [];
-              const totalScore = resultArr.reduce((sum, c) => sum + (c.score || 0), 0);
+              const resultArr = Array.isArray(candidate.result)
+                ? candidate.result
+                : [];
+              const totalScore = resultArr.reduce(
+                (sum, c) => sum + (c.score || 0),
+                0,
+              );
               return {
                 id: candidate.id,
                 name: candidate.candidateName || "Unknown",
                 email: candidate.candidateEmail || "unknown@email.com",
                 position: candidate.jobTitle || "Unknown Position",
                 score: totalScore || 0,
-                status: candidate.isRejected ? "Rejected" : (candidate.status || "applied"),
+                status: candidate.isRejected
+                  ? "Rejected"
+                  : candidate.status || "applied",
                 applied: candidate.createdAt
                   ? new Date(candidate.createdAt).toLocaleDateString("en-US", {
                       year: "numeric",
@@ -200,24 +99,37 @@ export const RecruiterDashboard = ({ onNavigate }) => {
                   : "N/A",
               };
             });
-          setCandidateData(transformedCandidates);
+          setCandidateData(transformed);
+        } catch (e) {
+          console.error("candidates json parse failed:", e);
         }
-
-        const activitiesResponse = await fetch(`/api/recruiter/activities?limit=15`);
-        if (activitiesResponse.ok) {
-          const activitiesJson = await activitiesResponse.json();
-          setActivities(Array.isArray(activitiesJson?.data) ? activitiesJson.data : []);
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-        setError(error.message);
-      } finally {
-        setIsLoading(false);
+      } else {
+        console.error("candidates fetch failed", candidatesRes);
       }
-    };
 
+      if (activitiesRes.status === "fulfilled" && activitiesRes.value.ok) {
+        try {
+          const activitiesJson = await activitiesRes.value.json();
+          setActivities(
+            Array.isArray(activitiesJson?.data) ? activitiesJson.data : [],
+          );
+        } catch (e) {
+          console.error("activities json parse failed:", e);
+        }
+      } else {
+        console.error("activities fetch failed", activitiesRes);
+      }
+
+      setIsLoading(false);
+      setIsRefreshing(false);
+    },
+    [session],
+  );
+
+  useEffect(() => {
+    if (sessionLoading) return;
     fetchDashboardData();
-  }, [session, sessionLoading]);
+  }, [sessionLoading, fetchDashboardData]);
 
   // Generate chart data from real analytics
   const volumeData = analytics?.recentActivity?.reduce((acc, activity) => {
@@ -275,7 +187,44 @@ export const RecruiterDashboard = ({ onNavigate }) => {
   }
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      {(analytics?.overview?.totalPositions ?? 0) === 0 &&
+        session?.user?.id && (
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+            <AlertCircle
+              size={16}
+              className="text-amber-600 flex-shrink-0 mt-0.5"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-amber-800">
+                Not seeing your data?
+              </p>
+              <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                The dashboard only shows positions where{" "}
+                <code className="px-1 py-0.5 rounded bg-amber-100 font-mono text-[10px]">
+                  job_positions.user_id
+                </code>{" "}
+                equals your logged-in user id. If you inserted data manually,
+                make sure the row's <code className="font-mono">user_id</code>{" "}
+                matches the value below.
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <code className="text-[10px] font-mono bg-white border border-amber-200 px-2 py-1 rounded select-all break-all">
+                  {session.user.id}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(session.user.id);
+                  }}
+                  className="text-[10px] font-bold text-amber-700 hover:text-amber-900 px-2 py-1 rounded hover:bg-amber-100 transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight">
             Recruiter Dashboard
@@ -284,13 +233,27 @@ export const RecruiterDashboard = ({ onNavigate }) => {
             Welcome back! Here's what's happening with your interviews.
           </p>
         </div>
-        <button
-          onClick={() => onNavigate?.("create")}
-          className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <Plus size={16} />
-          Create New Interview
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchDashboardData({ silent: true })}
+            disabled={isRefreshing}
+            title="Refresh data"
+            className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50 flex items-center gap-2 transition-all disabled:opacity-50"
+          >
+            <RefreshCw
+              size={14}
+              className={isRefreshing ? "animate-spin" : ""}
+            />
+            {isRefreshing ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            onClick={() => onNavigate?.("create")}
+            className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Plus size={16} />
+            Create New Interview
+          </button>
+        </div>
       </div>
 
       {/* Statistic Cards */}
@@ -370,142 +333,107 @@ export const RecruiterDashboard = ({ onNavigate }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Charts Section */}
-        <div className="p-5 rounded-2xl bg-white border border-black/5 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <TrendingUp size={16} className="text-emerald-600" />
-              Interview Volume
-            </h3>
-            <select className="text-[10px] font-bold bg-gray-50 border-none rounded-lg px-2 py-1 focus:ring-0">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
-            </select>
+        {/* Interview Volume */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-50 to-white border border-purple-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-purple-600 flex items-center justify-center">
+                  <TrendingUp size={13} className="text-white" />
+                </div>
+                Interview Volume
+              </h3>
+              <p className="text-[10px] text-gray-400 mt-0.5 ml-8">
+                Interviews conducted per day
+              </p>
+            </div>
+            <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+              Last 7 Days
+            </span>
           </div>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={volumeData}>
-                <defs>
-                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f0f0f0"
-                />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "#999" }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "#999" }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "none",
-                    boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                    fontSize: "10px",
-                  }}
-                />
-
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorCount)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-[220px]">
+            {volumeData.every((d) => d.count === 0) ? (
+              <div className="h-full flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                  <TrendingUp size={20} className="text-purple-400" />
+                </div>
+                <p className="text-xs text-gray-400 font-medium">No interview data yet</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={volumeData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+                  <defs>
+                    <linearGradient id="volumeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f0ff" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#a78bfa" }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#a78bfa" }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 8px 20px -3px rgb(124 58 237 / 0.15)", fontSize: "11px", background: "#fff" }}
+                    labelStyle={{ color: "#7c3aed", fontWeight: "700" }}
+                  />
+                  <Area type="monotone" dataKey="count" stroke="#7c3aed" strokeWidth={2.5} fillOpacity={1} fill="url(#volumeGrad)"
+                    dot={{ r: 4, fill: "#7c3aed", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 6, fill: "#7c3aed", stroke: "#fff", strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-black/5 shadow-sm">
-          <h3 className="text-sm font-bold mb-6">Candidate Quality Trend</h3>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={qualityData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f0f0f0"
-                />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "#999" }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "#999" }}
-                />
-                <Tooltip
-                  cursor={{ fill: "#f9fafb" }}
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "none",
-                    boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                    fontSize: "10px",
-                  }}
-                />
-
-                <Bar
-                  dataKey="score"
-                  fill="#3b82f6"
-                  radius={[4, 4, 0, 0]}
-                  barSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+        {/* Candidate Quality Trend */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-white border border-blue-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-blue-600 flex items-center justify-center">
+                  <Target size={13} className="text-white" />
+                </div>
+                Candidate Quality Trend
+              </h3>
+              <p className="text-[10px] text-gray-400 mt-0.5 ml-8">
+                Avg. fit score per position
+              </p>
+            </div>
+            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+              Top 5
+            </span>
           </div>
-        </div>
-      </div>
-
-      {/* Progress Chart */}
-      <div className="p-4 rounded-xl bg-white border border-black/5 shadow-sm">
-        <h3 className="text-sm font-bold mb-4">Progress</h3>
-        <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={progressData}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="#f0f0f0"
-              />
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: "#999" }}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: "#999" }}
-              />
-              <Tooltip
-                contentStyle={{ fontSize: "10px", borderRadius: "8px" }}
-              />
-              <Line
-                type="monotone"
-                dataKey="score"
-                stroke="#10b981"
-                strokeWidth={2}
-                dot={{ r: 3, fill: "#10b981" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="h-[220px]">
+            {qualityData.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Target size={20} className="text-blue-400" />
+                </div>
+                <p className="text-xs text-gray-400 font-medium">No scored interviews yet</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={qualityData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+                  <defs>
+                    <linearGradient id="qualityGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eff6ff" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#93c5fd" }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#93c5fd" }} domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 8px 20px -3px rgb(37 99 235 / 0.15)", fontSize: "11px", background: "#fff" }}
+                    labelStyle={{ color: "#2563eb", fontWeight: "700" }}
+                    formatter={(v) => [`${v}%`, "Avg Score"]}
+                  />
+                  <Area type="monotone" dataKey="score" stroke="#2563eb" strokeWidth={2.5} fillOpacity={1} fill="url(#qualityGrad)"
+                    dot={{ r: 5, fill: "#2563eb", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 7, fill: "#2563eb", stroke: "#fff", strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </div>
 
@@ -591,6 +519,18 @@ export const RecruiterDashboard = ({ onNavigate }) => {
             View All
           </button>
         </div>
+        {candidateData.length === 0 ? (
+          <div className="text-center py-10">
+            <Users size={28} className="mx-auto text-gray-200 mb-2" />
+            <p className="text-xs font-semibold text-gray-500">
+              No candidates yet
+            </p>
+            <p className="text-[10px] text-gray-400 mt-1">
+              Candidates will appear here after they register for one of your
+              interviews
+            </p>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -670,6 +610,7 @@ export const RecruiterDashboard = ({ onNavigate }) => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

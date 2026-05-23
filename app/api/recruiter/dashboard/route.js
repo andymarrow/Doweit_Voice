@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
-import { eq, and, count, sum, sql } from 'drizzle-orm';
-import { 
-  jobPositions, 
-  candidateApplications, 
-  interviews,
-  users 
-} from '@/lib/db/schemaCharacterAI';
+import { sql } from 'drizzle-orm';
+
+// NOTE: this route uses raw db.execute(sql`...`) instead of the typed
+// query builder because drizzle-orm's neon-http driver has a bug where
+// single-column projections (e.g. .select({ count: count() })) silently
+// return [] from the database. See diag work in commit history.
+const firstRow = (r) => (r?.rows ?? r)[0] || {};
+const rows = (r) => r?.rows ?? r ?? [];
 
 export async function GET(request) {
   try {
@@ -21,176 +22,115 @@ export async function GET(request) {
       );
     }
 
-    // 1. Total positions - fetch all job positions by userId
-    const totalPositionsResult = await db
-      .select({ count: count() })
-      .from(jobPositions)
-      .where(eq(jobPositions.userId, userId));
+    // 1. Total positions
+    const totalPositionsR = await db.execute(
+      sql`SELECT COUNT(*)::int AS c FROM job_positions WHERE user_id = ${userId}`,
+    );
+    const totalPositions = Number(firstRow(totalPositionsR).c || 0);
 
-    const totalPositions = totalPositionsResult[0]?.count || 0;
+    // 2. Total applications (joined to positions owned by user)
+    const totalApplicationsR = await db.execute(
+      sql`SELECT COUNT(*)::int AS c
+          FROM candidate_applications a
+          LEFT JOIN job_positions p ON a.position_id = p.id
+          WHERE p.user_id = ${userId}`,
+    );
+    const totalApplications = Number(firstRow(totalApplicationsR).c || 0);
 
-    // 2. Total applications - fetch all candidates from candidateApplications table
-    const totalApplicationsResult = await db
-      .select({ count: count() })
-      .from(candidateApplications)
-      .leftJoin(jobPositions, eq(candidateApplications.positionId, jobPositions.id))
-      .where(eq(jobPositions.userId, userId));
-
-    const totalApplications = totalApplicationsResult[0]?.count || 0;
-
-    // 3. Total interviews - fetch interviews related to candidate applications
-    // First get all position IDs for this user
-    const userPositionsResult = await db
-      .select({ id: jobPositions.id })
-      .from(jobPositions)
-      .where(eq(jobPositions.userId, userId));
-
-    const userPositionIds = userPositionsResult.map(pos => pos.id);
-
-    let totalInterviews = 0;
-    if (userPositionIds.length > 0) {
-      // Get interviews that are related to these positions
-      const totalInterviewsResult = await db
-        .select({ count: count() })
-        .from(interviews)
-        .where(
-          sql`${interviews.positionId} IN (${sql.join(userPositionIds, sql`,`)})`
-        );
-
-      totalInterviews = totalInterviewsResult[0]?.count || 0;
-    }
+    // 3. Total interviews on this user's positions
+    const totalInterviewsR = await db.execute(
+      sql`SELECT COUNT(*)::int AS c FROM interviews
+          WHERE position_id IN (SELECT id FROM job_positions WHERE user_id = ${userId})`,
+    );
+    const totalInterviews = Number(firstRow(totalInterviewsR).c || 0);
 
     // 4. Active positions count
-    const activePositionsResult = await db
-      .select({ count: count() })
-      .from(jobPositions)
-      .where(and(
-        eq(jobPositions.userId, userId),
-        eq(jobPositions.status, 'active')
-      ));
-
-    const activePositions = activePositionsResult[0]?.count || 0;
+    const activePositionsR = await db.execute(
+      sql`SELECT COUNT(*)::int AS c FROM job_positions
+          WHERE user_id = ${userId} AND status = 'active'`,
+    );
+    const activePositions = Number(firstRow(activePositionsR).c || 0);
 
     // 5. Candidates by status
-    const candidatesByStatusResult = await db
-      .select({
-        status: candidateApplications.status,
-        count: count()
-      })
-      .from(candidateApplications)
-      .leftJoin(jobPositions, eq(candidateApplications.positionId, jobPositions.id))
-      .where(eq(jobPositions.userId, userId))
-      .groupBy(candidateApplications.status);
-
-    const candidatesByStatus = candidatesByStatusResult.reduce((acc, item) => {
-      acc[item.status] = item.count;
+    const candidatesByStatusR = await db.execute(
+      sql`SELECT a.status, COUNT(*)::int AS c
+          FROM candidate_applications a
+          LEFT JOIN job_positions p ON a.position_id = p.id
+          WHERE p.user_id = ${userId}
+          GROUP BY a.status`,
+    );
+    const candidatesByStatus = rows(candidatesByStatusR).reduce((acc, r) => {
+      if (r.status) acc[r.status] = Number(r.c || 0);
       return acc;
     }, {});
 
     // 6. Interview status counts
-    let interviewsByStatus = {};
-    if (userPositionIds.length > 0) {
-      const interviewsByStatusResult = await db
-        .select({
-          status: interviews.status,
-          count: count()
-        })
-        .from(interviews)
-        .where(
-          sql`${interviews.positionId} IN (${sql.join(userPositionIds, sql`,`)})`
-        )
-        .groupBy(interviews.status);
-
-      interviewsByStatus = interviewsByStatusResult.reduce((acc, item) => {
-        acc[item.status] = item.count;
-        return acc;
-      }, {});
-    }
+    const interviewsByStatusR = await db.execute(
+      sql`SELECT i.status, COUNT(*)::int AS c
+          FROM interviews i
+          WHERE i.position_id IN (SELECT id FROM job_positions WHERE user_id = ${userId})
+          GROUP BY i.status`,
+    );
+    const interviewsByStatus = rows(interviewsByStatusR).reduce((acc, r) => {
+      if (r.status) acc[r.status] = Number(r.c || 0);
+      return acc;
+    }, {});
 
     // 7. Average fit score
-    let avgFitScore = 0;
-    if (userPositionIds.length > 0) {
-      const avgFitScoreResult = await db
-        .select({
-          avgScore: sql`AVG(${interviews.fitScore})`.mapWith(Number)
-        })
-        .from(interviews)
-        .where(
-          sql`${interviews.positionId} IN (${sql.join(userPositionIds, sql`,`)}) AND ${interviews.fitScore} IS NOT NULL`
-        );
+    const avgFitScoreR = await db.execute(
+      sql`SELECT AVG(fit_score)::float AS avg
+          FROM interviews
+          WHERE fit_score IS NOT NULL
+            AND position_id IN (SELECT id FROM job_positions WHERE user_id = ${userId})`,
+    );
+    const avgFitScore = Math.round(firstRow(avgFitScoreR).avg || 0);
 
-      avgFitScore = Math.round(avgFitScoreResult[0]?.avgScore || 0);
-    }
-
-    // 8. Recent activity (last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    let recentActivity = [];
-    if (userPositionIds.length > 0) {
-      const recentActivityResult = await db
-        .select({
-          createdAt: interviews.createdAt
-        })
-        .from(interviews)
-        .where(
-          sql`${interviews.positionId} IN (${sql.join(userPositionIds, sql`,`)}) AND ${interviews.createdAt} >= ${sevenDaysAgo}`
-        )
-        .orderBy(interviews.createdAt)
-        .limit(50);
-
-      recentActivity = recentActivityResult;
-    }
+    // 8. Recent activity (last 7 days, interview rows)
+    const recentActivityR = await db.execute(
+      sql`SELECT created_at
+          FROM interviews
+          WHERE position_id IN (SELECT id FROM job_positions WHERE user_id = ${userId})
+            AND created_at >= NOW() - INTERVAL '7 days'
+          ORDER BY created_at ASC
+          LIMIT 50`,
+    );
+    const recentActivity = rows(recentActivityR).map((r) => ({
+      createdAt: r.created_at,
+    }));
 
     // 9. Top positions by average score
-    let topPositions = [];
-    if (userPositionIds.length > 0) {
-      const topPositionsResult = await db
-        .select({
-          title: jobPositions.title,
-          avgScore: sql`AVG(${interviews.fitScore})`.mapWith(Number)
-        })
-        .from(jobPositions)
-        .leftJoin(interviews, eq(jobPositions.id, interviews.positionId))
-        .where(
-          and(
-            eq(jobPositions.userId, userId),
-            sql`${interviews.fitScore} IS NOT NULL`
-          )
-        )
-        .groupBy(jobPositions.id, jobPositions.title)
-        .orderBy(sql`AVG(${interviews.fitScore}) DESC`)
-        .limit(5);
+    const topPositionsR = await db.execute(
+      sql`SELECT p.title, AVG(i.fit_score)::float AS avg_score
+          FROM job_positions p
+          LEFT JOIN interviews i ON p.id = i.position_id
+          WHERE p.user_id = ${userId} AND i.fit_score IS NOT NULL
+          GROUP BY p.id, p.title
+          ORDER BY AVG(i.fit_score) DESC
+          LIMIT 5`,
+    );
+    const topPositions = rows(topPositionsR).map((r) => ({
+      title: r.title,
+      averageScore: Math.round(r.avg_score || 0),
+    }));
 
-      topPositions = topPositionsResult.map(pos => ({
-        title: pos.title,
-        averageScore: Math.round(pos.avgScore || 0)
-      }));
-    }
-
-    // 10. Candidates who are not rejected (is_rejected = false)
-    const activeCandidatesResult = await db
-      .select({ count: count() })
-      .from(candidateApplications)
-      .leftJoin(jobPositions, eq(candidateApplications.positionId, jobPositions.id))
-      .where(
-        and(
-          eq(jobPositions.userId, userId),
-          eq(candidateApplications.isRejected, false)
-        )
-      );
-
-    const activeCandidates = activeCandidatesResult[0]?.count || 0;
+    // 10. Candidates who are not rejected
+    const activeCandidatesR = await db.execute(
+      sql`SELECT COUNT(*)::int AS c
+          FROM candidate_applications a
+          LEFT JOIN job_positions p ON a.position_id = p.id
+          WHERE p.user_id = ${userId} AND a.is_rejected = false`,
+    );
+    const activeCandidates = Number(firstRow(activeCandidatesR).c || 0);
 
     const dashboardData = {
       overview: {
         totalPositions,
         totalApplications,
         averageFitScore: avgFitScore,
-        totalInterviews
+        totalInterviews,
       },
       positions: {
-        active: activePositions
+        active: activePositions,
       },
       applications: {
         interviewing: candidatesByStatus.interviewing || 0,
@@ -198,28 +138,33 @@ export async function GET(request) {
         offered: candidatesByStatus.offered || 0,
         screening: candidatesByStatus.screening || 0,
         applied: candidatesByStatus.applied || 0,
-        rejected: candidatesByStatus.rejected || 0
+        rejected: candidatesByStatus.rejected || 0,
       },
       interviews: {
         completed: interviewsByStatus.completed || 0,
         ongoing: interviewsByStatus.ongoing || 0,
-        pending: interviewsByStatus.pending || 0
+        pending: interviewsByStatus.pending || 0,
       },
-      activeCandidates, // Non-rejected candidates
+      activeCandidates,
       conversionRates: {
-        applicationToInterview: totalApplications > 0 ? Math.round((totalInterviews / totalApplications) * 100) : 0,
-        interviewToHire: totalInterviews > 0 ? Math.round(((candidatesByStatus.hired || 0) / totalInterviews) * 100) : 0
+        applicationToInterview:
+          totalApplications > 0
+            ? Math.round((totalInterviews / totalApplications) * 100)
+            : 0,
+        interviewToHire:
+          totalInterviews > 0
+            ? Math.round(((candidatesByStatus.hired || 0) / totalInterviews) * 100)
+            : 0,
       },
       recentActivity,
-      topPositions
+      topPositions,
     };
 
     return NextResponse.json(dashboardData);
-
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch dashboard data' },
+      { error: 'Failed to fetch dashboard data', details: error.message },
       { status: 500 }
     );
   }

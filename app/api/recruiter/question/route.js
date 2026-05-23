@@ -1,6 +1,9 @@
 export const dynamic = 'force-dynamic';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GEMINI_API_KEY } from "@/configs/constants";
+import { db } from "@/lib/database";
+import { jobPositions } from "@/lib/db/schemaCharacterAI";
+import { eq } from "drizzle-orm";
 
 // Initialize Google AI
 const apiKey = GEMINI_API_KEY;
@@ -66,12 +69,34 @@ function generateFallbackQuestions(title, experienceLevel, count) {
 export async function POST(request) {
   const body = await request.json();
   try {
-    const { 
-      title, 
-      department, 
-      description, 
-      requirements, 
-      experienceLevel, 
+    // Save mode: when called with { positionId, aiQuestions }, update the
+    // stored questions on the position. This is what the InterviewDetail
+    // Questions tab uses for its "Save Questions" button.
+    if (body.positionId && Array.isArray(body.aiQuestions)) {
+      const updated = await db
+        .update(jobPositions)
+        .set({
+          aiQuestions: body.aiQuestions,
+          updatedAt: new Date(),
+        })
+        .where(eq(jobPositions.id, body.positionId))
+        .returning();
+      if (updated.length === 0) {
+        return Response.json({ error: "Position not found" }, { status: 404 });
+      }
+      return Response.json({
+        success: true,
+        questions: body.aiQuestions,
+        count: body.aiQuestions.length,
+      });
+    }
+
+    const {
+      title,
+      department,
+      description,
+      requirements,
+      experienceLevel,
       questionCount ,
       duration,
       evaluationCriteria,

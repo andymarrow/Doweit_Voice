@@ -11,6 +11,7 @@ import {
   Target,
   HelpCircle,
   Loader2,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "react-hot-toast";
@@ -40,6 +41,7 @@ export const InterviewDetail = ({
   const [error, setError] = useState(null);
   const [candidateResults, setCandidateResults] = useState({});
   const [isGettingResults, setIsGettingResults] = useState(false);
+  const [isSendingResults, setIsSendingResults] = useState(false);
 
   // candidate detail modal
   const [detailCandidate, setDetailCandidate] = useState(null);
@@ -62,9 +64,6 @@ export const InterviewDetail = ({
   const [editQuestionIdx, setEditQuestionIdx] = useState(null);
   const [questionText, setQuestionText] = useState("");
 
-  // shortlist
-  const [selected, setSelected] = useState(new Set());
-
   const tab = activeTab || "dashboard";
 
   // ── data fetching ──────────────────────────────────────────────────────────
@@ -73,13 +72,18 @@ export const InterviewDetail = ({
     try {
       const res = await fetch(
         `/api/recruiter/position-candidates?positionId=${interviewId}`,
+        { cache: "no-store" },
       );
-      if (res.ok) {
-        const data = await res.json();
-        setCandidates(data.candidates || []);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("position-candidates failed:", res.status, data);
+        toast.error(data.error || `Failed to load candidates (${res.status})`);
+        return;
       }
+      setCandidates(Array.isArray(data.candidates) ? data.candidates : []);
     } catch (err) {
-      console.error("fetchCandidates:", err);
+      console.error("fetchCandidates network error:", err);
+      toast.error("Network error loading candidates");
     }
   }, [interviewId]);
 
@@ -89,8 +93,11 @@ export const InterviewDetail = ({
         const res = await fetch(
           `/api/recruiter/createInterview?positionId=${interviewId}`,
         );
-        if (!res.ok) throw new Error("Failed to fetch interview");
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          console.error("createInterview GET failed:", res.status, data);
+          throw new Error(data.error || `Failed to fetch interview (${res.status})`);
+        }
         const pos = data.data;
         setInterview(pos);
         // seed criteria from DB
@@ -138,6 +145,7 @@ export const InterviewDetail = ({
             map[r.id] = {
               result: r.result || [],
               reasonResult: r.reasonResult || "",
+              pass: r.pass,
             };
           });
           setCandidateResults(map);
@@ -151,6 +159,47 @@ export const InterviewDetail = ({
       toast.error("Error fetching results");
     } finally {
       setIsGettingResults(false);
+    }
+  };
+
+  // ── send results to candidates via email ──────────────────────────────────
+
+  const handleSendResults = async () => {
+    setIsSendingResults(true);
+    try {
+      const res = await fetch("/api/recruiter/send-result-emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ positionId: interviewId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Failed to send results");
+        return;
+      }
+      const sent = data.emailsSent || 0;
+      const failed = data.emailsFailed || 0;
+      const skipped = data.skipped || 0;
+      if (sent > 0) {
+        toast.success(
+          `Result emails sent to ${sent} candidate${sent !== 1 ? "s" : ""}`,
+        );
+      }
+      if (failed > 0) {
+        toast.error(`${failed} email${failed !== 1 ? "s" : ""} failed`);
+      }
+      if (sent === 0 && failed === 0) {
+        toast(
+          skipped > 0
+            ? `No evaluated candidates yet (run "Get Results" first)`
+            : "No eligible candidates",
+          { icon: "ℹ️" },
+        );
+      }
+    } catch {
+      toast.error("Error sending result emails");
+    } finally {
+      setIsSendingResults(false);
     }
   };
 
@@ -202,7 +251,7 @@ export const InterviewDetail = ({
 
   const activeCandidates = candidates.filter((c) => !c.isRejected);
   const rejectedCandidates = candidates.filter((c) => c.isRejected);
-  const shortlisted = activeCandidates.filter((c) => selected.has(c.id));
+  const shortlisted = activeCandidates;
   const weightSum = criteria.reduce((s, c) => s + Number(c.weight || 0), 0);
 
   // ── loading / error ────────────────────────────────────────────────────────
@@ -257,10 +306,10 @@ export const InterviewDetail = ({
       case "shortlist":
         return (
           <ShortlistTab
-            activeCandidates={activeCandidates}
+            candidates={candidates}
             candidateResults={candidateResults}
-            selected={selected}
-            setSelected={setSelected}
+            positionId={interviewId}
+            refreshCandidates={fetchCandidates}
           />
         );
       case "configuration":
@@ -384,10 +433,10 @@ export const InterviewDetail = ({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[9px] font-bold text-gray-400 uppercase">
-                Shortlisted
+                Active
               </span>
               <span className="text-xs font-black text-blue-700">
-                {selected.size}
+                {activeCandidates.length}
               </span>
             </div>
           </div>
@@ -408,18 +457,32 @@ export const InterviewDetail = ({
           </div>
           <div className="flex items-center gap-2">
             {tab === "candidates" && (
-              <button
-                onClick={handleGetResults}
-                disabled={isGettingResults}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-bold hover:bg-white/30 transition-colors disabled:opacity-50"
-              >
-                {isGettingResults ? (
-                  <Loader2 size={11} className="animate-spin" />
-                ) : (
-                  <FileText size={11} />
-                )}
-                {isGettingResults ? "Loading…" : "Get Results"}
-              </button>
+              <>
+                <button
+                  onClick={handleGetResults}
+                  disabled={isGettingResults}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/20 text-white text-xs font-bold hover:bg-white/30 transition-colors disabled:opacity-50"
+                >
+                  {isGettingResults ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <FileText size={11} />
+                  )}
+                  {isGettingResults ? "Loading…" : "Get Results"}
+                </button>
+                <button
+                  onClick={handleSendResults}
+                  disabled={isSendingResults}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-purple-700 text-xs font-bold hover:bg-purple-50 transition-colors disabled:opacity-50"
+                >
+                  {isSendingResults ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <Send size={11} />
+                  )}
+                  {isSendingResults ? "Sending…" : "Send Results"}
+                </button>
+              </>
             )}
           </div>
         </div>

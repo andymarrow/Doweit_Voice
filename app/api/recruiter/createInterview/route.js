@@ -65,7 +65,8 @@ export async function POST(request) {
       agentName,
       price,
       accessType,
-      evaluationCriteria
+      evaluationCriteria,
+      candidateEvaluation
     } = body;
 
     if (!title || !jobPosition || !description) {
@@ -109,6 +110,7 @@ export async function POST(request) {
       agentName: agentName || 'viktor',
       tone: tone || 'Friendly',
       evaluationCriteria: evaluationCriteria || [],
+      candidateEvaluation: candidateEvaluation || '',
       price: price || 50,
       accessType: accessType || 'Public (Anyone)',
       status: 'draft',
@@ -212,6 +214,7 @@ export async function GET(request) {
         accessType: jobPositions.accessType,
         status: jobPositions.status,
         evaluationCriteria: jobPositions.evaluationCriteria,
+        candidateEvaluation: jobPositions.candidateEvaluation,
         language: jobPositions.language,
         createdAt: jobPositions.createdAt,
         updatedAt: jobPositions.updatedAt,
@@ -264,6 +267,7 @@ export async function GET(request) {
       accessType: jobPositions.accessType,
       status: jobPositions.status,
       evaluationCriteria: jobPositions.evaluationCriteria,
+      candidateEvaluation: jobPositions.candidateEvaluation,
       language: jobPositions.language,
       createdAt: jobPositions.createdAt,
       updatedAt: jobPositions.updatedAt,

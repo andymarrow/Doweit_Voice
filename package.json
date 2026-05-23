@@ -60,6 +60,7 @@
 		"react-youtube": "^10.1.0",
 		"reactflow": "^11.11.4",
 		"recharts": "^3.5.1",
+		"resend": "^6.12.3",
 		"shadcn": "^2.4.0-canary.12",
 		"sidebar": "^1.0.2",
 		"tailwind-merge": "^2.5.2",

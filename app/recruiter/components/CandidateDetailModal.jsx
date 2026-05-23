@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { X } from "lucide-react";
+import { X, XCircle, CheckCircle2, FileText, Mail, Phone, MapPin } from "lucide-react";
 import { calcScore, getReason } from "./utils";
 
 export const CandidateDetailModal = ({ candidate, candidateResults, onClose }) => {
@@ -48,6 +48,34 @@ export const CandidateDetailModal = ({ candidate, candidateResults, onClose }) =
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          {/* Rejection banner — shown prominently when candidate is rejected */}
+          {c.isRejected ? (
+            <div className="rounded-xl bg-red-50 border border-red-200 p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <XCircle size={14} className="text-red-600" />
+                <p className="text-xs font-bold text-red-700 uppercase tracking-wider">
+                  Rejected
+                </p>
+              </div>
+              {c.rejectReason ? (
+                <p className="text-[11px] text-red-800 leading-relaxed whitespace-pre-wrap">
+                  {c.rejectReason}
+                </p>
+              ) : (
+                <p className="text-[11px] text-red-600/80 italic">
+                  No reason provided.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center gap-2">
+              <CheckCircle2 size={14} className="text-emerald-600" />
+              <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                Active candidate
+              </p>
+            </div>
+          )}
+
           {/* score */}
           <div className="flex items-center gap-3 p-3 rounded-xl bg-purple-50 border border-purple-200">
             <div className="w-12 h-12 rounded-xl bg-purple-600 text-white flex items-center justify-center font-black text-lg">
@@ -64,28 +92,57 @@ export const CandidateDetailModal = ({ candidate, candidateResults, onClose }) =
           </div>
 
           {/* contact info */}
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "Phone", value: c.candidatePhone || "—" },
-              {
-                label: "Status",
-                value: c.isRejected ? "Rejected" : c.status || "Applied",
-              },
-              { label: "Address", value: c.address || "—" },
-              { label: "CV", value: c.cv ? "Uploaded" : "Not submitted" },
-            ].map((f, i) => (
-              <div
-                key={i}
-                className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2"
-              >
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-                  {f.label}
-                </p>
-                <p className="text-xs font-semibold text-gray-800 truncate">
-                  {f.value}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+              <Mail size={12} className="text-gray-400 flex-shrink-0" />
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider w-14 flex-shrink-0">
+                Email
+              </p>
+              <p className="text-xs font-semibold text-gray-800 truncate">
+                {c.candidateEmail || "—"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+              <Phone size={12} className="text-gray-400 flex-shrink-0" />
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider w-14 flex-shrink-0">
+                Phone
+              </p>
+              <p className="text-xs font-semibold text-gray-800 truncate">
+                {c.candidatePhone || "—"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+              <MapPin size={12} className="text-gray-400 flex-shrink-0" />
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider w-14 flex-shrink-0">
+                Address
+              </p>
+              <p className="text-xs font-semibold text-gray-800 truncate">
+                {c.address || c.country || "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* CV content */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <FileText size={12} className="text-gray-500" />
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                CV / Resume
+              </p>
+            </div>
+            {c.cv ? (
+              <div className="max-h-48 overflow-y-auto rounded-lg bg-gray-50 border border-gray-100 p-3">
+                <pre className="text-[11px] text-gray-700 whitespace-pre-wrap leading-relaxed font-sans">
+                  {c.cv}
+                </pre>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
+                <p className="text-[11px] text-gray-400 italic">
+                  No CV submitted
                 </p>
               </div>
-            ))}
+            )}
           </div>
 
           {/* criteria breakdown */}

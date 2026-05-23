@@ -97,6 +97,7 @@ export const CreateInterview = () => {
   // AI generation states
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [isGeneratingEvaluation, setIsGeneratingEvaluation] = useState(false);
 
   // Evaluation criteria
   const [criteria, setCriteria] = useState([]);
@@ -122,11 +123,14 @@ export const CreateInterview = () => {
     endDate: "",
     duration: 30,
     questionCount: 8,
+    passScore: 50,
     // step 1
     description: "",
     // step 2 (AI)
     systemPrompt: "",
     aiQuestions: [],
+    // step 3
+    candidateEvaluation: "",
     // step 4
     agentName: "Viktor",
     voiceProvider: "vapi",
@@ -143,14 +147,38 @@ export const CreateInterview = () => {
 
   const searchParams = useSearchParams();
 
-  // ── when entering step 3, auto-generate criteria ────────────────────────
-  useEffect(() => {
-    if (step === 3 && !criteriaReady) {
-      const count = (Number(form.questionCount) || 8) + 2;
+  // ── AI-generate evaluation criteria (called when leaving step 2) ───────
+  const generateEvaluation = async () => {
+    const count = (Number(form.questionCount) || 8) + 2;
+    setIsGeneratingEvaluation(true);
+    try {
+      const res = await fetch("/api/recruiter/evaluation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionCount: form.questionCount,
+          language: form.language,
+          systemPrompt: form.systemPrompt,
+          criteriaCount: count,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCriteria(data.criteria || buildCriteria(count));
+        toast.success(
+          `${data.criteria?.length || count} evaluation criteria generated`,
+        );
+      } else {
+        setCriteria(buildCriteria(count));
+      }
+      setCriteriaReady(true);
+    } catch {
       setCriteria(buildCriteria(count));
       setCriteriaReady(true);
+    } finally {
+      setIsGeneratingEvaluation(false);
     }
-  }, [step, criteriaReady, form.questionCount]);
+  };
 
   // ── voice modal ─────────────────────────────────────────────────────────
   const handleVoiceSelected = (voice) => {
@@ -236,6 +264,7 @@ export const CreateInterview = () => {
           aiQuestions: form.aiQuestions || [],
           systemPrompt: form.systemPrompt || "",
           evaluationCriteria: criteria,
+          evaluationDescription: String(form.passScore ?? ""),
           recruiterId: "default-recruiter",
         }),
       });
@@ -306,7 +335,7 @@ export const CreateInterview = () => {
     <div className="space-y-5 animate-in fade-in duration-300">
       <div>
         <h3 className="text-sm font-black text-gray-900">
-          Registration & Job Setup
+          Registration & Job Setups
         </h3>
         <p className="text-[10px] text-gray-400 mt-0.5">
           Configure dates, position details and interview parameters
@@ -416,6 +445,21 @@ export const CreateInterview = () => {
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-400 pointer-events-none">
               MIN
+            </span>
+          </div>
+        </Field>
+        <Field label="Pass Score *">
+          <div className="relative">
+            <input
+              className={inputCls}
+              type="number"
+              min={0}
+              max={100}
+              value={form.passScore}
+              onChange={(e) => set("passScore", parseInt(e.target.value))}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-400 pointer-events-none">
+              %
             </span>
           </div>
         </Field>
@@ -808,6 +852,29 @@ export const CreateInterview = () => {
           {JSON.stringify(criteria, null, 2)}
         </pre>
       </details>
+
+      {/* Candidate Selection Rules */}
+      <div className="bg-blue-50 rounded-xl border border-blue-100 p-4 space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-5 h-5 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+            <User size={11} className="text-white" />
+          </div>
+          <label className="text-xs font-bold text-gray-900">
+            Candidate Selection Rules
+          </label>
+        </div>
+        <p className="text-[10px] text-gray-500 leading-relaxed">
+          Describe the criteria for auto-shortlisting candidates (minimum
+          experience, required skills, availability, etc.). This is used by AI
+          to accept or reject candidates.
+        </p>
+        <textarea
+          value={form.candidateEvaluation}
+          onChange={(e) => set("candidateEvaluation", e.target.value)}
+          placeholder="e.g. Minimum 3 years experience in React, strong communication skills, must be available for full-time position, degree in Computer Science preferred…"
+          className="w-full h-24 px-3 py-2 rounded-lg border border-blue-200 bg-white text-xs leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+        />
+      </div>
     </div>
   );
 
@@ -1290,11 +1357,24 @@ export const CreateInterview = () => {
 
           {step < 5 ? (
             <button
-              onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-              disabled={!canProceed()}
+              onClick={async () => {
+                if (step === 2 && !criteriaReady) {
+                  await generateEvaluation();
+                }
+                setStep((s) => Math.min(STEPS.length - 1, s + 1));
+              }}
+              disabled={!canProceed() || isGeneratingEvaluation}
               className="flex items-center gap-2 px-6 py-2 rounded-xl bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 disabled:opacity-40 transition-all shadow-sm"
             >
-              Continue <ChevronRight size={15} />
+              {isGeneratingEvaluation ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" /> Generating…
+                </>
+              ) : (
+                <>
+                  Continue <ChevronRight size={15} />
+                </>
+              )}
             </button>
           ) : (
             !createdPosition &&

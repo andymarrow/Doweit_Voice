@@ -58,19 +58,7 @@ function RecruiterApp() {
     { id: 'tokens', label: 'Tokens', icon: Coins },
     { id: 'settings', label: 'Settings', icon: Settings }];
   const renderContent = () => {
-
     if (activeModule === 'recruiter') {
-      if (activeSection === 'interviews' && selectedInterviewId) {
-        return (
-          <InterviewDetail
-            interviewId={selectedInterviewId}
-            activeTab={activeInterviewTab}
-            onTabChange={(tab) => setActiveInterviewTab(tab)}
-            onBack={() => setSelectedInterviewId(null)} />);
-
-
-      }
-
       switch (activeSection) {
         case 'dashboard': return <RecruiterDashboard onNavigate={setActiveSection} />;
         case 'interviews': return (
@@ -198,6 +186,20 @@ function RecruiterApp() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
+
+      {/* Full-screen InterviewDetail overlay */}
+      {activeSection === 'interviews' && selectedInterviewId && (
+        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+          <div className="p-6 min-h-screen">
+            <InterviewDetail
+              interviewId={selectedInterviewId}
+              activeTab={activeInterviewTab}
+              onTabChange={(tab) => setActiveInterviewTab(tab)}
+              onBack={() => setSelectedInterviewId(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>);
 }
 

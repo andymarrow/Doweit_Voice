@@ -15,7 +15,7 @@ if (!apiKey) {
 const ai = new GoogleGenerativeAI(apiKey);
 
 // AI evaluation function for interview transcripts
-async function evaluateInterviewTranscripts(interviewCandidates, evaluationCriteria, candidateEvaluation) {
+async function evaluateInterviewTranscripts(interviewCandidates, evaluationCriteria, candidateEvaluation, passScore) {
   try {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY not available');
@@ -38,6 +38,9 @@ ${JSON.stringify(evaluationCriteria, null, 2)}
 EVALUATION DESCRIPTION:
 ${candidateEvaluation}
 
+PASS SCORE THRESHOLD: ${passScore} (out of 100)
+A candidate "passes" when the sum of their per-criterion scores (each weighted by its weight) is >= this threshold.
+
 CANDIDATES TO EVALUATE:
 ${JSON.stringify(candidatesForAI, null, 2)}
 
@@ -52,7 +55,8 @@ Please evaluate each candidate and return a JSON array with the following struct
       { "name": "Cultural Fit", "score": 5 },
       { "name": "Confidence", "score": 2 }
     ],
-    "reasonResult": "Candidate could not answer technical questions and showed low confidence."
+    "reasonResult": "Candidate could not answer technical questions and showed low confidence.",
+    "pass": true
   }
 ]
 
@@ -62,6 +66,7 @@ Guidelines:
 - Analyze the entire transcript for evidence
 - Provide specific, professional reasoning for the overall assessment
 - Be fair and objective in your evaluation
+- Set "pass": true ONLY if the candidate's total weighted score meets or exceeds the PASS SCORE THRESHOLD; otherwise set "pass": false
 - Return only valid JSON format
 `;
 
@@ -117,30 +122,33 @@ Guidelines:
       
       return evaluationResults.map(result => ({
         id: result.id,
-        result: result.result ,
-        reasonResult: result.reasonResult
+        result: result.result,
+        reasonResult: result.reasonResult,
+        pass: typeof result.pass === 'boolean' ? result.pass : null,
       }));
-      
+
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
       console.log('Raw AI response:', generatedText);
-      
+
       // Fallback: return all candidates with default scores
       return interviewCandidates.map(candidate => ({
         id: candidate.publicId,
         result: evaluationCriteria.map(criteria => ({ name: criteria.name, score: 3 })),
-        reasonResult: 'AI evaluation failed - manual review required'
+        reasonResult: 'AI evaluation failed - manual review required',
+        pass: null,
       }));
     }
 
   } catch (error) {
     console.error('Error evaluating interview transcripts:', error);
-    
+
     // Fallback: return all candidates with default scores
     return interviewCandidates.map(candidate => ({
       id: candidate.publicId,
       result: evaluationCriteria.map(criteria => ({ name: criteria.name, score: 3 })),
-      reasonResult: 'AI evaluation failed - manual review required'
+      reasonResult: 'AI evaluation failed - manual review required',
+      pass: null,
     }));
   }
 }
@@ -162,11 +170,15 @@ export async function POST(request) {
       id: jobPositions.id,
       title: jobPositions.title,
       evaluationCriteria: jobPositions.evaluationCriteria,
-      candidateEvaluation: jobPositions.candidateEvaluation
+      candidateEvaluation: jobPositions.candidateEvaluation,
+      evaluationDescription: jobPositions.evaluationDescription,
     })
     .from(jobPositions)
     .where(eq(jobPositions.id, positionId))
     .limit(1);
+
+    // Pass score is stored as a string in evaluationDescription
+    const passScore = Number(position?.evaluationDescription) || 50;
 
     if (!position) {
       return NextResponse.json(
@@ -197,11 +209,12 @@ export async function POST(request) {
     .orderBy(desc(candidateApplications.createdAt));
 
     // Evaluate candidates with AI (only if evaluation criteria exist)
-    const aiEvaluationResults = position.evaluationCriteria && position.evaluationCriteria.length > 0 
+    const aiEvaluationResults = position.evaluationCriteria && position.evaluationCriteria.length > 0
       ? await evaluateInterviewTranscripts(
-          interviewCandidates, 
-          position.evaluationCriteria, 
-          position.candidateEvaluation
+          interviewCandidates,
+          position.evaluationCriteria,
+          position.candidateEvaluation,
+          passScore,
         )
       : []; // Return empty results if no evaluation criteria
 
@@ -212,6 +225,7 @@ export async function POST(request) {
         .set({
           result: evalResult.result,
           reasonResult: evalResult.reasonResult,
+          pass: evalResult.pass,
           updatedAt: new Date(),
         })
         .where(eq(candidateApplications.publicId, evalResult.id));

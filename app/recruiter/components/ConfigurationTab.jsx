@@ -6,6 +6,7 @@ import {
   Copy,
   Shield,
   Zap,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "react-hot-toast";
@@ -170,6 +171,29 @@ export const ConfigurationTab = ({ interview }) => {
               />
             </div>
           </div>
+
+          {/* Candidate Evaluation Rules */}
+          {interview?.candidateEvaluation && (
+            <div className="bg-white rounded-xl border border-gray-100">
+              <div className="px-4 py-3 border-b border-gray-50">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-blue-600 flex items-center justify-center">
+                    <UserCheck size={12} className="text-white" />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Candidate Selection Rules
+                  </h3>
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+                  <p className="text-[11px] text-blue-800 leading-relaxed whitespace-pre-wrap">
+                    {interview.candidateEvaluation}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* System prompt */}
           {interview?.systemPrompt && (
