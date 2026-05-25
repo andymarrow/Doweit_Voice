@@ -99,37 +99,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background text-text-main font-sans selection:bg-primary/30 selection:text-primary">
-
-      {/* ── Top Banner ────────────────────────────────── */}
-      <motion.div
-        initial={{ y: -40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="bg-primary text-white text-xs py-2 text-center flex items-center justify-center gap-2 font-medium relative overflow-hidden"
-      >
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-          animate={{ x: ['-100%', '200%'] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'linear', repeatDelay: 2 }}
-        />
-        <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>🚀</motion.span>
-        <span className="relative">Session 2026 • Early-bird registration now open</span>
-        <ArrowRight className="w-3 h-3 relative" />
-      </motion.div>
-
       <Header />
 
       <main>
 
         {/* ── 3D Robot ─────────────────────────── KEEP ── */}
-        <section className="py-12 px-6">
+        <section id="hero" className="py-12 px-6">
           <div className="max-w-7xl mx-auto">
             <SplineSceneBasic />
           </div>
         </section>
 
         {/* ── Native Multilingual ───────────────── KEEP ── */}
-        <section className="py-24 px-6 bg-surface/30 border-y border-border-color">
+        <section id="features" className="py-24 px-6 bg-surface/30 border-y border-border-color">
           <div className="max-w-7xl mx-auto">
             <div className="grid md:grid-cols-2 gap-16 items-center">
 
@@ -225,6 +207,7 @@ export default function App() {
 
         {/* ── How It Works ──────────────────────────────── */}
         <motion.section
+          id="how-it-works"
           initial="hidden" whileInView="visible"
           viewport={{ once: true, margin: "-50px" }} variants={stagger}
           className="py-24 px-6"
@@ -414,6 +397,7 @@ export default function App() {
 
         {/* ── FAQ ───────────────────────────────────────── */}
         <motion.section
+          id="faq"
           initial="hidden" whileInView="visible"
           viewport={{ once: true, margin: "-50px" }} variants={fadeUp}
           className="py-24 px-6"

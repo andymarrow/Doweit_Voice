@@ -1,25 +1,32 @@
 "use client";
-import React, { useState } from "react"; // Import useState
+import React, { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import ThemeToggle from "@/components/Themetoggle"; // Assuming this path is correct
-import { Search, Menu, X } from "lucide-react"; // Import Menu and X icons
+import ThemeToggle from "@/components/Themetoggle";
+import { Search, Menu, X } from "lucide-react";
 import UserProfile from "@/components/UserProfile";
 
 function Header() {
-	const [isMenuOpen, setIsMenuOpen] = useState(false); // State to manage mobile menu visibility
+	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
 	const navItems = [
-		{ name: "Agents Marketplace", href: "/agents-marketplace" }, // Replace with your actual paths
 		{ name: "Dashboard", href: "/voice-agents-dashboard" },
-		{ name: "My Agents", href: "/my-agents" }, // Replace with your actual paths
-		{ name: "Bookings", href: "/bookings" }, // Replace with your actual paths
-		{ name: "Docs", href: "/docs" }, // Replace with your actual paths
+		{ name: "Home", href: "#hero" },
+		{ name: "Features", href: "#features" },
+		{ name: "How It Works", href: "#how-it-works" },
+		{ name: "FAQ", href: "#faq" },
+		{ name: "Doc", href: "/docs" }
 	];
 
-	// Toggle the menu state
-	const toggleMenu = () => {
-		setIsMenuOpen(!isMenuOpen);
+	const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+
+	const handleNavClick = (e, href) => {
+		if (href.startsWith("#")) {
+			e.preventDefault();
+			const el = document.querySelector(href);
+			if (el) el.scrollIntoView({ behavior: "smooth" });
+			setIsMenuOpen(false);
+		}
 	};
 
 	return (
@@ -52,6 +59,7 @@ function Header() {
 						<Link
 							key={item.name}
 							href={item.href}
+							onClick={(e) => handleNavClick(e, item.href)}
 							className="text-gray-700 dark:text-white hover:text-purple-700 dark:hover:text-cyan-400 transition-colors duration-200 ease-in-out text-sm"
 						>
 							{item.name}
@@ -113,8 +121,8 @@ function Header() {
 						<Link
 							key={item.name}
 							href={item.href}
-							onClick={() => setIsMenuOpen(false)} // Close menu on link click
-							className="block text-gray-700 dark:text-white hover:text-purple-700 dark:hover:text-cyan-400 transition-colors duration-200 ease-in-out text-base p-2" // Increased text size slightly for mobile, added padding
+							onClick={(e) => handleNavClick(e, item.href)}
+							className="block text-gray-700 dark:text-white hover:text-purple-700 dark:hover:text-cyan-400 transition-colors duration-200 ease-in-out text-base p-2"
 						>
 							{item.name}
 						</Link>

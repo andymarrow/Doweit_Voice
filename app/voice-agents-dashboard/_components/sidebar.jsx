@@ -49,7 +49,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
 	// Define sidebar items
 	const mainNavItems = [
-		{ name: "Workspace Home", icon: FiHome, href: "/voice-agents-dashboard" },
+		{ name: "Workspace Home", icon: FiHome, href: "/voice-agents" },
 	];
 
 	const agentToolItems = [
