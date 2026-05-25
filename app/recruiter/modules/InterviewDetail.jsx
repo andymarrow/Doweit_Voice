@@ -376,20 +376,20 @@ export const InterviewDetail = ({
     <div className="flex gap-4 min-h-[calc(100vh-4rem)]">
       {/* Sidebar */}
       <aside className="w-52 flex-shrink-0">
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden sticky top-4 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden sticky top-4 shadow-sm">
           {/* Back */}
           <button
             onClick={onBack}
-            className="w-full flex items-center gap-2 px-4 py-3 text-[11px] font-bold text-gray-500 hover:text-purple-700 hover:bg-purple-50 transition-colors border-b border-gray-100 group"
+            className="w-full flex items-center gap-2 px-4 py-3 text-[11px] font-bold text-gray-500 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 group"
           >
-            <div className="w-6 h-6 rounded-lg bg-gray-100 group-hover:bg-purple-100 flex items-center justify-center transition-colors">
+            <div className="w-6 h-6 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/40 flex items-center justify-center transition-colors">
               <ChevronLeft size={12} />
             </div>
             Back to Interviews
           </button>
 
           {/* position title */}
-          <div className="relative px-4 py-4 border-b border-gray-100 bg-gradient-to-br from-purple-50/40 to-blue-50/30">
+          <div className="relative px-4 py-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-br from-purple-50/40 to-blue-50/30 dark:from-purple-900/20 dark:to-blue-900/10">
             {/* avatar + title row */}
             <div className="flex items-start gap-2.5 mb-2">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 text-white flex items-center justify-center font-black text-sm flex-shrink-0 shadow-md shadow-purple-200">
@@ -399,7 +399,7 @@ export const InterviewDetail = ({
                 <p className="text-[9px] font-bold text-purple-400 uppercase tracking-wider mb-0.5">
                   Position
                 </p>
-                <p className="text-xs font-black text-gray-900 line-clamp-2 leading-tight">
+                <p className="text-xs font-black text-gray-900 dark:text-white line-clamp-2 leading-tight">
                   {interview?.title || "Interview"}
                 </p>
               </div>
@@ -408,10 +408,10 @@ export const InterviewDetail = ({
               className={cn(
                 "inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
                 interview?.status === "active"
-                  ? "bg-emerald-100 text-emerald-700"
+                  ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
                   : interview?.status === "closed"
-                    ? "bg-purple-100 text-purple-700"
-                    : "bg-gray-100 text-gray-600",
+                    ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
               )}
             >
               <span
@@ -430,7 +430,7 @@ export const InterviewDetail = ({
 
           {/* nav items */}
           <nav className="p-2 space-y-1">
-            <p className="px-2 pt-1 pb-1 text-[8px] font-black uppercase tracking-widest text-gray-400">
+            <p className="px-2 pt-1 pb-1 text-[8px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">
               Workspace
             </p>
             {tabs.map((t) => {
@@ -443,7 +443,7 @@ export const InterviewDetail = ({
                     "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all group",
                     active
                       ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-200"
-                      : "text-gray-500 hover:bg-purple-50 hover:text-purple-700",
+                      : "text-gray-500 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-gray-700 hover:text-purple-700 dark:hover:text-purple-300",
                   )}
                 >
                   <div
@@ -451,7 +451,7 @@ export const InterviewDetail = ({
                       "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
                       active
                         ? "bg-white/20"
-                        : "bg-gray-100 group-hover:bg-purple-100",
+                        : "bg-gray-100 dark:bg-gray-700 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/40",
                     )}
                   >
                     <t.icon size={12} />
@@ -466,20 +466,20 @@ export const InterviewDetail = ({
           </nav>
 
           {/* mini stats */}
-          <div className="px-3 py-3 border-t border-gray-100 grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-gradient-to-br from-purple-50 to-purple-100/40 border border-purple-100 px-2.5 py-2 text-center">
-              <p className="text-[8px] font-black text-purple-400 uppercase tracking-wider">
+          <div className="px-3 py-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-gradient-to-br from-purple-50 to-purple-100/40 dark:from-purple-900/30 dark:to-purple-900/10 border border-purple-100 dark:border-purple-800 px-2.5 py-2 text-center">
+              <p className="text-[8px] font-black text-purple-400 dark:text-purple-300 uppercase tracking-wider">
                 Total
               </p>
-              <p className="text-sm font-black text-purple-700 mt-0.5">
+              <p className="text-sm font-black text-purple-700 dark:text-purple-200 mt-0.5">
                 {candidates.length}
               </p>
             </div>
-            <div className="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/40 border border-blue-100 px-2.5 py-2 text-center">
-              <p className="text-[8px] font-black text-blue-400 uppercase tracking-wider">
+            <div className="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/10 border border-blue-100 dark:border-blue-800 px-2.5 py-2 text-center">
+              <p className="text-[8px] font-black text-blue-400 dark:text-blue-300 uppercase tracking-wider">
                 Active
               </p>
-              <p className="text-sm font-black text-blue-700 mt-0.5">
+              <p className="text-sm font-black text-blue-700 dark:text-blue-200 mt-0.5">
                 {activeCandidates.length}
               </p>
             </div>

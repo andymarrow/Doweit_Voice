@@ -30,6 +30,7 @@ import {
 } from
   'lucide-react';
 import { cn } from '@/lib/utils';
+import ProfileMenu from '@/components/ProfileMenu';
 
 function RecruiterApp() {
   const searchParams = useSearchParams();
@@ -84,21 +85,21 @@ function RecruiterApp() {
         {/* Sidebar: Section Switcher (Module Specific) */}
         {(activeModule === 'recruiter' || activeModule === 'trainee') &&
           <aside className={cn(
-            "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-screen fixed left-0 top-0 transition-all duration-300 z-40",
+            "bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-screen fixed left-0 top-0 transition-all duration-300 z-40 flex flex-col",
             isSidebarCollapsed ? "w-16" : "w-56"
           )}>
             {/* Shrink/Expand Button */}
             <div className="flex justify-end p-2">
               <button
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-200"
               >
                 {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
               </button>
             </div>
-            
+
             <div className={cn(
-              "px-4 space-y-6 h-full overflow-hidden",
+              "px-4 space-y-6 flex-1 overflow-hidden",
               isSidebarCollapsed ? "hidden" : "block"
             )}>
               <div className="space-y-2">
@@ -140,7 +141,7 @@ function RecruiterApp() {
 
             {/* Icons-only view when collapsed */}
             {isSidebarCollapsed && (
-              <div className="px-2 space-y-4 h-full overflow-hidden">
+              <div className="px-2 space-y-4 flex-1 overflow-hidden">
                 <div className="flex justify-center">
                   <div className="w-8 h-8 bg-purple-600 dark:bg-purple-500 rounded flex items-center justify-center text-white text-xs font-bold">H</div>
                 </div>
@@ -163,6 +164,12 @@ function RecruiterApp() {
                 </div>
               </div>
             )}
+
+            {/* Profile menu — pinned to the bottom of the sidebar so the user
+                can change theme + log out from anywhere in /recruiter. */}
+            <div className="border-t border-gray-100 dark:border-gray-700 px-2 py-3">
+              <ProfileMenu collapsed={isSidebarCollapsed} variant="purple" />
+            </div>
           </aside>
         }
 
@@ -186,9 +193,11 @@ function RecruiterApp() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* Full-screen InterviewDetail overlay */}
+      {/* Full-screen InterviewDetail overlay — respect the current theme.
+          Previously hard-coded to bg-gray-50, which made the overlay always
+          render light even when the rest of the app was in dark mode. */}
       {activeSection === 'interviews' && selectedInterviewId && (
-        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-y-auto">
           <div className="p-6 min-h-screen">
             <InterviewDetail
               interviewId={selectedInterviewId}

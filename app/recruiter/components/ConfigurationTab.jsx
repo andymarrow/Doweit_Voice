@@ -11,9 +11,11 @@ import {
   FileText,
   Loader2,
   RotateCcw,
+  Mic2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "react-hot-toast";
+import VoiceModal from "@/app/characterai/create/_components/VoiceModal";
 
 // Convert a Date-ish value to the "YYYY-MM-DD" format an <input type="date"> expects.
 function toDateInput(v) {
@@ -43,6 +45,9 @@ function buildForm(interview) {
     candidateEvaluation: interview?.candidateEvaluation || "",
     systemPrompt: interview?.systemPrompt || "",
     agentName: interview?.agentName || "",
+    voiceProvider: interview?.voiceProvider || "vapi",
+    voiceId: interview?.voiceId || "",
+    voiceName: interview?.voiceName || interview?.voiceId || "",
   };
 }
 
@@ -52,6 +57,21 @@ const EXPERIENCE_LEVELS = ["junior", "mid", "senior", "expert"];
 export const ConfigurationTab = ({ interview, onSaved }) => {
   const [form, setForm] = useState(() => buildForm(interview));
   const [saving, setSaving] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+
+  // Snap a voice selected in the modal back into the form. The modal returns
+  // VapiVoice objects; we keep provider + id + name so the interview agent
+  // can re-render the selection without re-querying /api/voices.
+  const handleVoiceSelected = (voice) => {
+    const platform = (voice.platform || voice.provider || "vapi").toLowerCase();
+    setForm((p) => ({
+      ...p,
+      voiceProvider: platform,
+      voiceId: voice.voiceId,
+      voiceName: voice.name,
+    }));
+    setIsVoiceModalOpen(false);
+  };
 
   // Reset form whenever the parent's interview row changes (e.g., after save).
   useEffect(() => {
@@ -100,6 +120,8 @@ export const ConfigurationTab = ({ interview, onSaved }) => {
         candidateEvaluation: form.candidateEvaluation,
         systemPrompt: form.systemPrompt,
         agentName: form.agentName,
+        voiceProvider: form.voiceProvider,
+        voiceId: form.voiceId,
       };
 
       const res = await fetch("/api/recruiter/createInterview", {
@@ -321,6 +343,36 @@ export const ConfigurationTab = ({ interview, onSaved }) => {
               </Field>
             </div>
           </Panel>
+
+          {/* Voice picker — opens the same VoiceModal used at creation time
+              so the recruiter can swap the interviewer's voice after the fact. */}
+          <Panel
+            icon={Mic2}
+            title="Interviewer Voice"
+            subtitle="Change the voice that conducts the interview"
+            accent="indigo"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex-1 px-3.5 py-2.5 rounded-xl bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-indigo-100 overflow-hidden">
+                <p className="text-[11px] font-bold text-indigo-900 truncate">
+                  {form.voiceName || form.voiceId || "No voice selected"}
+                </p>
+                <p className="text-[10px] text-indigo-500 mt-0.5">
+                  Provider: {form.voiceProvider || "—"}
+                  {form.voiceId && form.voiceName && form.voiceName !== form.voiceId
+                    ? ` · ID: ${form.voiceId}`
+                    : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVoiceModalOpen(true)}
+                className="px-3 py-2.5 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white text-xs font-bold hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-sm"
+              >
+                Change Voice
+              </button>
+            </div>
+          </Panel>
         </div>
 
         {/* ─── RIGHT COLUMN ──────────────────────────────────────────── */}
@@ -410,6 +462,14 @@ export const ConfigurationTab = ({ interview, onSaved }) => {
           </Panel>
         </div>
       </div>
+
+      {/* Voice picker modal — shared with the recruitment creation flow so the
+          recruiter sees the exact same voice catalog they had at creation. */}
+      <VoiceModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onVoiceSelect={handleVoiceSelected}
+      />
     </div>
   );
 };

@@ -416,6 +416,8 @@ const EDITABLE_FIELDS = new Set([
   // Recruiter-editable AI behavior
   'systemPrompt',
   'agentName',
+  'voiceProvider',
+  'voiceId',
 ]);
 
 export async function PATCH(request) {
