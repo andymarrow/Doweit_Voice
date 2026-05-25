@@ -34,7 +34,7 @@ const agentData = [
     }
 ];
 
-function Hero() {
+function Jero() {
     const { theme } = useTheme();
     const [isMounted, setIsMounted] = useState(false);
 
@@ -320,4 +320,4 @@ function Hero() {
   );
 }
 
-export default Hero;
+export default Jero;

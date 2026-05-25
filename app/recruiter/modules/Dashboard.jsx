@@ -49,11 +49,15 @@ export const RecruiterDashboard = ({ onNavigate }) => {
       }
 
       // Each fetch is independent — one failure doesn't kill the rest.
+      // cache: 'no-store' is critical: without it, the browser was serving
+      // a stale "Total Positions: 2" response from HTTP cache even after
+      // the recruiter deleted all their positions.
+      const ts = Date.now(); // cache-bust query param as a belt-and-braces guard
       const [dashboardRes, candidatesRes, activitiesRes] =
         await Promise.allSettled([
-          fetch(`/api/recruiter/dashboard?userId=${encodeURIComponent(userId)}`),
-          fetch(`/api/recruiter/applications`),
-          fetch(`/api/recruiter/activities?limit=15`),
+          fetch(`/api/recruiter/dashboard?userId=${encodeURIComponent(userId)}&_=${ts}`, { cache: 'no-store' }),
+          fetch(`/api/recruiter/applications?_=${ts}`, { cache: 'no-store' }),
+          fetch(`/api/recruiter/activities?limit=15&_=${ts}`, { cache: 'no-store' }),
         ]);
 
       if (dashboardRes.status === "fulfilled" && dashboardRes.value.ok) {
@@ -187,43 +191,6 @@ export const RecruiterDashboard = ({ onNavigate }) => {
   }
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {(analytics?.overview?.totalPositions ?? 0) === 0 &&
-        session?.user?.id && (
-          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
-            <AlertCircle
-              size={16}
-              className="text-amber-600 flex-shrink-0 mt-0.5"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-amber-800">
-                Not seeing your data?
-              </p>
-              <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
-                The dashboard only shows positions where{" "}
-                <code className="px-1 py-0.5 rounded bg-amber-100 font-mono text-[10px]">
-                  job_positions.user_id
-                </code>{" "}
-                equals your logged-in user id. If you inserted data manually,
-                make sure the row's <code className="font-mono">user_id</code>{" "}
-                matches the value below.
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="text-[10px] font-mono bg-white border border-amber-200 px-2 py-1 rounded select-all break-all">
-                  {session.user.id}
-                </code>
-                <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(session.user.id);
-                  }}
-                  className="text-[10px] font-bold text-amber-700 hover:text-amber-900 px-2 py-1 rounded hover:bg-amber-100 transition-colors"
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold tracking-tight">

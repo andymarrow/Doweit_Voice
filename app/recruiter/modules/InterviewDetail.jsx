@@ -313,7 +313,12 @@ export const InterviewDetail = ({
           />
         );
       case "configuration":
-        return <ConfigurationTab interview={interview} />;
+        return (
+          <ConfigurationTab
+            interview={interview}
+            onSaved={(updated) => setInterview((prev) => ({ ...prev, ...updated }))}
+          />
+        );
       case "evaluation":
         return (
           <EvaluationTab
@@ -370,74 +375,113 @@ export const InterviewDetail = ({
   return (
     <div className="flex gap-4 min-h-[calc(100vh-4rem)]">
       {/* Sidebar */}
-      <aside className="w-44 flex-shrink-0">
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden sticky top-4">
+      <aside className="w-52 flex-shrink-0">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden sticky top-4 shadow-sm">
           {/* Back */}
           <button
             onClick={onBack}
-            className="w-full flex items-center gap-2 px-3 py-3 text-xs font-bold text-gray-500 hover:text-purple-700 hover:bg-purple-50 transition-colors border-b border-gray-100"
+            className="w-full flex items-center gap-2 px-4 py-3 text-[11px] font-bold text-gray-500 hover:text-purple-700 hover:bg-purple-50 transition-colors border-b border-gray-100 group"
           >
-            <ChevronLeft size={14} /> Back
+            <div className="w-6 h-6 rounded-lg bg-gray-100 group-hover:bg-purple-100 flex items-center justify-center transition-colors">
+              <ChevronLeft size={12} />
+            </div>
+            Back to Interviews
           </button>
 
           {/* position title */}
-          <div className="px-3 py-3 border-b border-gray-100">
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Position
-            </p>
-            <p className="text-xs font-bold text-gray-800 line-clamp-2 leading-tight">
-              {interview?.title || "Interview"}
-            </p>
+          <div className="relative px-4 py-4 border-b border-gray-100 bg-gradient-to-br from-purple-50/40 to-blue-50/30">
+            {/* avatar + title row */}
+            <div className="flex items-start gap-2.5 mb-2">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 text-white flex items-center justify-center font-black text-sm flex-shrink-0 shadow-md shadow-purple-200">
+                {(interview?.title || "?").charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold text-purple-400 uppercase tracking-wider mb-0.5">
+                  Position
+                </p>
+                <p className="text-xs font-black text-gray-900 line-clamp-2 leading-tight">
+                  {interview?.title || "Interview"}
+                </p>
+              </div>
+            </div>
             <span
               className={cn(
-                "inline-block mt-1.5 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
+                "inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
                 interview?.status === "active"
-                  ? "bg-blue-100 text-blue-700"
+                  ? "bg-emerald-100 text-emerald-700"
                   : interview?.status === "closed"
                     ? "bg-purple-100 text-purple-700"
                     : "bg-gray-100 text-gray-600",
               )}
             >
+              <span
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  interview?.status === "active"
+                    ? "bg-emerald-500"
+                    : interview?.status === "closed"
+                      ? "bg-purple-500"
+                      : "bg-gray-400",
+                )}
+              />
               {interview?.status || "Draft"}
             </span>
           </div>
 
           {/* nav items */}
-          <nav className="p-2 space-y-0.5">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => onTabChange?.(t.id)}
-                className={cn(
-                  "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-bold transition-all",
-                  tab === t.id
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-gray-500 hover:bg-purple-50 hover:text-purple-700",
-                )}
-              >
-                <t.icon size={13} />
-                {t.label}
-              </button>
-            ))}
+          <nav className="p-2 space-y-1">
+            <p className="px-2 pt-1 pb-1 text-[8px] font-black uppercase tracking-widest text-gray-400">
+              Workspace
+            </p>
+            {tabs.map((t) => {
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => onTabChange?.(t.id)}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all group",
+                    active
+                      ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-200"
+                      : "text-gray-500 hover:bg-purple-50 hover:text-purple-700",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
+                      active
+                        ? "bg-white/20"
+                        : "bg-gray-100 group-hover:bg-purple-100",
+                    )}
+                  >
+                    <t.icon size={12} />
+                  </div>
+                  <span className="flex-1 text-left truncate">{t.label}</span>
+                  {active && (
+                    <span className="w-1 h-1 rounded-full bg-white/80" />
+                  )}
+                </button>
+              );
+            })}
           </nav>
 
           {/* mini stats */}
-          <div className="px-3 py-3 border-t border-gray-100 space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] font-bold text-gray-400 uppercase">
-                Candidates
-              </span>
-              <span className="text-xs font-black text-purple-700">
+          <div className="px-3 py-3 border-t border-gray-100 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-gradient-to-br from-purple-50 to-purple-100/40 border border-purple-100 px-2.5 py-2 text-center">
+              <p className="text-[8px] font-black text-purple-400 uppercase tracking-wider">
+                Total
+              </p>
+              <p className="text-sm font-black text-purple-700 mt-0.5">
                 {candidates.length}
-              </span>
+              </p>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] font-bold text-gray-400 uppercase">
+            <div className="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/40 border border-blue-100 px-2.5 py-2 text-center">
+              <p className="text-[8px] font-black text-blue-400 uppercase tracking-wider">
                 Active
-              </span>
-              <span className="text-xs font-black text-blue-700">
+              </p>
+              <p className="text-sm font-black text-blue-700 mt-0.5">
                 {activeCandidates.length}
-              </span>
+              </p>
             </div>
           </div>
         </div>

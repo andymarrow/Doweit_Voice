@@ -232,7 +232,17 @@ export default function TraineeInterviewPage() {
   // ─── Start interview ─────────────────────────────────────────────────
   const startInterview = async () => {
     if (!interviewData) return toast.error('Interview data not loaded');
-    if (!activeInterview.canStart) return toast.error('Interview engine is not ready');
+
+    // If a previous attempt left the hook in 'error' or 'ended' state,
+    // canStart goes false and clicking Start would otherwise dead-end with
+    // "Interview engine is not ready". Reset and proceed — only block while
+    // an attempt is actively connecting/in-progress.
+    if (!activeInterview.canStart) {
+      if (activeInterview.isConnecting || activeInterview.isActive) {
+        return toast.error('An interview is already in progress');
+      }
+      try { activeInterview.reset?.(); } catch {}
+    }
 
     // Build a candidate-shaped object the existing hooks expect.
     const candidate = {

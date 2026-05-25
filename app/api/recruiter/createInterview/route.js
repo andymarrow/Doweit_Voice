@@ -364,3 +364,86 @@ export async function DELETE(request) {
     );
   }
 }
+
+// PATCH - Update editable fields on a position. Used by the Configuration tab
+// in the recruiter's per-interview workspace. Only fields the user is allowed
+// to edit are accepted; everything else (aiQuestions, evaluationCriteria,
+// systemPrompt, etc.) has dedicated routes.
+const EDITABLE_FIELDS = new Set([
+  'title',
+  'department',
+  'description',
+  'evaluationDescription',
+  'location',
+  'employmentType',
+  'requiredExperience',
+  'language',
+  'duration',
+  'questionCount',
+  'antiCheatEnabled',
+  'startDate',
+  'endDate',
+  'registrationStartDate',
+  'registrationEndDate',
+  'price',
+  'accessType',
+  'status',
+  'tone',
+  'candidateEvaluation',
+]);
+
+export async function PATCH(request) {
+  try {
+    const session = await auth.api.getSession({ headers: request.headers });
+    const userId = session?.user?.id;
+    if (!userId) {
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { positionId, ...rest } = body || {};
+    if (!positionId) {
+      return NextResponse.json({ error: 'positionId is required' }, { status: 400 });
+    }
+
+    // Filter to the whitelist + coerce date strings to Date objects
+    const dateFields = new Set(['startDate', 'endDate', 'registrationStartDate', 'registrationEndDate']);
+    const updates = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (!EDITABLE_FIELDS.has(k)) continue;
+      if (v === '' || v === undefined) continue;
+      if (dateFields.has(k)) {
+        updates[k] = v === null ? null : new Date(v);
+      } else {
+        updates[k] = v;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No editable fields provided' }, { status: 400 });
+    }
+
+    const [updated] = await db
+      .update(jobPositions)
+      .set(updates)
+      .where(
+        and(
+          eq(jobPositions.id, positionId),
+          eq(jobPositions.userId, userId),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Position not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Update Interview Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update interview', details: error.message },
+      { status: 500 }
+    );
+  }
+}
