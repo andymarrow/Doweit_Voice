@@ -71,11 +71,11 @@ const features = [
 ];
 
 const logos = [
-  { icon: <Bot className="w-6 h-6" />, name: "OpenAI" },
-  { icon: <Zap className="w-6 h-6" />, name: "Gemini" },
-  { icon: <ShieldCheck className="w-6 h-6" />, name: "DeepSeek" },
-  { icon: <MessageSquare className="w-6 h-6" />, name: "Grok" },
-  { icon: <Mic className="w-6 h-6" />, name: "Vapi" },
+  { Icon: Bot,          name: "OpenAI",   color: "text-violet-500",  bg: "bg-violet-500/10"  },
+  { Icon: Zap,          name: "Gemini",   color: "text-yellow-400",  bg: "bg-yellow-400/10"  },
+  { Icon: ShieldCheck,  name: "DeepSeek", color: "text-cyan-400",    bg: "bg-cyan-400/10"    },
+  { Icon: MessageSquare,name: "Grok",     color: "text-rose-500",    bg: "bg-rose-500/10"    },
+  { Icon: Mic,          name: "Vapi",     color: "text-purple-500",  bg: "bg-purple-500/10"  },
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -381,15 +381,26 @@ export default function App() {
         </motion.section>
 
         {/* ── Logos Marquee ─────────────────────────────── */}
-        <section className="py-12 border-y border-border-color bg-surface/50 overflow-hidden">
-          {/* CSS keyframe handles the scroll — framer-motion % is unreliable here */}
+        <section
+          className="py-14 border-y border-border-color bg-surface/50 overflow-hidden"
+          style={{ maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)' }}
+        >
+          <p className="text-center text-xs font-semibold tracking-widest text-text-secondary uppercase mb-8">
+            Powered by the best in AI
+          </p>
           <div
-            className="flex items-center gap-16 opacity-60 grayscale hover:grayscale-0 hover:[animation-play-state:paused] transition-all duration-500 animate-marquee"
-            style={{ width: 'max-content', paddingRight: '4rem' }}
+            className="flex items-center gap-6 animate-marquee"
+            style={{ width: 'max-content', paddingRight: '1.5rem' }}
           >
-            {[...logos, ...logos].map((logo, i) => (
-              <div key={i} className="flex items-center gap-2 text-xl font-bold whitespace-nowrap shrink-0">
-                {logo.icon} {logo.name}
+            {[...logos, ...logos, ...logos].map((logo, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-2.5 whitespace-nowrap shrink-0 px-5 py-2.5 rounded-full border border-border-color ${logo.bg} hover:border-primary/30 transition-all duration-300 group`}
+              >
+                <logo.Icon className={`w-5 h-5 ${logo.color}`} />
+                <span className="text-sm font-semibold text-text-main">
+                  {logo.name}
+                </span>
               </div>
             ))}
           </div>

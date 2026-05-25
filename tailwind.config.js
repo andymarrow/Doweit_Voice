@@ -102,7 +102,7 @@ module.exports = {
   		animation: {
   			run: 'run 2s linear infinite',
   			spotlight: 'spotlight 2s ease 0.75s 1 forwards',
-  			marquee: 'marquee 22s linear infinite'
+  			marquee: 'marquee 18s linear infinite'
   		}
   	}
   },
