@@ -4,17 +4,13 @@ import React, { useState, useEffect } from 'react';
 // import { useParams } from 'next/navigation'; // No longer strictly needed, but can keep if you use it elsewhere
 import { motion } from 'framer-motion';
 import {
-    FiSave, FiEdit3, FiFileText, FiCpu, FiCheck, FiBookOpen, FiLoader // Icons
+    FiSave, FiEdit3, FiBookOpen, FiLoader // Icons
 } from 'react-icons/fi'; // Import necessary icons, including FiLoader
 import { toast } from 'react-hot-toast'; // Assuming you use react-hot-toast or similar
 
 import { useRouter } from "next/navigation";
 // Import context hook
 import { useCallAgent } from '../_context/CallAgentContext';
-
-// Import components
-import UseTemplateModal from './_component/UseTemplateModal'; // Use _components path
-import AskDoweitChatModal from './_component/AskDoweitChatModal'; // Use _components path
 
 // Import constants
 import { uiColors } from '../../_constants/uiConstants';    // Adjust path as necessary
@@ -58,8 +54,6 @@ export default function PromptPage() {
     // State for UI control
     const [isEditing, setIsEditing] = useState(false); // Controls if prompt textarea is editable
     const [isFlowDesignerEnabled, setIsFlowDesignerEnabled] = useState(false); // Controls Prompt/Flow Designer toggle
-    const [showTemplateModal, setShowTemplateModal] = useState(false); // Controls Use Template modal
-    const [showDoweitChatModal, setShowDoweitChatModal] = useState(false); // Controls Ask DoweitChat modal
 
     // State to track loading/saving status and dirty state
     const [isLoading, setIsLoading] = useState(true); // Loading initial data from context
@@ -89,12 +83,6 @@ export default function PromptPage() {
         }
     }, [initialAgent]); // Dependency on initialAgent
 
-
-    // Handlers for Modals
-    const openTemplateModal = () => setShowTemplateModal(true);
-    const closeTemplateModal = () => setShowTemplateModal(false);
-    const openDoweitChatModal = () => setShowDoweitChatModal(true);
-    const closeDoweitChatModal = () => setShowDoweitChatModal(false);
 
     // Handler for Edit Prompt Button
     const handleEditToggle = () => {
@@ -191,34 +179,6 @@ export default function PromptPage() {
          }
     };
 
-    // Handler for using a template from the modal
-    // This replaces the current prompt text
-    const handleUseTemplate = (templatePrompt) => {
-        console.log("[Prompt Page] Using template:", templatePrompt);
-        setPromptText(templatePrompt); // Replace the main prompt text
-        setIsDirty(true); // Mark as dirty
-        setIsEditing(true); // Automatically enter editing mode if using a template
-        closeTemplateModal(); // Close the modal
-         toast.success('Template applied! Remember to Save.');
-    };
-
-    // Handler for adding knowledge base content from the modal
-    // For simplicity, this appends to the main prompt text.
-    // A more complex implementation would save to a separate KB entry.
-    const handleAddKnowledgeBase = (kbContent) => {
-         console.log("[Prompt Page] Adding KB content:", kbContent);
-         setPromptText(prevPrompt => {
-             // Append the new content, maybe with a separator if existing content exists
-             const separator = prevPrompt.trim() ? "\n\n---\n\nKnowledge Base Content:\n\n" : "Knowledge Base Content:\n\n"; // Add a clear separator
-             return prevPrompt.trim() + separator + kbContent.trim();
-        });
-        setIsDirty(true); // Mark as dirty
-         setIsEditing(true); // Automatically enter editing mode if adding KB content
-        closeTemplateModal(); // Close the modal
-         toast.success('Knowledge Base content added to prompt! Remember to Save.');
-    };
-
-
     // Show loading state if initial agent data is not yet ready
      if (isLoading || !initialAgent) {
          return (
@@ -267,18 +227,6 @@ export default function PromptPage() {
 
                 {/* Right: Action Buttons */}
                 <div className="flex flex-wrap w-full sm:w-auto sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 justify-end"> {/* Added justify-end */}
-                    <button
-                         onClick={openTemplateModal}
-                         className={`inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none w-full sm:w-auto`}
-                     >
-                         <FiFileText className="mr-2 w-4 h-4" /> Use a template
-                     </button>
-                     <button
-                         onClick={openDoweitChatModal}
-                         className={`inline-flex items-center justify-center px-4 py-2 text-sm font-semibold rounded-md transition-colors ${uiColors.bgSecondary} ${uiColors.textPrimary} ${uiColors.hoverBgSubtle} ${uiColors.ringAccentShade} focus:ring-1 outline-none w-full sm:w-auto`}
-                     >
-                         <FiCpu className="mr-2 w-4 h-4" /> Ask DoweitChat
-                     </button>
                      {/* Edit/Done Editing Button */}
                      <button
                          onClick={handleEditToggle}
@@ -399,21 +347,6 @@ export default function PromptPage() {
                  </motion.div>
              )}
 
-
-            {/* Render Modals */}
-             <UseTemplateModal
-                isOpen={showTemplateModal}
-                onClose={closeTemplateModal}
-                onUseTemplate={handleUseTemplate} // Pass handler for using a template
-                 // Pass the simplified handler for adding KB content (appends to prompt)
-                onAddKnowledgeBase={handleAddKnowledgeBase}
-             />
-             <AskDoweitChatModal
-                isOpen={showDoweitChatModal}
-                onClose={closeDoweitChatModal}
-                agentId={agentId} // Pass agentId
-                 agent={initialAgent} // Pass the whole agent object for context
-             />
 
         </motion.div>
     );

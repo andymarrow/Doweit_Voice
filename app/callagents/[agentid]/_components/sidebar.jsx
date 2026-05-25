@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 
 import {
-    FiLayers, FiEdit3, FiZap, FiCompass, FiPhoneCall, FiFileText, FiUploadCloud, // Example Icons
+    FiLayers, FiEdit3, FiZap, FiCompass, FiPhoneCall, FiFileText, // Example Icons
     FiChevronLeft, FiChevronRight,
     FiCopy, FiCheck, // Added Copy and Check icons
     FiShare2 // Integrations
@@ -26,7 +26,6 @@ const detailSidebarNavItems = [
     { name: 'Configure', icon: FiEdit3, hrefSegment: 'configure' },
     { name: 'Prompt', icon: FiFileText, hrefSegment: 'prompt' },
     { name: 'Actions', icon: FiZap, hrefSegment: 'actions' },
-    { name: 'Deployment', icon: FiUploadCloud, hrefSegment: 'deployment' },
     { name: 'Calls', icon: FiPhoneCall, hrefSegment: 'calls' },
     { name: 'Integrations', icon: FiShare2, hrefSegment: 'integrations' }
 ];

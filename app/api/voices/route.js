@@ -21,6 +21,30 @@ const GEMINI_VOICES = [
     'Zubenelgenubi', 'Vindemiatrix', 'Sadchibia', 'Sadaltager', 'Sulafat'
 ];
 
+// --- Hardcoded Vapi built-in voices (provider: "vapi") ---
+// These ship with Vapi out of the box and don't require the user to create
+// an assistant per voice. Names are the voiceId Vapi expects when you call
+// the API with provider: "vapi".
+const VAPI_DEFAULT_VOICES = [
+    'Elliot', 'Rohan', 'Lily', 'Savannah', 'Hana', 'Neha', 'Cole', 'Harry',
+    'Paige', 'Spencer',
+    'Zoe', 'Zac', 'Mia', 'Dan', 'Leo', 'Jess', 'Tara', 'Leah', 'Gustavo',
+    'Sid', 'Naina', 'Kai', 'Neil', 'Sagar', 'Nico', 'Godfrey', 'Clara',
+    'Layla', 'Emma'
+];
+
+function getVapiDefaultVoices() {
+    return VAPI_DEFAULT_VOICES.map((voiceName) => ({
+        id: `vapi-${voiceName}`,
+        voiceId: voiceName,
+        name: voiceName,
+        description: 'Vapi default voice',
+        sampleAudioUrl: null,
+        platform: 'vapi',
+        provider: 'vapi',
+    }));
+}
+
 // Fetch voices by reading the voice config from user-created Vapi assistants.
 // Each assistant represents a voice persona — the assistant name is the voice
 // name and assistant.voice contains the provider + voiceId to use.
@@ -118,10 +142,12 @@ export async function GET(request) {
 		]);
 
 		const geminiVoices = getGeminiVoices();
+		const vapiDefaultVoices = getVapiDefaultVoices();
 
 		// Merge — custom voices overwrite duplicates
 		const combinedVoicesMap = new Map();
 		geminiVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
+		vapiDefaultVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
 		vapiVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
 		customVoices.forEach((voice) => combinedVoicesMap.set(voice.id, voice));
 
