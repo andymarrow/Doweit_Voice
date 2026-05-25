@@ -12,6 +12,31 @@ import { auth } from "@/lib/auth";
 
 import nodemailer from "nodemailer";
 
+// Build the public-facing app URL the candidate's interview link points at.
+// The old code hard-coded `${process.env.NEXT_PUBLIC_APP_URL}interview/…` which
+// rendered as "undefinedinterview/…" whenever that env var was missing in
+// production. We now try several known env vars, fall back to the incoming
+// request's own origin, and only as a last resort use localhost. We also
+// strip any trailing slashes from the base so the final URL has exactly one
+// slash before "interview/…".
+function getAppBaseUrl(request) {
+  const candidates = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_BASE_URL,
+    process.env.BASE_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  ];
+  let base = candidates.find((v) => typeof v === "string" && v.trim());
+  if (!base) {
+    const origin = request?.headers?.get?.("origin");
+    const host = request?.headers?.get?.("host");
+    const proto = request?.headers?.get?.("x-forwarded-proto") || "https";
+    base = origin || (host ? `${proto}://${host}` : null);
+  }
+  if (!base) base = "http://localhost:3000";
+  return base.trim().replace(/\/+$/, "");
+}
+
 // Gmail SMTP — free, works on localhost, no domain verification needed.
 // Set EMAIL_USER (your gmail) and EMAIL_APP_PASSWORD (Gmail App Password,
 // 16-char code from https://myaccount.google.com/apppasswords) in .env.local.
@@ -113,6 +138,10 @@ export async function POST(request) {
 
     console.log(`Found ${candidates.length} candidates`);
 
+    // Resolve the base URL once per request — same value used for every email.
+    const appBaseUrl = getAppBaseUrl(request);
+    console.log(`Using interview base URL: ${appBaseUrl}`);
+
     const sentEmails = [];
 
     for (const candidate of candidates) {
@@ -130,7 +159,7 @@ export async function POST(request) {
             { status: 401 },
           );
         }
-        const generatedLink = `${process.env.NEXT_PUBLIC_APP_URL}interview/${interviewLink[0].linkId}/${candidate.publicId}`;
+        const generatedLink = `${appBaseUrl}/interview/${interviewLink[0].linkId}/${candidate.publicId}`;
 
         const html = `
 

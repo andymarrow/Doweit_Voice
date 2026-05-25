@@ -4,6 +4,29 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { GoogleGenAI, Modality } from '@google/genai';
 
+// Phrases the AI interviewer says when the interview is done. We watch the
+// streamed AI transcript for these and auto-stop the session, so the
+// candidate doesn't have to manually click "End" after the goodbye.
+const END_PHRASES = [
+    'thank you for completing the interview',
+    'thanks for completing the interview',
+    'thanks for joining',
+    'thank you for your time',
+    'we are done with the interview',
+    "we're done with the interview",
+    'that concludes our interview',
+    'that wraps up the interview',
+    'this concludes the interview',
+    'goodbye',
+    'have a great day',
+];
+
+function transcriptEndsTheInterview(text) {
+    if (!text) return false;
+    const lower = String(text).toLowerCase();
+    return END_PHRASES.some((phrase) => lower.includes(phrase));
+}
+
 // Fetch the Google API key from the backend — same endpoint as TestAgentSidePanel
 const getGoogleKey = async () => {
     try {
@@ -56,8 +79,19 @@ export function useGeminiInterview() {
     const transcriptRef         = useRef([]);
     const interviewDataRef      = useRef(null);
     const candidateDataRef      = useRef(null);
+    // Latches once we've decided the interview is over so multiple end-phrase
+    // matches don't fire stopInterview() repeatedly.
+    const endTriggeredRef       = useRef(false);
+    const endTimerRef           = useRef(null);
 
     useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
+
+    useEffect(() => () => {
+        if (endTimerRef.current) {
+            clearTimeout(endTimerRef.current);
+            endTimerRef.current = null;
+        }
+    }, []);
 
     // ── Playback helpers ───────────────────────────────────────────────────────
     const cancelScheduledPlayback = useCallback(() => {
@@ -182,6 +216,26 @@ export function useGeminiInterview() {
                 : [...prev, { role: 'AI', text, timestamp: new Date().toISOString() }];
             transcriptRef.current = next;
             setTranscript(next);
+
+            // Auto-end when the AI announces the interview is over. Inspect the
+            // accumulated AI bubble so we still match phrases that were split
+            // across streaming chunks. Delay the stop so the goodbye audio
+            // finishes playing first.
+            const aggregated = next[next.length - 1]?.text || '';
+            if (
+                !endTriggeredRef.current &&
+                transcriptEndsTheInterview(aggregated)
+            ) {
+                endTriggeredRef.current = true;
+                if (endTimerRef.current) clearTimeout(endTimerRef.current);
+                endTimerRef.current = setTimeout(() => {
+                    const session = geminiSessionRef.current;
+                    geminiSessionRef.current = null;
+                    if (session) { try { session.close(); } catch (_) {} }
+                    stopAudioIO();
+                    setCallStatus('ended');
+                }, 2500);
+            }
         }
 
         // Candidate transcript
@@ -201,7 +255,7 @@ export function useGeminiInterview() {
                 setCurrentQuestionIndex(prev => prev < total - 1 ? prev + 1 : prev);
             }
         }
-    }, [cancelScheduledPlayback, playStreamedAudio]);
+    }, [cancelScheduledPlayback, playStreamedAudio, stopAudioIO]);
 
     // ── Start interview ────────────────────────────────────────────────────────
     const startInterview = useCallback(async (interviewData, candidateData) => {
@@ -220,6 +274,11 @@ export function useGeminiInterview() {
         interviewDataRef.current  = interviewData;
         candidateDataRef.current  = candidateData;
         transcriptRef.current     = [];
+        endTriggeredRef.current   = false;
+        if (endTimerRef.current) {
+            clearTimeout(endTimerRef.current);
+            endTimerRef.current = null;
+        }
 
         setIsConnecting(true);
         setCallStatus('connecting');
@@ -389,6 +448,11 @@ export function useGeminiInterview() {
         transcriptRef.current    = [];
         interviewDataRef.current = null;
         candidateDataRef.current = null;
+        endTriggeredRef.current  = false;
+        if (endTimerRef.current) {
+            clearTimeout(endTimerRef.current);
+            endTimerRef.current = null;
+        }
     }, [stopAudioIO]);
 
     // Cleanup on unmount

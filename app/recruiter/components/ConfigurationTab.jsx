@@ -41,6 +41,8 @@ function buildForm(interview) {
     registrationStartDate: toDateInput(interview?.registrationStartDate),
     registrationEndDate: toDateInput(interview?.registrationEndDate),
     candidateEvaluation: interview?.candidateEvaluation || "",
+    systemPrompt: interview?.systemPrompt || "",
+    agentName: interview?.agentName || "",
   };
 }
 
@@ -96,6 +98,8 @@ export const ConfigurationTab = ({ interview, onSaved }) => {
         registrationStartDate: form.registrationStartDate || null,
         registrationEndDate: form.registrationEndDate || null,
         candidateEvaluation: form.candidateEvaluation,
+        systemPrompt: form.systemPrompt,
+        agentName: form.agentName,
       };
 
       const res = await fetch("/api/recruiter/createInterview", {
@@ -292,21 +296,31 @@ export const ConfigurationTab = ({ interview, onSaved }) => {
             </div>
           </Panel>
 
-          {/* System prompt (read-only) */}
-          {interview?.systemPrompt && (
-            <Panel
-              icon={Zap}
-              title="System Prompt"
-              subtitle="Generated AI behavior — read only"
-              accent="indigo"
-            >
-              <div className="h-48 overflow-y-auto rounded-xl bg-gradient-to-br from-slate-50 to-purple-50/30 border border-purple-100 p-3.5">
-                <pre className="text-[11px] text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
-                  {interview.systemPrompt}
-                </pre>
-              </div>
-            </Panel>
-          )}
+          {/* System prompt (editable) */}
+          <Panel
+            icon={Zap}
+            title="System Prompt"
+            subtitle="The AI interviewer's behavior — fully editable"
+            accent="indigo"
+          >
+            <textarea
+              value={form.systemPrompt}
+              onChange={(e) => setField("systemPrompt", e.target.value)}
+              rows={12}
+              placeholder="The agent's system prompt. This is what guides how the AI interviewer asks questions and reacts to candidate answers."
+              className="w-full rounded-xl bg-gradient-to-br from-slate-50 to-purple-50/30 border border-purple-100 p-3.5 text-[11px] text-gray-700 whitespace-pre-wrap font-mono leading-relaxed resize-y focus:outline-none focus:border-purple-300 focus:ring-2 focus:ring-purple-100 transition"
+            />
+            <div className="mt-3">
+              <Field label="Agent Name">
+                <input
+                  value={form.agentName}
+                  onChange={(e) => setField("agentName", e.target.value)}
+                  placeholder="e.g. Viktor"
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+          </Panel>
         </div>
 
         {/* ─── RIGHT COLUMN ──────────────────────────────────────────── */}

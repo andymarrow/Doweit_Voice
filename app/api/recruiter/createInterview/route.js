@@ -16,6 +16,28 @@ function generateSecureId() {
 }
 import { eq, and, desc, inArray } from 'drizzle-orm';
 
+// Build the public-facing app URL the candidate's interview link points at.
+// Same logic as send-interview-emails: try known env vars, fall back to the
+// request's own origin, only use localhost as a last resort. Strip trailing
+// slashes so we don't end up with "https://example.com//interview/…".
+function getAppBaseUrl(request) {
+  const candidates = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_BASE_URL,
+    process.env.BASE_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  ];
+  let base = candidates.find((v) => typeof v === 'string' && v.trim());
+  if (!base) {
+    const origin = request?.headers?.get?.('origin');
+    const host = request?.headers?.get?.('host');
+    const proto = request?.headers?.get?.('x-forwarded-proto') || 'https';
+    base = origin || (host ? `${proto}://${host}` : null);
+  }
+  if (!base) base = 'http://localhost:3000';
+  return base.trim().replace(/\/+$/, '');
+}
+
 // POST - Create new interview position
 export async function POST(request) {
   try {
@@ -123,7 +145,8 @@ export async function POST(request) {
 
     // Generate interview magic link
     const interviewLinkId = nanoid(12);
-    const interviewMagicLink = `${process.env.NEXT_PUBLIC_BASE_URL}/interview/${interviewLinkId}`;
+    const appBaseUrl = getAppBaseUrl(request);
+    const interviewMagicLink = `${appBaseUrl}/interview/${interviewLinkId}`;
 
     // Create interview link
     const [interviewLink] = await db.insert(interviewLinks).values({
@@ -135,7 +158,7 @@ export async function POST(request) {
     }).returning();
 
     // Generate registration magic link (uses same ID as interview link)
-    const registrationMagicLink = `${process.env.NEXT_PUBLIC_BASE_URL}/candidate/${interviewLinkId}`;
+    const registrationMagicLink = `${appBaseUrl}/candidate/${interviewLinkId}`;
 
     // Return success response with all data needed for frontend
     return NextResponse.json({
@@ -390,6 +413,9 @@ const EDITABLE_FIELDS = new Set([
   'status',
   'tone',
   'candidateEvaluation',
+  // Recruiter-editable AI behavior
+  'systemPrompt',
+  'agentName',
 ]);
 
 export async function PATCH(request) {

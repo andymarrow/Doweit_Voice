@@ -6,6 +6,30 @@ import { toast } from 'react-hot-toast';
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY;
 
+// Phrases the AI interviewer says at the end of the conversation. If we hear
+// any of these in an assistant final transcript, we wrap the call up — Vapi
+// would otherwise sit idle until the candidate manually clicks "End" because
+// the model itself doesn't terminate the call.
+const END_PHRASES = [
+    'thank you for completing the interview',
+    'thanks for completing the interview',
+    'thanks for joining',
+    'thank you for your time',
+    'we are done with the interview',
+    "we're done with the interview",
+    'that concludes our interview',
+    'that wraps up the interview',
+    'this concludes the interview',
+    'goodbye',
+    'have a great day',
+];
+
+function transcriptEndsTheInterview(text) {
+    if (!text) return false;
+    const lower = String(text).toLowerCase();
+    return END_PHRASES.some((phrase) => lower.includes(phrase));
+}
+
 export function useVapiInterview() {
     const [isConnecting, setIsConnecting] = useState(false);
     const [callStatus, setCallStatus] = useState('idle');
@@ -18,8 +42,19 @@ export function useVapiInterview() {
     const interviewDataRef = useRef(null);
     const candidateDataRef = useRef(null);
     const transcriptRef = useRef([]);
+    // Latches once we've decided to end the call — prevents firing
+    // vapi.stop() multiple times if several end-phrases land in a row.
+    const endTriggeredRef = useRef(false);
+    const endTimerRef = useRef(null);
 
     useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
+
+    useEffect(() => () => {
+        if (endTimerRef.current) {
+            clearTimeout(endTimerRef.current);
+            endTimerRef.current = null;
+        }
+    }, []);
 
     useEffect(() => {
         if (!VAPI_PUBLIC_KEY || vapiRef.current) return;
@@ -68,6 +103,23 @@ export function useVapiInterview() {
                     const total = (interviewDataRef.current.aiQuestions || []).length;
                     setCurrentQuestionIndex(prev => prev < total - 1 ? prev + 1 : prev);
                 }
+
+                // Auto-close detection. When the AI assistant says one of the
+                // sign-off phrases, schedule a Vapi stop after a short delay so
+                // the audio of the goodbye finishes playing. Vapi's own
+                // endCallPhrases (set in the payload) covers most cases — this
+                // is a belt-and-suspenders fallback for matches it misses.
+                if (
+                    message.role === 'assistant' &&
+                    !endTriggeredRef.current &&
+                    transcriptEndsTheInterview(message.transcript)
+                ) {
+                    endTriggeredRef.current = true;
+                    if (endTimerRef.current) clearTimeout(endTimerRef.current);
+                    endTimerRef.current = setTimeout(() => {
+                        try { vapiRef.current?.stop(); } catch (_) {}
+                    }, 2500);
+                }
             }
         });
 
@@ -89,6 +141,11 @@ export function useVapiInterview() {
         interviewDataRef.current = interviewData;
         candidateDataRef.current = candidateData;
         transcriptRef.current = [];
+        endTriggeredRef.current = false;
+        if (endTimerRef.current) {
+            clearTimeout(endTimerRef.current);
+            endTimerRef.current = null;
+        }
 
         setIsConnecting(true);
         setCallStatus('connecting');
@@ -112,6 +169,13 @@ export function useVapiInterview() {
             else if (providerRaw === 'vapi') voiceProvider = 'vapi';
             else voiceProvider = 'vapi';
 
+            // Cap the call at the configured duration (plus 60s grace) so a
+            // runaway interview can't sit on the line forever.
+            const maxDurationSeconds = Math.max(
+                300,
+                Math.round((Number(interviewData.duration) || 30) * 60) + 60,
+            );
+
             const vapiPayload = {
                 model: {
                     provider: 'google',
@@ -124,6 +188,15 @@ export function useVapiInterview() {
                 },
                 firstMessage: `Hello ${candidateData.candidateName}! Welcome to your interview${interviewData.title ? ` for the ${interviewData.title} role` : ''}. ${firstQuestion}`,
                 recordingEnabled: true,
+                // Vapi will auto-hang-up the call as soon as the assistant says
+                // any of these phrases — no need to wait for an explicit stop.
+                endCallPhrases: [
+                    'thank you for completing the interview',
+                    'goodbye',
+                    'that concludes our interview',
+                    'we are done with the interview',
+                ],
+                maxDurationSeconds,
                 server: {
                     url: process.env.NEXT_PUBLIC_WEBHOOK_URL,
                 },
@@ -193,6 +266,11 @@ export function useVapiInterview() {
         transcriptRef.current = [];
         interviewDataRef.current = null;
         candidateDataRef.current = null;
+        endTriggeredRef.current = false;
+        if (endTimerRef.current) {
+            clearTimeout(endTimerRef.current);
+            endTimerRef.current = null;
+        }
     }, []);
 
     // Vapi web calls are voice-only — chat input isn't supported. Returning false
