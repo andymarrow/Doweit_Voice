@@ -5,7 +5,14 @@
       "Bash(tasklist)",
       "Bash(node --check lib/db/schemaCharacterAI.js)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(node -e ' *)",
+      "PowerShell(node _diag.mjs)",
+      "PowerShell(curl.exe -s \"http://localhost:3000/api/recruiter/dashboard?userId=Iy7VLx4bv5ckijLwXSb0DoKIIC0WtiA5\")",
+      "PowerShell(curl.exe -s \"http://localhost:3000/api/recruiter/dashboard?userId=Iy7VLx4bv5ckijLwXSb0DoKIIC0WtiA5\" -H \"Cookie: better-auth.session_token=CeNElxByb85n7djvX2ZwLII6CiQmwlu7\")",
+      "PowerShell(node _verify.mjs)",
+      "PowerShell(curl.exe -s \"http://localhost:3000/api/diag-pos?positionId=U9iuYd4uxToO&userId=Iy7VLx4bv5ckijLwXSb0DoKIIC0WtiA5\" -H \"Cookie: better-auth.session_token=test\")",
+      "Bash(break)"
     ]
   }
 }

@@ -83,10 +83,26 @@ module.exports = {
   				'100%': {
   					transform: 'translateX(100%)'
   				}
+  			},
+  			spotlight: {
+  				'0%': {
+  					opacity: 0,
+  					transform: 'translate(-72%, -62%) scale(0.5)'
+  				},
+  				'100%': {
+  					opacity: 1,
+  					transform: 'translate(-50%, -40%) scale(1)'
+  				}
+  			},
+  			marquee: {
+  				'0%':   { transform: 'translateX(0%)' },
+  				'100%': { transform: 'translateX(-50%)' }
   			}
   		},
   		animation: {
-  			run: 'run 2s linear infinite'
+  			run: 'run 2s linear infinite',
+  			spotlight: 'spotlight 2s ease 0.75s 1 forwards',
+  			marquee: 'marquee 22s linear infinite'
   		}
   	}
   },

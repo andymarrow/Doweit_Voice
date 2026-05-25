@@ -6,7 +6,7 @@ import { MyInterviews } from './modules/MyInterviews';
 import { InterviewDetail } from './modules/InterviewDetail';
 import { CreateInterview } from './modules/CreateInterview';
 import { CandidateDatabase } from './modules/CandidateDatabase';
-import { Library as RecruiterLibrary } from './modules/Library';
+import { Marketplace as RecruiterMarketplace } from './modules/Marketplace';
 import { Tokens as RecruiterTokens } from './modules/Tokens';
 import { Settings as RecruiterSettings } from './modules/Settings';
 import {
@@ -24,7 +24,6 @@ import {
   Users,
   BarChart3,
   PlusCircle,
-  Library,
   Coins,
   ClipboardCheck,
   History
@@ -54,23 +53,11 @@ function RecruiterApp() {
     { id: 'interviews', label: 'Interviews', icon: Briefcase },
     { id: 'create', label: 'Create', icon: PlusCircle },
     { id: 'candidates', label: 'Candidates', icon: Users },
-    { id: 'library', label: 'Library', icon: Library },
+    { id: 'marketplace', label: 'Marketplace', icon: ShoppingBag },
     { id: 'tokens', label: 'Tokens', icon: Coins },
     { id: 'settings', label: 'Settings', icon: Settings }];
   const renderContent = () => {
-
     if (activeModule === 'recruiter') {
-      if (activeSection === 'interviews' && selectedInterviewId) {
-        return (
-          <InterviewDetail
-            interviewId={selectedInterviewId}
-            activeTab={activeInterviewTab}
-            onTabChange={(tab) => setActiveInterviewTab(tab)}
-            onBack={() => setSelectedInterviewId(null)} />);
-
-
-      }
-
       switch (activeSection) {
         case 'dashboard': return <RecruiterDashboard onNavigate={setActiveSection} />;
         case 'interviews': return (
@@ -81,7 +68,7 @@ function RecruiterApp() {
             }} />);
         case 'create': return <CreateInterview />;
         case 'candidates': return <CandidateDatabase />;
-        case 'library': return <RecruiterLibrary onNavigate={(section, id) => { setActiveSection(section); if (id) setSelectedInterviewId(id); }} />;
+        case 'marketplace': return <RecruiterMarketplace buyerType="recruiter" onNavigate={(section) => setActiveSection(section)} />;
         case 'tokens': return <RecruiterTokens />;
         case 'settings': return <RecruiterSettings />;
         default: return <div className="py-10 text-center text-gray-400 italic">Coming soon...</div>;
@@ -198,6 +185,20 @@ function RecruiterApp() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
+
+      {/* Full-screen InterviewDetail overlay */}
+      {activeSection === 'interviews' && selectedInterviewId && (
+        <div className="fixed inset-0 z-50 bg-gray-50 overflow-y-auto">
+          <div className="p-6 min-h-screen">
+            <InterviewDetail
+              interviewId={selectedInterviewId}
+              activeTab={activeInterviewTab}
+              onTabChange={(tab) => setActiveInterviewTab(tab)}
+              onBack={() => setSelectedInterviewId(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>);
 }
 

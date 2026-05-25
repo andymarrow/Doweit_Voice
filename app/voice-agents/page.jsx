@@ -1,312 +1,218 @@
 "use client";
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Sun, 
-  Moon, 
-  Mic, 
-  ArrowRight, 
-  Star, 
-  Globe2, 
-  Users, 
-  TrendingUp, 
-  Plus, 
-  X, 
-  Bot, 
-  ShieldCheck, 
-  Zap, 
-  MessageSquare,
-  Twitter,
-  Linkedin,
-  Github,
-  Menu,
-  Wrench,
-  PhoneCall,
-  Check,
-  User,
-  Home
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
+import {
+  Mic, ArrowRight, Star, Globe2, Plus, X, Bot, ShieldCheck,
+  Zap, MessageSquare, Wrench, PhoneCall, Check, PlayCircle,
 } from 'lucide-react';
 import Header from './_components/header';
 import Link from 'next/link';
 import Footage from './_components/footage';
-import Hero from '../_components/Hero';
-import Exploreagents from './_components/exploreagents'
+import Exploreagents from './_components/exploreagents';
+import { SplineSceneBasic } from './_components/SplineSceneBasic';
 
-export default function App() {
-  const [isDark, setIsDark] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [openFaq, setOpenFaq] = useState(0);
+// ── Animated counter ──────────────────────────────────────────────────────────
+function AnimatedCounter({ end, suffix = '', duration = 2 }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
 
-  // Handle theme switching
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
+    if (!isInView) return;
+    let start;
+    const tick = (ts) => {
+      if (!start) start = ts;
+      const pct = Math.min((ts - start) / (duration * 1000), 1);
+      const eased = 1 - Math.pow(1 - pct, 3);
+      setCount(Math.floor(eased * end));
+      if (pct < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [isInView, end, duration]);
 
-  const fadeUp = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } }
-  };
+  return <span ref={ref}>{count}{suffix}</span>;
+}
 
-  const staggerContainer = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { 
-        duration: 0.6, 
-        ease: [0.22, 1, 0.36, 1],
-        staggerChildren: 0.1 
-      }
-    }
-  };
+// ── Shared variants ───────────────────────────────────────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+};
+const stagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.12 } },
+};
 
+// ── Static data ───────────────────────────────────────────────────────────────
 const faqs = [
-  {
-    q: "How does a Doweit Voice agent work?",
-    a: "You can create an AI agent by defining its role, selecting a voice, and choosing a language model such as OpenAI or Gemini. The agent can then handle calls, conversations, or tasks in real time using natural, human-like voice interactions."
-  },
-  {
-    q: "What makes Doweit Voice different from other AI tools?",
-    a: "Unlike single-purpose tools, Doweit Voice combines multiple capabilities in one platform, including call agents, recruitment AI, character AI, and embeddable voice assistants, all with multilingual support in English, Amharic, and Afan Oromo."
-  },
-  {
-    q: "How does the recruitment AI interview system work?",
-    a: "Recruiters can upload a job description, and the system automatically creates an AI interviewer. It generates a public link that candidates can use to take voice interviews, after which the system analyzes responses and provides scores and feedback."
-  },
-  {
-    q: "Can I use my own API keys and models?",
-    a: "Yes, Doweit Voice supports a bring-your-own-key system. You can integrate your own API keys from providers like OpenAI, Gemini, or ElevenLabs and use your preferred models and voice services داخل the platform."
-  },
-  {
-    q: "How are payments and credits handled?",
-    a: "The platform uses a credit-based system where each interaction (calls, interviews, or AI usage) consumes credits. You can securely add credits and manage usage directly from your dashboard."
-  }
+  { q: "How does a Doweit Voice agent work?", a: "You create an AI agent by defining its role, selecting a voice, and choosing a language model such as OpenAI or Gemini. The agent handles calls, conversations, or tasks in real time using natural, human-like voice interactions." },
+  { q: "What makes Doweit Voice different from other AI tools?", a: "Unlike single-purpose tools, Doweit Voice combines multiple capabilities in one platform — call agents, recruitment AI, character AI, and embeddable voice assistants — all with multilingual support in English, Amharic, and Afan Oromo." },
+  { q: "How does the recruitment AI interview system work?", a: "Recruiters upload a job description and the system automatically creates an AI interviewer. It generates a public link for candidates who take voice interviews, then the system analyzes responses and provides scores and feedback." },
+  { q: "Can I use my own API keys and models?", a: "Yes, Doweit Voice supports a bring-your-own-key system. Integrate your own keys from providers like OpenAI, Gemini, or ElevenLabs and use your preferred models and voice services within the platform." },
+  { q: "How are payments and credits handled?", a: "The platform uses a credit-based system where each interaction (calls, interviews, or AI usage) consumes credits. You can securely add credits and manage usage directly from your dashboard." },
 ];
 
-  return (
-    <div className="min-h-screen bg-background text-text-main font-sans transition-colors duration-300 selection:bg-primary/30 selection:text-primary">
-      
-      {/* Top Banner */}
-      <div className="bg-primary text-white text-xs py-2 text-center flex items-center justify-center gap-2 font-medium">
-        🚀 Session 2026 • Early-bird registration now open <ArrowRight className="w-3 h-3" />
-      </div>
+const testimonials = [
+  { name: "Sarah K.", role: "Head of Talent @ Nexus Corp", quote: "Doweit's recruitment AI cut our interview time by 70%. The Amharic support alone was a game-changer for our Ethiopian operations.", rating: 5, avatar: "https://i.pravatar.cc/100?img=5" },
+  { name: "Dawit M.", role: "CTO @ Addis Fintech", quote: "We deployed 12 inbound call agents in a weekend. Our support volume tripled but our team size stayed the same.", rating: 5, avatar: "https://i.pravatar.cc/100?img=11" },
+  { name: "Yemisi A.", role: "Product Lead @ VoiceFlow", quote: "The embedded SDK is incredibly easy. I had a voice assistant on my SaaS in under 2 hours. The character AI for onboarding is magical.", rating: 5, avatar: "https://i.pravatar.cc/100?img=9" },
+];
 
-      {/* Navbar */}
+const steps = [
+  { step: "01", title: "Define Your Agent", desc: "Upload a job description, write a system prompt, or pick from templates. Your agent is ready in minutes.", icon: Bot, color: "from-violet-500 to-purple-600" },
+  { step: "02", title: "Choose Voice & Language", desc: "Pick from 50+ voices across English, Amharic, and Afan Oromo. Preview in real-time before deploying.", icon: Mic, color: "from-pink-500 to-rose-600" },
+  { step: "03", title: "Deploy & Scale", desc: "Go live with one click. Your agent handles unlimited parallel conversations with zero infrastructure.", icon: Zap, color: "from-cyan-500 to-blue-600" },
+];
+
+const features = [
+  { icon: PhoneCall, title: "AI Call Agents", desc: "A departure from robotic IVRs — natural, human-like voice interactions for customer support and sales.", gradient: "from-violet-500 to-primary" },
+  { icon: Globe2, title: "Multilingual Support", desc: "Communicate fluently in English, Amharic, and Afan Oromo with our proprietary neural engines.", gradient: "from-pink-500 to-secondary" },
+  { icon: Wrench, title: "Custom Agent Builder", desc: "Build, deploy, and manage custom AI voice agents tailored to your specific business needs.", gradient: "from-cyan-500 to-blue-500", featured: true },
+];
+
+const logos = [
+  { icon: <Bot className="w-6 h-6" />, name: "OpenAI" },
+  { icon: <Zap className="w-6 h-6" />, name: "Gemini" },
+  { icon: <ShieldCheck className="w-6 h-6" />, name: "DeepSeek" },
+  { icon: <MessageSquare className="w-6 h-6" />, name: "Grok" },
+  { icon: <Mic className="w-6 h-6" />, name: "Vapi" },
+];
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [openFaq, setOpenFaq] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [direction, setDirection] = useState(1); // 1 = forward, -1 = back
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDirection(1);
+      setActiveIdx(prev => (prev + 1) % testimonials.length);
+    }, 4500);
+    return () => clearInterval(id);
+  }, []);
+
+  const goTo = (idx) => {
+    setDirection(idx > activeIdx ? 1 : -1);
+    setActiveIdx(idx);
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-text-main font-sans selection:bg-primary/30 selection:text-primary">
+
+      {/* ── Top Banner ────────────────────────────────── */}
+      <motion.div
+        initial={{ y: -40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="bg-primary text-white text-xs py-2 text-center flex items-center justify-center gap-2 font-medium relative overflow-hidden"
+      >
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+          animate={{ x: ['-100%', '200%'] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'linear', repeatDelay: 2 }}
+        />
+        <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>🚀</motion.span>
+        <span className="relative">Session 2026 • Early-bird registration now open</span>
+        <ArrowRight className="w-3 h-3 relative" />
+      </motion.div>
+
       <Header />
+
       <main>
 
-        {/* Hero Section */}
-        <section className="py-12 md:py-20 px-6">
-          <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-            
-            {/* Hero Left */}
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="max-w-xl"
-            >
-              <div className="text-xs font-semibold tracking-widest text-text-secondary uppercase mb-6">
-                Try it now!
-              </div>
-              <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
-                Change the way <br/>
-                you build <br/>
-                <span className="font-serif italic font-normal text-primary">AI Agents</span>
-              </h1>
-              <p className="text-lg text-text-secondary mb-10 leading-relaxed max-w-md">
-                From your everyday customer support, to planning for your future with automated sales, Doweit Voice helps you get more from your conversations.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-8">
-                <Link href="/voice-agents-dashboard" className="px-8 py-4 bg-primary hover:bg-primary-hover text-white font-medium rounded-full transition-colors text-center">
-                  Get Started Now
-                </Link>
-                
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    ))}
-                    <span className="font-bold ml-2 text-sm">5.0</span>
-                  </div>
-                  <div className="text-xs text-text-secondary">
-                    from 120+ <span className="underline decoration-border-color underline-offset-2">reviews</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Hero Right (Bento Grid) */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-              className="grid grid-cols-2 gap-4 h-[500px]"
-            >
-              {/* Column 1 */}
-              <div className="flex flex-col gap-4 h-full">
-                {/* Phone Mockup Card */}
-                <div className="bg-surface-light rounded-3xl p-6 flex-1 border border-border-color relative overflow-hidden flex flex-col items-center justify-center group">
-                  <div className="absolute top-6 right-6 flex flex-col gap-2">
-                    <div className="w-12 h-2 bg-border-color rounded-full" />
-                    <div className="w-8 h-2 bg-border-color rounded-full" />
-                  </div>
-                  <div className="w-32 h-48 bg-surface rounded-2xl shadow-sm border border-border-color p-4 flex flex-col gap-3 transform -rotate-6 group-hover:rotate-0 transition-transform duration-500 ease-out">
-                    <div className="w-full h-3 bg-border-color rounded-full" />
-                    <div className="w-3/4 h-3 bg-border-color rounded-full" />
-                    <div className="mt-auto w-full h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                      <Mic className="w-5 h-5 text-primary" />
-                    </div>
-                  </div>
-                </div>
-                {/* Users Active Card */}
-                <div className="bg-surface-light rounded-3xl p-6 h-40 border border-border-color flex flex-col justify-between relative overflow-hidden">
-                  <div className="flex gap-2">
-                    <Star className="w-6 h-6 text-primary fill-primary" />
-                    <Star className="w-6 h-6 text-primary fill-primary" />
-                  </div>
-                  <div className="text-lg font-medium">Active Agents</div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex -space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-surface border-2 border-surface-light flex items-center justify-center overflow-hidden"><img src="https://i.pravatar.cc/100?img=1" alt="user" /></div>
-                      <div className="w-8 h-8 rounded-full bg-surface border-2 border-surface-light flex items-center justify-center overflow-hidden"><img src="https://i.pravatar.cc/100?img=2" alt="user" /></div>
-                      <div className="w-8 h-8 rounded-full bg-surface border-2 border-surface-light flex items-center justify-center overflow-hidden"><img src="https://i.pravatar.cc/100?img=3" alt="user" /></div>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
-                      <ArrowRight className="w-4 h-4 -rotate-45" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Column 2 */}
-              <div className="flex flex-col gap-4 h-full">
-                {/* Languages Card */}
-                <div className="bg-accent rounded-3xl p-6 h-48 rounded-tr-[4rem] border border-border-color flex flex-col justify-between">
-                  <div className="text-4xl font-bold text-text-main">5+</div>
-                  <div className="text-lg font-medium text-text-main">Languages</div>
-                  <div className="self-end mt-auto">
-                    <Globe2 className="w-12 h-12 text-primary opacity-50" strokeWidth={1} />
-                  </div>
-                </div>
-                {/* Stats Card */}
-                <div className="bg-primary text-white rounded-3xl p-6 flex-1 relative overflow-hidden flex flex-col justify-between">
-                  <div>
-                    <div className="text-3xl font-bold mb-1">1.8k+</div>
-                    <div className="text-sm text-white/80 flex items-center gap-1">
-                      <ArrowRight className="w-3 h-3 -rotate-45" /> Calls Handled
-                    </div>
-                  </div>
-                  <div className="mt-auto h-24 relative">
-                    {/* Mock Line Chart */}
-                    <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                      <path 
-                        d="M0,40 L10,35 L20,45 L30,20 L40,25 L50,10 L60,15 L70,5 L80,10 L90,0 L100,5" 
-                        fill="none" 
-                        stroke="white" 
-                        strokeWidth="2"
-                        className="drop-shadow-md"
-                      />
-                      <circle cx="100" cy="5" r="3" fill="white" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+        {/* ── 3D Robot ─────────────────────────── KEEP ── */}
+        <section className="py-12 px-6">
+          <div className="max-w-7xl mx-auto">
+            <SplineSceneBasic />
           </div>
         </section>
 
-        {/* Logos Section */}
-        <section className="py-12 border-y border-border-color bg-surface/50 overflow-hidden">
-          <motion.div 
-            variants={staggerContainer}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-50px" }}
-            className="max-w-7xl mx-auto px-6 flex flex-wrap justify-between items-center gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500"
-          >
-            {[
-              { icon: <Bot className="w-6 h-6" />, name: "OpenAI" },
-              { icon: <Zap className="w-6 h-6" />, name: "Gemini" },
-              { icon: <ShieldCheck className="w-6 h-6" />, name: "DeepSeek" },
-              { icon: <MessageSquare className="w-6 h-6" />, name: "Grok" },
-              { icon: <Mic className="w-6 h-6" />, name: "Vapi" }
-            ].map((logo, i) => (
-              <motion.div key={i} variants={fadeUp} className="flex items-center gap-2 text-xl font-bold">
-                {logo.icon} {logo.name}
-              </motion.div>
-            ))}
-          </motion.div>
-        </section>
-
-
-        {/* Native Multilingual Support */}
+        {/* ── Native Multilingual ───────────────── KEEP ── */}
         <section className="py-24 px-6 bg-surface/30 border-y border-border-color">
           <div className="max-w-7xl mx-auto">
             <div className="grid md:grid-cols-2 gap-16 items-center">
-              {/* Left Graphic */}
-              <motion.div 
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-50px" }}
-                variants={fadeUp}
+
+              {/* Left — animated globe */}
+              <motion.div
+                initial="hidden" whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }} variants={fadeUp}
                 className="relative flex items-center justify-center h-[400px]"
               >
-                {/* Glow */}
                 <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full w-3/4 h-3/4 m-auto" />
-                
-                {/* Concentric Circles */}
+
+                {/* Concentric rings — each rotates at own speed */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-[300px] h-[300px] rounded-full border border-primary/30 absolute" />
-                  <div className="w-[400px] h-[400px] rounded-full border border-primary/20 absolute" />
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+                    className="w-[300px] h-[300px] rounded-full border border-primary/40 absolute" />
+                  <motion.div animate={{ rotate: -360 }} transition={{ duration: 35, repeat: Infinity, ease: 'linear' }}
+                    className="w-[400px] h-[400px] rounded-full border border-primary/25 absolute" />
                   <div className="w-[500px] h-[500px] rounded-full border border-primary/10 absolute" />
                 </div>
 
-                {/* Center Icon */}
-                <div className="relative z-10 text-primary">
+                {/* Globe — gentle pulse */}
+                <motion.div
+                  className="relative z-10 text-primary"
+                  animate={{ scale: [1, 1.06, 1] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                >
                   <Globe2 className="w-32 h-32" strokeWidth={1.5} />
-                </div>
+                </motion.div>
 
-                {/* Language Pills */}
-                <div className="absolute top-[15%] right-[15%] bg-primary text-white font-bold px-4 py-2 rounded-full text-sm z-20 shadow-lg">
-                  English
-                </div>
-                <div className="absolute top-[25%] left-[10%] bg-primary text-white font-bold px-4 py-2 rounded-full text-sm z-20 shadow-lg">
-                  Afan Oromo
-                </div>
-                <div className="absolute bottom-[20%] left-[5%] bg-primary text-white font-bold px-4 py-2 rounded-full text-sm z-20 shadow-lg">
-                  Amharic
-                </div>
+                {/* Language pills — circular orbit */}
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                >
+                  {[
+                    { label: 'English', angle: 0 },
+                    { label: 'Afan Oromo', angle: 120 },
+                    { label: 'Amharic', angle: 240 },
+                  ].map(({ label, angle }) => {
+                    const rad = (angle - 90) * (Math.PI / 180);
+                    const r = 170;
+                    return (
+                      <motion.div
+                        key={label}
+                        className="absolute"
+                        style={{ x: Math.cos(rad) * r, y: Math.sin(rad) * r }}
+                        animate={{ rotate: -360 }}
+                        transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <div className="bg-primary text-white font-bold px-4 py-2 rounded-full text-sm shadow-lg whitespace-nowrap ring-2 ring-primary/20">
+                          {label}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
               </motion.div>
 
-              {/* Right Content */}
-              <motion.div 
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-50px" }}
-                variants={fadeUp}
-				>
-                <h2 className="text-5xl font-bold mb-6 text-text-main leading-tight">
-                  Native<br/>Multilingual<br/>Support
-                </h2>
-                <p className="text-text-secondary text-lg mb-8 leading-relaxed">
-                  Break language barriers with native support for Ethiopian languages and global dialects. Our neural engines capture the cultural nuances and regional accents perfectly.
-                </p>
+              {/* Right — content */}
+              <motion.div
+                initial="hidden" whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }} variants={stagger}
+              >
+                <motion.h2 variants={fadeUp} className="text-5xl font-bold mb-6 text-text-main leading-tight">
+                  Native<br />Multilingual<br />Support
+                </motion.h2>
+                <motion.p variants={fadeUp} className="text-text-secondary text-lg mb-8 leading-relaxed">
+                  Break language barriers with native support for Ethiopian languages and global dialects.
+                  Our neural engines capture cultural nuances and regional accents perfectly.
+                </motion.p>
                 <ul className="space-y-4">
-                  {[
-                    "Full Amharic Speech-to-Speech support",
-                    "High-fidelity Afan Oromo voice models",
-                    "Real-time code-switching between languages"
-				].map((item, i) => (
-					<li key={i} className="flex items-center gap-3 text-text-main font-medium">
-                      <Check className="w-5 h-5 text-accent" />
+                  {["Full Amharic Speech-to-Speech support", "High-fidelity Afan Oromo voice models", "Real-time code-switching between languages"].map((item, i) => (
+                    <motion.li
+                      key={i}
+                      variants={fadeUp}
+                      className="flex items-center gap-3 text-text-main font-medium"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Check className="w-3.5 h-3.5 text-primary" />
+                      </div>
                       {item}
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               </motion.div>
@@ -314,83 +220,142 @@ const faqs = [
           </div>
         </section>
 
-        {/* Explore Agents */}
-		<Exploreagents/>
-        
+        {/* ── Explore Agents ────────────────────────────── */}
+        <Exploreagents />
 
-        {/* Values (Features) */}
-        <motion.section 
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          className="py-24 px-6 bg-surface/30 border-t border-border-color"
+        {/* ── How It Works ──────────────────────────────── */}
+        <motion.section
+          initial="hidden" whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }} variants={stagger}
+          className="py-24 px-6"
         >
           <div className="max-w-7xl mx-auto">
-            <motion.div variants={fadeUp} className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8">
-              <div>
-                <div className="text-xs font-semibold tracking-widest text-text-secondary uppercase mb-4">Values</div>
-                <h2 className="text-4xl md:text-5xl font-bold max-w-md leading-tight">Make your conversations, Well-spoken</h2>
-              </div>
-              <p className="text-text-secondary max-w-sm">
-                Manages a diversified group of specialized voice agents with efficient tech-enabled processes.
-              </p>
+            <motion.div variants={fadeUp} className="text-center mb-16">
+              <div className="text-xs font-semibold tracking-widest text-text-secondary uppercase mb-4">Process</div>
+              <h2 className="text-4xl md:text-5xl font-bold">Up and running in minutes</h2>
             </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-6">
-              <motion.div variants={fadeUp} className="border border-border-color rounded-3xl p-8 bg-surface hover:border-primary/30 transition-colors group">
-                <div className="w-12 h-12 rounded-full border border-border-color flex items-center justify-center mb-6 text-primary">
-                  <PhoneCall className="w-5 h-5" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">AI Call Agents</h3>
-                <p className="text-text-secondary text-sm leading-relaxed mb-8">
-                  A departure from robotic IVRs, providing natural, human-like voice interactions for customer support and sales.
-                </p>
-                <button className="w-10 h-10 rounded-full border border-border-color flex items-center justify-center group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-colors">
-                  <ArrowRight className="w-4 h-4 -rotate-45" />
-                </button>
-              </motion.div>
+            <div className="grid md:grid-cols-3 gap-8 relative">
+              {/* Connector line (desktop) */}
+              <div className="hidden md:block absolute top-14 left-[18%] right-[18%] h-px bg-gradient-to-r from-transparent via-border-color to-transparent z-0" />
 
-              <motion.div variants={fadeUp} className="border border-border-color rounded-3xl p-8 bg-surface hover:border-primary/30 transition-colors group">
-                <div className="w-12 h-12 rounded-full border border-border-color flex items-center justify-center mb-6 text-primary">
-                  <Globe2 className="w-5 h-5" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">Multilingual Support</h3>
-                <p className="text-text-secondary text-sm leading-relaxed mb-8">
-                  Our proprietary AI platform helps your business communicate fluently in English, Amharic, and Afan Oromo.
-                </p>
-                <button className="w-10 h-10 rounded-full border border-border-color flex items-center justify-center group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-colors">
-                  <ArrowRight className="w-4 h-4 -rotate-45" />
-                </button>
-              </motion.div>
-
-              <motion.div variants={fadeUp} className="bg-surface-light rounded-3xl p-8 rounded-tr-[4rem] border border-border-color hover:border-primary/30 transition-colors group">
-                <div className="w-12 h-12 rounded-full border border-border-color flex items-center justify-center mb-6 text-primary bg-surface">
-                  <Wrench className="w-5 h-5" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">Custom Agent Builder</h3>
-                <p className="text-text-secondary text-sm leading-relaxed mb-8">
-                  We provide access to powerful tools to build, deploy, and manage custom AI voice agents tailored to your specific business needs.
-                </p>
-                <button className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary-hover transition-colors">
-                  <ArrowRight className="w-4 h-4 -rotate-45" />
-                </button>
-              </motion.div>
+              {steps.map((s, i) => (
+                <motion.div
+                  key={i} variants={fadeUp}
+                  whileHover={{ y: -8, boxShadow: '0 24px 60px -10px rgba(135,91,249,0.18)' }}
+                  className="relative z-10 flex flex-col items-center text-center p-8 rounded-3xl border border-border-color bg-surface hover:border-primary/40 transition-all duration-300 group"
+                >
+                  <motion.div
+                    className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-6 shadow-lg`}
+                    whileHover={{ rotate: [0, -8, 8, 0] }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <s.icon className="w-9 h-9 text-white" />
+                  </motion.div>
+                  <div className="text-xs font-black tracking-widest text-primary/50 uppercase mb-3">{s.step}</div>
+                  <h3 className="text-xl font-bold mb-3">{s.title}</h3>
+                  <p className="text-text-secondary text-sm leading-relaxed">{s.desc}</p>
+                </motion.div>
+              ))}
             </div>
           </div>
         </motion.section>
 
-        {/* Stats Banner */}
-        <motion.section 
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={fadeUp}
+        {/* ── Testimonials — single-card carousel ───────── */}
+        <motion.section
+          initial="hidden" whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }} variants={fadeUp}
+          className="py-24 px-6"
+        >
+          <div className="max-w-3xl mx-auto">
+            <div className="text-center mb-16">
+              <div className="text-xs font-semibold tracking-widest text-text-secondary uppercase mb-4">Social Proof</div>
+              <h2 className="text-4xl md:text-5xl font-bold">Trusted by builders</h2>
+            </div>
+
+            {/* Card area */}
+            <div className="relative overflow-hidden min-h-[280px] flex items-center">
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={activeIdx}
+                  custom={direction}
+                  variants={{
+                    enter:  (d) => ({ opacity: 0, x: d * 80 }),
+                    center: { opacity: 1, x: 0 },
+                    exit:   (d) => ({ opacity: 0, x: d * -80 }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="w-full bg-surface border border-border-color rounded-3xl p-10 flex flex-col gap-6"
+                >
+                  {/* Stars */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: testimonials[activeIdx].rating }).map((_, j) => (
+                      <motion.div
+                        key={j}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: j * 0.07 }}
+                      >
+                        <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Quote */}
+                  <p className="text-text-main text-lg leading-relaxed">
+                    "{testimonials[activeIdx].quote}"
+                  </p>
+
+                  {/* Author */}
+                  <div className="flex items-center gap-4 pt-4 border-t border-border-color">
+                    <img
+                      src={testimonials[activeIdx].avatar}
+                      alt={testimonials[activeIdx].name}
+                      className="w-12 h-12 rounded-full object-cover ring-2 ring-primary/20"
+                    />
+                    <div>
+                      <div className="font-bold">{testimonials[activeIdx].name}</div>
+                      <div className="text-sm text-text-secondary">{testimonials[activeIdx].role}</div>
+                    </div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Dot navigation */}
+            <div className="flex items-center justify-center gap-3 mt-8">
+              {testimonials.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  className="focus:outline-none"
+                  aria-label={`Go to testimonial ${i + 1}`}
+                >
+                  <motion.div
+                    animate={{
+                      width: i === activeIdx ? 28 : 8,
+                      backgroundColor: i === activeIdx ? '#875bf9' : '#d1d5db',
+                    }}
+                    transition={{ duration: 0.3 }}
+                    className="h-2 rounded-full"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+
+        {/* ── Stats Banner ──────────────────────────────── */}
+        <motion.section
+          initial="hidden" whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }} variants={fadeUp}
           className="py-12 px-6"
         >
           <div className="max-w-7xl mx-auto">
             <div className="bg-primary text-white rounded-3xl p-12 md:p-20 relative overflow-hidden">
-              {/* Abstract Background */}
               <div className="absolute inset-0 opacity-20">
                 <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                   <defs>
@@ -403,15 +368,24 @@ const faqs = [
                   <rect width="100%" height="100%" fill="url(#waves)" />
                 </svg>
               </div>
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                animate={{ x: ['-100%', '200%'] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatDelay: 3 }}
+              />
               <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-3xl rounded-full translate-x-1/3 -translate-y-1/3" />
 
               <div className="grid md:grid-cols-3 gap-12 relative z-10 items-center">
                 <div>
-                  <div className="text-5xl md:text-7xl font-bold mb-2 tracking-tight">50+</div>
+                  <div className="text-5xl md:text-7xl font-bold mb-2 tracking-tight">
+                    <AnimatedCounter end={50} suffix="+" />
+                  </div>
                   <div className="text-white/80 text-lg">AI Agents deployed</div>
                 </div>
                 <div>
-                  <div className="text-5xl md:text-7xl font-bold mb-2 tracking-tight">5k+</div>
+                  <div className="text-5xl md:text-7xl font-bold mb-2 tracking-tight">
+                    <AnimatedCounter end={5} suffix="k+" duration={2.5} />
+                  </div>
                   <div className="text-white/80 text-lg">Minutes processed</div>
                 </div>
                 <div>
@@ -423,12 +397,25 @@ const faqs = [
           </div>
         </motion.section>
 
-        {/* FAQ */}
-        <motion.section 
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={fadeUp}
+        {/* ── Logos Marquee ─────────────────────────────── */}
+        <section className="py-12 border-y border-border-color bg-surface/50 overflow-hidden">
+          {/* CSS keyframe handles the scroll — framer-motion % is unreliable here */}
+          <div
+            className="flex items-center gap-16 opacity-60 grayscale hover:grayscale-0 hover:[animation-play-state:paused] transition-all duration-500 animate-marquee"
+            style={{ width: 'max-content', paddingRight: '4rem' }}
+          >
+            {[...logos, ...logos].map((logo, i) => (
+              <div key={i} className="flex items-center gap-2 text-xl font-bold whitespace-nowrap shrink-0">
+                {logo.icon} {logo.name}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── FAQ ───────────────────────────────────────── */}
+        <motion.section
+          initial="hidden" whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }} variants={fadeUp}
           className="py-24 px-6"
         >
           <div className="max-w-7xl mx-auto">
@@ -437,81 +424,120 @@ const faqs = [
                 <div className="text-xs font-semibold tracking-widest text-text-secondary uppercase mb-4">FAQ</div>
                 <h2 className="text-4xl font-bold leading-tight">Frequently asked questions</h2>
               </div>
-              
               <div className="md:col-span-8 flex flex-col gap-2">
                 {faqs.map((faq, i) => (
-                  <div 
-                    key={i} 
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.08 }}
                     className="border-b border-border-color py-4"
                   >
-                    <button 
+                    <button
                       className="w-full flex justify-between items-center text-left py-4 hover:text-primary transition-colors"
                       onClick={() => setOpenFaq(openFaq === i ? null : i)}
                     >
                       <span className="text-xl font-medium">{faq.q}</span>
-                      <span className="text-text-secondary ml-4">
-                        {openFaq === i ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                      </span>
+                      <motion.span
+                        animate={{ rotate: openFaq === i ? 45 : 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="text-text-secondary ml-4 shrink-0"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </motion.span>
                     </button>
                     <AnimatePresence>
                       {openFaq === i && (
-                        <motion.div 
+                        <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                           className="overflow-hidden"
                         >
-                          <p className="text-text-secondary leading-relaxed pb-6 pr-12">
-                            {faq.a}
-                          </p>
+                          <p className="text-text-secondary leading-relaxed pb-6 pr-12">{faq.a}</p>
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
           </div>
         </motion.section>
 
-        {/* Final CTA */}
-        <motion.section 
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={fadeUp}
+        {/* ── Final CTA ─────────────────────────────────── */}
+        <motion.section
+          initial="hidden" whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }} variants={fadeUp}
           className="py-12 px-6"
         >
           <div className="max-w-7xl mx-auto">
             <div className="bg-primary text-white rounded-3xl p-12 md:p-20 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-12">
-              
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                animate={{ x: ['-100%', '200%'] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'linear', repeatDelay: 2 }}
+              />
+              <motion.div
+                className="absolute top-8 right-32 w-24 h-24 bg-secondary/30 rounded-full blur-xl"
+                animate={{ y: [0, -20, 0], scale: [1, 1.1, 1] }}
+                transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <motion.div
+                className="absolute bottom-8 right-16 w-16 h-16 bg-white/10 rounded-full blur-xl"
+                animate={{ y: [0, 20, 0], scale: [1, 1.15, 1] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+              />
+
               <div className="max-w-xl relative z-10">
                 <h2 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-                  Change the way you build <span className="font-serif italic font-normal">AI Agents</span>
+                  Change the way you build{' '}
+                  <span className="font-serif italic font-normal">AI Agents</span>
                 </h2>
                 <p className="text-white/80 mb-10 text-lg">
                   Join over 10,000 developers who choose Doweit Voice for fast and secure AI automation.
                 </p>
-                <Link href="/voice-agents-dashboard" className="bg-white text-primary px-8 py-4 rounded-full font-medium hover:bg-white/90 transition-colors inline-block">
-                  Get Started Now
-                </Link>
-              </div>
-
-              {/* Graphics */}
-              <div className="relative z-10 w-full md:w-1/3 flex justify-center">
-                <div className="relative w-48 h-48">
-                  {/* Abstract Star Shapes */}
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-white rounded-full rounded-tr-none rounded-bl-none transform rotate-45 opacity-90" />
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full rounded-tr-none rounded-bl-none transform rotate-45 opacity-90" />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-accent rounded-full" />
+                <div className="flex flex-wrap gap-4">
+                  <Link
+                    href="/voice-agents-dashboard"
+                    className="bg-white text-primary px-8 py-4 rounded-full font-medium hover:bg-white/90 transition-colors inline-flex items-center gap-2"
+                  >
+                    Get Started Now <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <button className="border border-white/30 text-white px-8 py-4 rounded-full font-medium hover:bg-white/10 transition-colors inline-flex items-center gap-2">
+                    <PlayCircle className="w-4 h-4" /> Watch Demo
+                  </button>
                 </div>
               </div>
 
+              <div className="relative z-10 w-full md:w-1/3 flex justify-center">
+                <div className="relative w-48 h-48">
+                  <motion.div
+                    className="absolute top-0 right-0 w-24 h-24 bg-white rounded-full rounded-tr-none rounded-bl-none transform rotate-45 opacity-90"
+                    animate={{ rotate: [45, 90, 45] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                  <motion.div
+                    className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full rounded-tr-none rounded-bl-none transform rotate-45 opacity-90"
+                    animate={{ rotate: [45, 0, 45] }}
+                    transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                  <motion.div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-secondary rounded-full"
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </motion.section>
+
       </main>
-	  <Footage/>
+
+      <Footage />
     </div>
   );
 }

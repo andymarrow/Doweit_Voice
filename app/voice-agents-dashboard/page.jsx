@@ -143,6 +143,73 @@ export default function DashboardPage() {
               call agents to embedded web assistants and interactive characters.
             </p>
           </div>
+
+          {/* --- 3D Animated Cube --- */}
+          <div
+            className="hidden md:flex items-center justify-center shrink-0"
+            style={{ perspective: "1200px" }}
+          >
+            <motion.div
+              className="relative"
+              style={{
+                width: "180px",
+                height: "180px",
+                transformStyle: "preserve-3d",
+              }}
+              animate={{ rotateX: [0, 360], rotateY: [0, 360] }}
+              transition={{
+                duration: 18,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+            >
+              {[
+                {
+                  t: "rotateY(0deg) translateZ(90px)",
+                  c: "from-cyan-500 to-blue-600",
+                  Icon: PhoneCall,
+                },
+                {
+                  t: "rotateY(90deg) translateZ(90px)",
+                  c: "from-purple-500 to-pink-600",
+                  Icon: Code2,
+                },
+                {
+                  t: "rotateY(180deg) translateZ(90px)",
+                  c: "from-emerald-500 to-teal-600",
+                  Icon: Briefcase,
+                },
+                {
+                  t: "rotateY(-90deg) translateZ(90px)",
+                  c: "from-orange-500 to-rose-600",
+                  Icon: MessageSquare,
+                },
+                {
+                  t: "rotateX(90deg) translateZ(90px)",
+                  c: "from-indigo-500 to-purple-600",
+                  Icon: Sparkles,
+                },
+                {
+                  t: "rotateX(-90deg) translateZ(90px)",
+                  c: "from-yellow-500 to-orange-500",
+                  Icon: Sparkles,
+                },
+              ].map((face, i) => (
+                <div
+                  key={i}
+                  className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${face.c} border border-white/30 shadow-2xl flex items-center justify-center`}
+                  style={{
+                    width: "180px",
+                    height: "180px",
+                    transform: face.t,
+                    backfaceVisibility: "hidden",
+                  }}
+                >
+                  <face.Icon className="w-16 h-16 text-white drop-shadow-lg" />
+                </div>
+              ))}
+            </motion.div>
+          </div>
         </div>
       </motion.div>
 

@@ -117,9 +117,17 @@ export const MySessions = ({ onNavigate }) => {
     if (!confirm('Delete this interview and all its attempts?')) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/trainee/interview/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
-      toast.success('Deleted');
+      const res = await fetch(`/api/trainee/interview/${id}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+      });
+      // Read the body so we can surface the real reason on failure — the
+      // old handler always toasted "Deleted" even when the API returned
+      // 404/500, which is exactly how the row stayed in the DB while
+      // looking deleted on the front-end.
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Delete failed (${res.status})`);
+      toast.success(`Deleted (${data.deletedId || id})`);
       setRefreshKey((k) => k + 1);
     } catch (e) {
       toast.error(e.message);
