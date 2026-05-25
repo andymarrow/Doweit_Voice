@@ -137,10 +137,7 @@ function ActionCard({ action }) {
     const requiredCount = paramEntries.filter(([, r]) => r?.required).length;
 
     return (
-        <div className={`group relative p-5 rounded-2xl border ${uiColors.borderPrimary} ${uiColors.bgPrimary} hover:shadow-lg hover:border-cyan-500/40 transition-all`}>
-            {/* Gradient on hover */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500/0 to-purple-500/0 group-hover:from-cyan-500/5 group-hover:to-purple-500/5 transition-all pointer-events-none" />
-
+        <div className={`group relative p-5 rounded-2xl border ${uiColors.borderPrimary} ${uiColors.bgPrimary} hover:border-cyan-500/40 transition-all`}>
             <div className="relative">
                 <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -207,7 +204,7 @@ function EmptyState({ appData }) {
         <div
             className={`p-12 rounded-2xl border-2 border-dashed ${uiColors.borderPrimary} ${uiColors.bgSecondary} flex flex-col items-center text-center`}
         >
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center text-white shadow-2xl shadow-cyan-500/20 mb-5">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center text-white mb-5">
                 <FiInbox className="w-10 h-10" />
             </div>
             <h3 className={`text-2xl font-extrabold mb-2 ${uiColors.textPrimary}`}>No manifest synced yet</h3>

@@ -139,11 +139,11 @@ export default function CreateProjectModal({ isOpen, onClose, onSuccess }) {
                     ) : <div></div>}
                     
                     {step === 1 ? (
-                        <button onClick={() => setStep(2)} className={`px-6 py-2.5 rounded-lg font-bold text-white ${uiColors.accentPrimaryGradient} shadow-lg hover:shadow-cyan-500/25 transition-all`}>
+                        <button onClick={() => setStep(2)} className={`px-6 py-2.5 rounded-lg font-bold text-white ${uiColors.accentPrimaryGradient} transition-all`}>
                             Continue
                         </button>
                     ) : (
-                        <button onClick={handleCreate} disabled={!projectName.trim() || isCreating} className={`flex items-center px-6 py-2.5 rounded-lg font-bold text-white ${uiColors.accentPrimaryGradient} shadow-lg hover:shadow-cyan-500/25 disabled:opacity-50 transition-all`}>
+                        <button onClick={handleCreate} disabled={!projectName.trim() || isCreating} className={`flex items-center px-6 py-2.5 rounded-lg font-bold text-white ${uiColors.accentPrimaryGradient} disabled:opacity-50 transition-all`}>
                             {isCreating ? <FiLoader className="w-5 h-5 animate-spin mr-2" /> : null}
                             Create Assistant
                         </button>

@@ -122,13 +122,9 @@ export default function EmbeddedAppDetail() {
             {/* HERO HEADER */}
             <div className={`relative overflow-hidden rounded-3xl border ${uiColors.borderPrimary} ${uiColors.bgPrimary} p-6 md:p-8 mb-6`}>
                 {/* Gradient backdrop */}
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/10 pointer-events-none" />
-                <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-cyan-400/10 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-purple-400/10 blur-3xl pointer-events-none" />
-
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-4 min-w-0">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-xl shadow-cyan-500/20 shrink-0">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shrink-0">
                             {appData.name?.substring(0, 2).toUpperCase() || "DW"}
                         </div>
                         <div className="min-w-0">
@@ -161,7 +157,7 @@ export default function EmbeddedAppDetail() {
                         </button>
                         <button
                             onClick={() => setActiveTab("playground")}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white ${uiColors.accentPrimaryGradient} shadow-lg`}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white ${uiColors.accentPrimaryGradient}`}
                         >
                             <FiPlay className="w-4 h-4" />
                             Test live

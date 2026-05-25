@@ -223,10 +223,10 @@ export default function PlaygroundTab({ appData, manifest }) {
                             <button
                                 type="button"
                                 onClick={toggleVoice}
-                                className={`p-3 rounded-xl transition-all shadow-sm flex items-center justify-center ${
+                                className={`p-3 rounded-xl transition-all flex items-center justify-center ${
                                     isLive
-                                        ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/30"
-                                        : "bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-cyan-500/25"
+                                        ? "bg-red-500 hover:bg-red-600 text-white"
+                                        : "bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white"
                                 }`}
                                 title={isLive ? "Stop voice session" : "Start voice session"}
                             >

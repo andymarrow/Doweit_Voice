@@ -74,9 +74,6 @@ export default function EmbeddedAgentsDashboard() {
         >
             {/* HERO */}
             <div className={`relative overflow-hidden rounded-3xl border ${uiColors.borderPrimary} ${uiColors.bgPrimary} p-6 md:p-8`}>
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/10 pointer-events-none" />
-                <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-cyan-400/10 blur-3xl pointer-events-none" />
-
                 <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                     <div>
                         <div className="flex items-center gap-2 mb-2">
@@ -94,7 +91,7 @@ export default function EmbeddedAgentsDashboard() {
 
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
-                        className={`group flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-white ${uiColors.accentPrimaryGradient} shadow-xl shadow-cyan-500/25 hover:shadow-2xl hover:shadow-cyan-500/30 transition-all`}
+                        className={`group flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-white ${uiColors.accentPrimaryGradient} transition-all`}
                     >
                         <FiPlus className="w-5 h-5 group-hover:rotate-90 transition-transform"/>
                         New project
@@ -155,16 +152,13 @@ function ProjectCard({ app, onOpen }) {
             whileHover={{ y: -4 }}
             transition={{ duration: 0.2 }}
             onClick={onOpen}
-            className={`group relative cursor-pointer flex flex-col p-5 rounded-2xl border ${uiColors.borderPrimary} ${uiColors.bgPrimary} hover:shadow-xl hover:border-cyan-500/40 transition-all overflow-hidden`}
+            className={`group relative cursor-pointer flex flex-col p-5 rounded-2xl border ${uiColors.borderPrimary} ${uiColors.bgPrimary} hover:border-cyan-500/40 transition-all overflow-hidden`}
         >
-            {/* Soft gradient on hover */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500/0 to-purple-500/0 group-hover:from-cyan-500/5 group-hover:to-purple-500/5 transition-all pointer-events-none" />
-
             <div className="relative flex flex-col h-full">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                     <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-base shadow-lg shadow-cyan-500/20 shrink-0">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-base shrink-0">
                             {app.name.substring(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
@@ -220,10 +214,7 @@ function EmptyState({ onCreate }) {
             variants={itemVariants}
             className={`relative overflow-hidden rounded-3xl border-2 border-dashed ${uiColors.borderPrimary} ${uiColors.bgSecondary} p-10 md:p-14 text-center flex flex-col items-center`}
         >
-            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-cyan-400/10 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-purple-400/10 blur-3xl pointer-events-none" />
-
-            <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-600 flex items-center justify-center text-white shadow-2xl shadow-cyan-500/30 mb-5">
+            <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-600 flex items-center justify-center text-white mb-5">
                 <FiCode className="w-10 h-10" />
             </div>
 
@@ -250,7 +241,7 @@ function EmptyState({ onCreate }) {
 
             <button
                 onClick={onCreate}
-                className={`relative flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-white ${uiColors.accentPrimaryGradient} shadow-xl shadow-cyan-500/25`}
+                className={`relative flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-white ${uiColors.accentPrimaryGradient}`}
             >
                 <FiPlus className="w-5 h-5" />
                 Create your first project
