@@ -123,7 +123,7 @@ export async function POST(request) {
 
     // Generate interview magic link
     const interviewLinkId = nanoid(12);
-    const interviewMagicLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/interview/${interviewLinkId}`;
+    const interviewMagicLink = `${process.env.NEXT_PUBLIC_BASE_URL}/interview/${interviewLinkId}`;
 
     // Create interview link
     const [interviewLink] = await db.insert(interviewLinks).values({
@@ -135,7 +135,7 @@ export async function POST(request) {
     }).returning();
 
     // Generate registration magic link (uses same ID as interview link)
-    const registrationMagicLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/candidate/${interviewLinkId}`;
+    const registrationMagicLink = `${process.env.NEXT_PUBLIC_BASE_URL}/candidate/${interviewLinkId}`;
 
     // Return success response with all data needed for frontend
     return NextResponse.json({
