@@ -5,7 +5,6 @@ import React, { useState, useEffect } from 'react';
 import {
     FiRefreshCw,
     FiSearch,
-    FiFilter,
     FiPlus,
     FiHelpCircle
 } from 'react-icons/fi';
@@ -108,15 +107,12 @@ function CallAgentsMainPage() {
             {/* Header Bar */}
             <div className={`flex flex-col md:flex-row items-center justify-between mb-6 p-2 rounded-lg ${uiAccentClasses.bgPrimary} shadow-sm ${uiAccentClasses.borderColor} border space-y-4 md:space-y-0`}>
 
-                {/* Left side: Tabs & Refresh */}
+                {/* Left side: Tab & Refresh */}
                 <div className="flex items-center space-x-4">
-                    {/* Tabs */}
+                    {/* Tab */}
                     <div className={`flex rounded-md overflow-hidden border ${uiAccentClasses.borderColor}`}>
                         <button className={`px-4 py-2 text-sm font-medium transition-colors ${uiAccentClasses.activeTabBg} ${uiAccentClasses.activeTabText}`}>
                             Agents
-                        </button>
-                        <button className={`px-4 py-2 text-sm font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300`}>
-                            Teams
                         </button>
                     </div>
                     {/* Refresh Button - Now correctly calls loadAgents */}
@@ -143,10 +139,6 @@ function CallAgentsMainPage() {
                              disabled={isLoadingAgents}
                         />
                     </div>
-                    {/* Filter Button */}
-                    <button className={`p-2 rounded-md transition-colors ${uiAccentClasses.hoverBgSubtle} flex-shrink-0`}>
-                        <FiFilter className="text-gray-600 dark:text-gray-300" />
-                    </button>
                     {/* Create Agent Button */}
                     <button
                         className={`inline-flex items-center text-sm font-semibold px-4 py-2 rounded-md shadow ${accentButtonClasses} flex-shrink-0`}
