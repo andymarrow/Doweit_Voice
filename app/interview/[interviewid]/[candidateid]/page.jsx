@@ -115,6 +115,10 @@ export default function InterviewPage({ params }) {
     const streamRef = useRef(null);
     const vapiRef = useRef(null);
     const screenshotIntervals = useRef([]);
+    // Latch so the post-interview finalize (save transcript + setStep) runs
+    // exactly once whether it was triggered by the manual "End" button or by
+    // the agent auto-closing the call via the end-phrase watcher.
+    const endProcessedRef = useRef(false);
 
     // 1. Load Interview Data (REAL API)
     useEffect(() => {
@@ -238,6 +242,20 @@ export default function InterviewPage({ params }) {
             screenshotIntervals.current.forEach(clearTimeout);
         };
     }, []);
+
+    // 4. Auto-close finalize. When the agent itself hangs up the call via the
+    // end-phrase watcher in vapi.jsx / gemini.jsx, callStatus flips to "ended"
+    // without anyone clicking the manual button. We still need to POST the
+    // transcript and move to the success screen — otherwise the recruiter's
+    // "Get Results" stays empty because interviewTaken was never flipped on
+    // the candidate row.
+    useEffect(() => {
+        if (activeInterview.callStatus !== 'ended') return;
+        if (step !== 'session') return;
+        if (endProcessedRef.current) return;
+        finalizeInterview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeInterview.callStatus, step]);
 
     // --- HANDLERS ---
 
@@ -473,10 +491,16 @@ const handleSendChat = () => {
     if (ok !== false) setChatInput('');
 };
 
-const endInterview = async () => {
-    try {
-        await activeInterview.stopInterview();
+// Save the transcript, mark interviewTaken=true on the candidate row (which
+// is what /api/recruiter/getCandidateResults reads to score and analyze),
+// then move the candidate to the completion screen. Runs at most once per
+// interview thanks to endProcessedRef — both the manual "End" button and the
+// agent auto-close end-phrase watcher route through here.
+const finalizeInterview = async ({ showToast = true } = {}) => {
+    if (endProcessedRef.current) return;
+    endProcessedRef.current = true;
 
+    try {
         if (activeInterview.transcript.length > 0) {
             const transcriptData = JSON.stringify(activeInterview.transcript);
 
@@ -485,21 +509,31 @@ const endInterview = async () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     candidateId: candidateid,
-                    interviewData: transcriptData
-                })
+                    interviewData: transcriptData,
+                    transcript: activeInterview.transcript,
+                }),
             });
 
             if (response.ok) {
                 console.log('Interview transcript saved successfully');
-                toast.success('Interview completed successfully!');
+                if (showToast) toast.success('Interview completed successfully!');
             } else {
                 console.error('Failed to save interview transcript');
-                toast.error('Failed to save interview data');
+                if (showToast) toast.error('Failed to save interview data');
             }
         }
 
         setStep('completed');
+    } catch (error) {
+        console.error('Error finalizing interview:', error);
+        if (showToast) toast.error('Error finalizing interview');
+    }
+};
 
+const endInterview = async () => {
+    try {
+        await activeInterview.stopInterview();
+        await finalizeInterview();
     } catch (error) {
         console.error('Error ending interview:', error);
         toast.error('Error ending interview');
