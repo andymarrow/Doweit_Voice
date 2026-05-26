@@ -104,7 +104,7 @@ export default function App() {
       <main>
 
         {/* ── 3D Robot ─────────────────────────── KEEP ── */}
-        <section id="hero" className="py-12 px-6">
+        <section id="hero" className="py-12 px-6 pt-24">
           <div className="max-w-7xl mx-auto">
             <SplineSceneBasic />
           </div>
