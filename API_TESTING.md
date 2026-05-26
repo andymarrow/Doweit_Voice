@@ -743,63 +743,122 @@ should now succeed.
 
 ## 7. Marketplace (publish / browse / clone AI agents)
 
-### 7.1 List marketplace agents
+The marketplace is built on **job positions** (the same `jobPositions` table
+the recruiter uses) — any position whose `accessType` starts with `"Public"`
+shows up here. There is no `/api/marketplace` root; the real endpoint is
+`/api/marketplace/positions`.
+
+### 7.1 List marketplace listings
 
 | Field | Value |
 |---|---|
 | Method | `GET` |
-| URL | `{{baseUrl}}/api/marketplace` |
+| URL | `{{baseUrl}}/api/marketplace/positions` |
 
-**Expected** — `200 OK`, array of marketplace listings each with `id`,
-`title`, `price`, `accessType`, `recruiterId`.
+**Optional query** — add `?q=engineer` to filter by title / department.
+
+**Expected** — `200 OK`, JSON array of listing rows. Each row contains:
+```json
+{
+  "id": "abc123def4567",
+  "title": "Senior Frontend Engineer",
+  "department": "Engineering",
+  "description": "…",
+  "location": "Remote",
+  "employment_type": "full-time",
+  "language": "English",
+  "required_experience": "senior",
+  "duration": 30,
+  "question_count": 5,
+  "price": 50,
+  "access_type": "Public (Anyone)",
+  "status": "active",
+  "user_id": "<seller user id>",
+  "seller_name": "Jane Doe",
+  "seller_email": "jane@example.com",
+  "created_at": "2026-05-26T10:00:00Z"
+}
+```
+
+**Save** one `id` value as `{{listingId}}` for 7.3 and 7.5.
 
 ---
 
-### 7.2 Publish an agent to the marketplace
+### 7.2 Publish a position to the marketplace
+
+The "publish" action is just flipping `accessType` to a `"Public …"` value on
+an existing position. Use the recruiter PATCH route to do it:
 
 | Field | Value |
 |---|---|
 | Method | `PATCH` |
-| URL | `{{baseUrl}}/api/callagents/{{agentId}}/config` |
-| Headers | `Content-Type: application/json` + `Origin: {{baseUrl}}` |
+| URL | `{{baseUrl}}/api/recruiter/createInterview` |
+| Headers | `Content-Type: application/json` |
 
 **Body**
 ```json
 {
-  "marketplaceConfig": {
-    "isPublished": true,
-    "title": "Customer Support Bot — Telecom",
-    "category": "Customer Support",
-    "price": 50,
-    "description": "Pre-tuned for tier-1 telecom support."
-  }
+  "positionId": "{{positionId}}",
+  "accessType": "Public (Anyone)",
+  "price": 50,
+  "status": "active"
 }
 ```
 
-**Expected** — `200 OK`. Re-run 7.1 and verify the new listing appears.
+**Expected** — `200 OK`, returned `data.accessType` is `"Public (Anyone)"`.
+Re-run 7.1 — the position now appears in the array.
 
 ---
 
-### 7.3 Buy / clone a marketplace agent
+### 7.3 Buy / clone a marketplace listing (as a trainee)
 
 | Field | Value |
 |---|---|
 | Method | `POST` |
-| URL | `{{baseUrl}}/api/marketplace/buy` |
-| Headers | `Content-Type: application/json` + `Origin: {{baseUrl}}` |
+| URL | `{{baseUrl}}/api/marketplace/positions/{{listingId}}/buy` |
+| Headers | `Content-Type: application/json` |
 
 **Body**
 ```json
-{ "agentId": "REPLACE_WITH_LISTING_INTEGER_ID" }
+{ "buyerType": "trainee" }
 ```
 
-**Expected** — `200 OK`, body returns the **cloned** agent (`{ id, publicId,
-type: "trainee_clone", … }`). Caller's `users.credits` should be debited by
-the listing price.
+**Expected** — `200 OK`, body contains the cloned trainee interview record
+(rows in `trainee_interviews`). Two `token_transactions` rows are written
+(debit on buyer, credit on seller); buyer's `token_balance` is debited by
+the listing `price`, seller's is credited.
+
+**Recruiter clone variant** — same URL, send `{ "buyerType": "recruiter" }`
+to clone the position into the caller's own `job_positions` as a fresh
+draft they own.
+
+**Failure cases**
+- Buying your own listing → `400 { "error": "You can't buy your own listing" }`.
+- Insufficient balance → `402` (or `400` with `"Insufficient tokens"`).
+- Listing not `Public …` → `403 Forbidden`.
 
 ---
 
-### 7.4 Marketplace dashboard (recruiter side)
+### 7.4 Rate a marketplace listing
+
+| Field | Value |
+|---|---|
+| Method | `POST` |
+| URL | `{{baseUrl}}/api/marketplace/positions/{{listingId}}/rate` |
+| Headers | `Content-Type: application/json` |
+
+**Body**
+```json
+{ "rating": 5 }
+```
+
+**Expected** — `200 OK`. Re-run 7.1 — the listing's average rating field now
+reflects your vote. The route is self-healing — first call will auto-create
+the `position_ratings` table if a fresh DB hasn't been pushed yet.
+
+---
+
+### 7.5 Marketplace dashboard (recruiter side)
 
 | Field | Value |
 |---|---|
@@ -811,7 +870,7 @@ the listing price.
 
 ---
 
-### 7.5 Recent recruiter activity
+### 7.6 Recent recruiter activity
 
 | Field | Value |
 |---|---|
@@ -836,6 +895,7 @@ Create one environment per test run with:
 | `candidatePublicId` | `<publicId from 5.4>` |
 | `sdkKey` | `dw_pub_<…>` |
 | `callId` | `<calls.id you want to analyze>` |
+| `listingId` | `<id from 7.1 — a public job_positions row>` |
 
 For screenshots in your report, capture for each request:
 1. The **request** pane (URL + method + body)

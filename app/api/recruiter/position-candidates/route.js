@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq, and, sql } from 'drizzle-orm';
 import { candidateApplications, jobPositions } from '@/lib/db/schemaCharacterAI';
 import { auth } from '@/lib/auth';
 
@@ -19,12 +19,19 @@ export async function GET(request) {
       return NextResponse.json({ error: 'positionId is required' }, { status: 400 });
     }
 
+    // Ownership check accepts either attribution column (matches the
+    // recruiter dashboard route). Filtering on userId alone hid legacy
+    // positions whose ownership lives in recruiter_id.
+    //
     // NOTE: must project 2+ columns. Drizzle's neon-http driver silently
     // returns [] for single-column projections.
     const [position] = await db
       .select({ id: jobPositions.id, userId: jobPositions.userId })
       .from(jobPositions)
-      .where(and(eq(jobPositions.id, positionId), eq(jobPositions.userId, userId)));
+      .where(and(
+        eq(jobPositions.id, positionId),
+        sql`(${jobPositions.userId} = ${userId} OR ${jobPositions.recruiterId} = ${userId})`,
+      ));
 
     if (!position) {
       return NextResponse.json({ error: 'Position not found' }, { status: 404 });

@@ -1,9 +1,11 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/database';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 import { jobPositions, interviewLinks } from '@/lib/db/schemaCharacterAI';
 import { auth } from '@/lib/auth';
+
+const rowsOf = (r) => r?.rows ?? r ?? [];
 
 export async function GET(request) {
   try {
@@ -13,36 +15,40 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Fetch all positions for the current user
-    const positions = await db
-      .select({
-        id: jobPositions.id,
-        title: jobPositions.title,
-        department: jobPositions.department,
-        description: jobPositions.description,
-        location: jobPositions.location,
-        employmentType: jobPositions.employmentType,
-        language: jobPositions.language,
-        duration: jobPositions.duration,
-        questionCount: jobPositions.questionCount,
-        status: jobPositions.status,
-        accessType: jobPositions.accessType,
-        requiredExperience: jobPositions.requiredExperience,
-        jobPosition: jobPositions.jobPosition,
-        voiceProvider: jobPositions.voiceProvider,
-        tone: jobPositions.tone,
-        antiCheatEnabled: jobPositions.antiCheatEnabled,
-        evaluationCriteria: jobPositions.evaluationCriteria,
-        startDate: jobPositions.startDate,
-        endDate: jobPositions.endDate,
-        registrationStartDate: jobPositions.registrationStartDate,
-        registrationEndDate: jobPositions.registrationEndDate,
-        price: jobPositions.price,
-        createdAt: jobPositions.createdAt,
-      })
-      .from(jobPositions)
-      .where(eq(jobPositions.userId, userId))
-      .orderBy(desc(jobPositions.createdAt));
+    // Raw SQL (same fix pattern as the dashboard / createInterview / applications
+    // routes). Drizzle's neon-http driver silently returns [] for many-column
+    // projection + .where() + .orderBy(). Ownership predicate also widened to
+    // accept either user_id or recruiter_id for legacy rows.
+    const positionsResult = await db.execute(sql`
+      SELECT
+        id,
+        title,
+        department,
+        description,
+        location,
+        employment_type           AS "employmentType",
+        language,
+        duration,
+        question_count            AS "questionCount",
+        status,
+        access_type               AS "accessType",
+        required_experience       AS "requiredExperience",
+        job_position              AS "jobPosition",
+        voice_provider            AS "voiceProvider",
+        tone,
+        anti_cheat_enabled        AS "antiCheatEnabled",
+        evaluation_criteria       AS "evaluationCriteria",
+        start_date                AS "startDate",
+        end_date                  AS "endDate",
+        registration_start_date   AS "registrationStartDate",
+        registration_end_date     AS "registrationEndDate",
+        price,
+        created_at                AS "createdAt"
+      FROM job_positions
+      WHERE user_id = ${userId} OR recruiter_id = ${userId}
+      ORDER BY created_at DESC
+    `);
+    const positions = rowsOf(positionsResult);
 
     if (positions.length === 0) {
       return NextResponse.json({ positions: [] });

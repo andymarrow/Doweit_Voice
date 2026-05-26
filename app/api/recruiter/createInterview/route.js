@@ -14,7 +14,7 @@ function generateSecureId() {
   }
   return result;
 }
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 
 // Build the public-facing app URL the candidate's interview link points at.
 // Same logic as send-interview-emails: try known env vars, fall back to the
@@ -185,15 +185,28 @@ export async function POST(request) {
 }
 
 // GET - Fetch interview positions
+//
+// Uses raw SQL (sql`…`) instead of Drizzle's column-projection builder. The
+// neon-http driver silently returns [] for a many-column projection chained
+// with .where() + .orderBy(), which was the root cause of the recruiter
+// dashboard showing zero positions even when rows existed.
+//
+// Ownership predicate matches the recruiter dashboard route: `user_id = X
+// OR recruiter_id = X`. Some older rows have attribution split across the
+// two columns; filtering on user_id alone hid them from the recruiter that
+// actually owns them.
+
+function rowsOf(r) { return r?.rows ?? r ?? []; }
+
 export async function GET(request) {
   try {
     // Get user session first
     const session = await auth.api.getSession({
       headers: request.headers
     });
-    
+
     const userId = session?.user?.id;
-    
+
     if (!userId) {
       return NextResponse.json(
         { error: 'User not authenticated' },
@@ -205,49 +218,52 @@ export async function GET(request) {
     const recruiterId = searchParams.get('recruiterId');
     const status = searchParams.get('status');
     const positionId = searchParams.get('positionId');
-    const requestUserId = searchParams.get('userId');
-    
-    
+
+    const POSITION_COLUMNS = sql`
+      id,
+      title,
+      department,
+      description,
+      evaluation_description    AS "evaluationDescription",
+      location,
+      employment_type           AS "employmentType",
+      start_date                AS "startDate",
+      end_date                  AS "endDate",
+      registration_start_date   AS "registrationStartDate",
+      registration_end_date     AS "registrationEndDate",
+      job_position              AS "jobPosition",
+      required_experience       AS "requiredExperience",
+      question_count            AS "questionCount",
+      duration,
+      anti_cheat_enabled        AS "antiCheatEnabled",
+      ai_questions              AS "aiQuestions",
+      voice_provider            AS "voiceProvider",
+      voice_id                  AS "voiceId",
+      system_prompt             AS "systemPrompt",
+      agent_name                AS "agentName",
+      tone,
+      price,
+      access_type               AS "accessType",
+      status,
+      evaluation_criteria       AS "evaluationCriteria",
+      candidate_evaluation      AS "candidateEvaluation",
+      language,
+      created_at                AS "createdAt",
+      updated_at                AS "updatedAt",
+      recruiter_id              AS "recruiterId",
+      user_id                   AS "userId"
+    `;
+
     // If positionId is provided, fetch specific position
     if (positionId) {
-      const [position] = await db.select({
-        id: jobPositions.id,
-        title: jobPositions.title,
-        department: jobPositions.department,
-        description: jobPositions.description,
-        evaluationDescription: jobPositions.evaluationDescription,
-        location: jobPositions.location,
-        employmentType: jobPositions.employmentType,
-        startDate: jobPositions.startDate,
-        endDate: jobPositions.endDate,
-        registrationStartDate: jobPositions.registrationStartDate,
-        registrationEndDate: jobPositions.registrationEndDate,
-        jobPosition: jobPositions.jobPosition,
-        requiredExperience: jobPositions.requiredExperience,
-        questionCount: jobPositions.questionCount,
-        duration: jobPositions.duration,
-        antiCheatEnabled: jobPositions.antiCheatEnabled,
-        aiQuestions: jobPositions.aiQuestions,
-        voiceProvider: jobPositions.voiceProvider,
-        voiceId: jobPositions.voiceId,
-        systemPrompt: jobPositions.systemPrompt,
-        agentName: jobPositions.agentName,
-        tone: jobPositions.tone,
-        price: jobPositions.price,
-        accessType: jobPositions.accessType,
-        status: jobPositions.status,
-        evaluationCriteria: jobPositions.evaluationCriteria,
-        candidateEvaluation: jobPositions.candidateEvaluation,
-        language: jobPositions.language,
-        createdAt: jobPositions.createdAt,
-        updatedAt: jobPositions.updatedAt,
-        recruiterId: jobPositions.recruiterId,
-        userId: jobPositions.userId
-      }).from(jobPositions)
-        .where(and(
-          eq(jobPositions.id, positionId),
-          eq(jobPositions.userId, userId) // Only return positions owned by current user
-        ));
+      const result = await db.execute(sql`
+        SELECT ${POSITION_COLUMNS}
+        FROM job_positions
+        WHERE id = ${positionId}
+          AND (user_id = ${userId} OR recruiter_id = ${userId})
+        LIMIT 1
+      `);
+      const position = rowsOf(result)[0];
 
       if (!position) {
         return NextResponse.json(
@@ -262,61 +278,28 @@ export async function GET(request) {
       });
     }
 
-    // Fetch all positions for the current user
-    let query = db.select({
-      id: jobPositions.id,
-      title: jobPositions.title,
-      department: jobPositions.department,
-      description: jobPositions.description,
-      evaluationDescription: jobPositions.evaluationDescription,
-      location: jobPositions.location,
-      employmentType: jobPositions.employmentType,
-      startDate: jobPositions.startDate,
-      endDate: jobPositions.endDate,
-      registrationStartDate: jobPositions.registrationStartDate,
-      registrationEndDate: jobPositions.registrationEndDate,
-      jobPosition: jobPositions.jobPosition,
-      requiredExperience: jobPositions.requiredExperience,
-      questionCount: jobPositions.questionCount,
-      duration: jobPositions.duration,
-      antiCheatEnabled: jobPositions.antiCheatEnabled,
-      aiQuestions: jobPositions.aiQuestions,
-      voiceProvider: jobPositions.voiceProvider,
-      voiceId: jobPositions.voiceId,
-      systemPrompt: jobPositions.systemPrompt,
-      agentName: jobPositions.agentName,
-      tone: jobPositions.tone,
-      price: jobPositions.price,
-      accessType: jobPositions.accessType,
-      status: jobPositions.status,
-      evaluationCriteria: jobPositions.evaluationCriteria,
-      candidateEvaluation: jobPositions.candidateEvaluation,
-      language: jobPositions.language,
-      createdAt: jobPositions.createdAt,
-      updatedAt: jobPositions.updatedAt,
-      recruiterId: jobPositions.recruiterId,
-      userId: jobPositions.userId
-    }).from(jobPositions);
+    // Fetch all positions owned by the current user (via either attribution
+    // column), optionally narrowed by recruiterId / status filter.
+    const ownership = sql`(user_id = ${userId} OR recruiter_id = ${userId})`;
+    const recruiterFilter = recruiterId
+      ? sql`AND recruiter_id = ${recruiterId}`
+      : sql``;
+    const statusFilter = status
+      ? sql`AND status = ${status}`
+      : sql``;
 
-    // Apply filters - always filter by current user's userId
-    const conditions = [eq(jobPositions.userId, userId)];
-    
-    if (recruiterId) {
-      conditions.push(eq(jobPositions.recruiterId, recruiterId));
-    }
-    if (status) {
-      conditions.push(eq(jobPositions.status, status));
-    }
-
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-    const positions = await query.orderBy(desc(jobPositions.createdAt));
+    const result = await db.execute(sql`
+      SELECT ${POSITION_COLUMNS}
+      FROM job_positions
+      WHERE ${ownership}
+      ${recruiterFilter}
+      ${statusFilter}
+      ORDER BY created_at DESC
+    `);
 
     return NextResponse.json({
       success: true,
-      data: positions
+      data: rowsOf(result)
     });
 
   } catch (error) {
@@ -355,14 +338,16 @@ export async function DELETE(request) {
       );
     }
 
-    // Delete the interview position
+    // Delete the interview position. Accept either attribution column —
+    // some legacy rows have user_id null but recruiter_id set, and the
+    // strict user_id-only check was rejecting the rightful owner.
     const deletedPosition = await db
       .delete(jobPositions)
       .where(
         and(
           eq(jobPositions.id, positionId),
-          eq(jobPositions.userId, userId) // Only allow deletion by position owner
-        )
+          sql`(user_id = ${userId} OR recruiter_id = ${userId})`,
+        ),
       )
       .returning();
 
@@ -457,7 +442,9 @@ export async function PATCH(request) {
       .where(
         and(
           eq(jobPositions.id, positionId),
-          eq(jobPositions.userId, userId),
+          // Same widened ownership check as GET / DELETE — accept either
+          // attribution column so legacy rows still patch correctly.
+          sql`(user_id = ${userId} OR recruiter_id = ${userId})`,
         ),
       )
       .returning();
